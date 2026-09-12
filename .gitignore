@@ -2,8 +2,9 @@
 docs/The-Embedders-Dilemma-2026/
 docs/The-Embedders-Dilemma-2026.pdf
 
-# Data and model caches
-data/
+# Data and model caches (benchmark datasets in data/tasks ARE tracked)
+data/*
+!data/tasks/
 *.tar.gz
 
 # Python

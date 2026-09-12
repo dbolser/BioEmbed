@@ -1,0 +1,46 @@
+{
+  "name": "GOProteinPairCls",
+  "category": "PairClassification",
+  "sizes": {
+    "test": 500,
+    "positives": 250,
+    "negatives": 250
+  },
+  "provenance": {
+    "source": "/outsee5/home/danbolser/Work/IUK-IPF/data/embeddings-catalogue/records/*.parquet",
+    "record_types": {
+      "proteins": [
+        "uniprot_human",
+        "uniprot_protein"
+      ],
+      "go_terms": [
+        "go_term"
+      ]
+    },
+    "go_hierarchy": "is_a edges from go_term record metadata (no .obo parsing needed)",
+    "seed": 42,
+    "build_script": "scripts/build_tier_c_pairs.py"
+  },
+  "protocol": {
+    "sentence1": "GO term 'name: definition'",
+    "sentence2": "UniProt Function section, FUNCTION: markers and {ECO:...} evidence tags stripped",
+    "protein_pool": "reviewed proteins, cleaned function text >= 200 chars, >= 3 GO annotations resolvable to defined GO terms (alt_ids mapped to primary)",
+    "term_pool": "GO terms with a definition and >= 1 is_a parent that is not a namespace root (biases sampling away from top-level terms); applied to positives and negatives alike",
+    "positives": "250 (protein, term) pairs sampled uniformly from actual annotations, <= 2 positives per protein",
+    "negatives": "250 terms sampled for the same proteins, excluding each protein's annotated terms and their full is_a ancestor closure (hierarchy-aware, avoids false negatives), namespace distribution matched to positives; <= 2 negatives per protein",
+    "constraints": "no protein > 4 appearances total; no duplicate (protein, term) pairs",
+    "ancestor_closure": "transitive closure over is_a edges only, memoised DFS, cycle-safe; term itself plus all is_a ancestors excluded when drawing negatives",
+    "namespace_distribution": {
+      "positives": {
+        "biological_process": 127,
+        "cellular_component": 75,
+        "molecular_function": 48
+      },
+      "negatives": {
+        "biological_process": 127,
+        "cellular_component": 75,
+        "molecular_function": 48
+      }
+    }
+  }
+}
