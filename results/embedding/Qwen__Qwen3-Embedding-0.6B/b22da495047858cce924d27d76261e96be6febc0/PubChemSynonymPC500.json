@@ -1,0 +1,49 @@
+{
+  "dataset_revision": "local",
+  "task_name": "PubChemSynonymPC500",
+  "mteb_version": "2.11.6",
+  "scores": {
+    "test": [
+      {
+        "similarity_accuracy": 0.954,
+        "similarity_f1": 0.716049,
+        "similarity_precision": 0.935484,
+        "similarity_recall": 0.58,
+        "similarity_ap": 0.701413,
+        "cosine_accuracy": 0.954,
+        "cosine_f1": 0.716049,
+        "cosine_precision": 0.935484,
+        "cosine_recall": 0.58,
+        "cosine_ap": 0.701413,
+        "manhattan_accuracy": 0.954,
+        "manhattan_f1": 0.716049,
+        "manhattan_precision": 0.935484,
+        "manhattan_recall": 0.58,
+        "manhattan_ap": 0.703716,
+        "euclidean_accuracy": 0.954,
+        "euclidean_f1": 0.716049,
+        "euclidean_precision": 0.935484,
+        "euclidean_recall": 0.58,
+        "euclidean_ap": 0.701731,
+        "dot_accuracy": 0.954,
+        "dot_f1": 0.716049,
+        "dot_precision": 0.935484,
+        "dot_recall": 0.58,
+        "dot_ap": 0.701394,
+        "max_accuracy": 0.954,
+        "max_f1": 0.716049,
+        "max_precision": 0.935484,
+        "max_recall": 0.58,
+        "max_ap": 0.703716,
+        "main_score": 0.703716,
+        "hf_subset": "default",
+        "languages": [
+          "eng-Latn"
+        ]
+      }
+    ]
+  },
+  "evaluation_time": 57.765220403671265,
+  "kg_co2_emissions": null,
+  "date": null
+}
