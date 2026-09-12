@@ -9,6 +9,7 @@ sentence-transformers/all-MiniLM-L6-v2,LLMPublicHealthQA,30881
 sentence-transformers/all-MiniLM-L6-v2,BioMeSHClassification,821393
 sentence-transformers/all-MiniLM-L6-v2,PubChemSynonymPC500,14819
 sentence-transformers/all-MiniLM-L6-v2,R2MEDBiologyPooled,245575
+sentence-transformers/all-MiniLM-L6-v2,GOPubMedRetrieval,108074
 sentence-transformers/all-MiniLM-L6-v2,GOProteinPairCls,167835
 BAAI/bge-small-en-v1.5,LLMBIOSSES,7861
 BAAI/bge-small-en-v1.5,LLMSTSBenchmark,14009
@@ -20,6 +21,7 @@ BAAI/bge-small-en-v1.5,LLMPublicHealthQA,30881
 BAAI/bge-small-en-v1.5,BioMeSHClassification,821393
 BAAI/bge-small-en-v1.5,PubChemSynonymPC500,14819
 BAAI/bge-small-en-v1.5,R2MEDBiologyPooled,245575
+BAAI/bge-small-en-v1.5,GOPubMedRetrieval,108074
 BAAI/bge-small-en-v1.5,GOProteinPairCls,167835
 BAAI/bge-base-en-v1.5,LLMBIOSSES,7861
 BAAI/bge-base-en-v1.5,LLMSTSBenchmark,14009
@@ -31,6 +33,7 @@ BAAI/bge-base-en-v1.5,LLMPublicHealthQA,30881
 BAAI/bge-base-en-v1.5,BioMeSHClassification,821393
 BAAI/bge-base-en-v1.5,PubChemSynonymPC500,14819
 BAAI/bge-base-en-v1.5,R2MEDBiologyPooled,245575
+BAAI/bge-base-en-v1.5,GOPubMedRetrieval,108074
 BAAI/bge-base-en-v1.5,GOProteinPairCls,167835
 BAAI/bge-large-en-v1.5,LLMBIOSSES,7861
 BAAI/bge-large-en-v1.5,LLMSTSBenchmark,14009
@@ -42,6 +45,7 @@ BAAI/bge-large-en-v1.5,LLMPublicHealthQA,30881
 BAAI/bge-large-en-v1.5,BioMeSHClassification,821393
 BAAI/bge-large-en-v1.5,PubChemSynonymPC500,14819
 BAAI/bge-large-en-v1.5,R2MEDBiologyPooled,245575
+BAAI/bge-large-en-v1.5,GOPubMedRetrieval,108074
 BAAI/bge-large-en-v1.5,GOProteinPairCls,167835
 intfloat/multilingual-e5-small,LLMBIOSSES,8667
 intfloat/multilingual-e5-small,LLMSTSBenchmark,15430
@@ -53,6 +57,7 @@ intfloat/multilingual-e5-small,LLMPublicHealthQA,33511
 intfloat/multilingual-e5-small,BioMeSHClassification,899377
 intfloat/multilingual-e5-small,PubChemSynonymPC500,13503
 intfloat/multilingual-e5-small,R2MEDBiologyPooled,276114
+intfloat/multilingual-e5-small,GOPubMedRetrieval,118418
 intfloat/multilingual-e5-small,GOProteinPairCls,178762
 Snowflake/snowflake-arctic-embed-l-v2.0,LLMBIOSSES,8667
 Snowflake/snowflake-arctic-embed-l-v2.0,LLMSTSBenchmark,15430
@@ -64,6 +69,7 @@ Snowflake/snowflake-arctic-embed-l-v2.0,LLMPublicHealthQA,33511
 Snowflake/snowflake-arctic-embed-l-v2.0,BioMeSHClassification,899377
 Snowflake/snowflake-arctic-embed-l-v2.0,PubChemSynonymPC500,13503
 Snowflake/snowflake-arctic-embed-l-v2.0,R2MEDBiologyPooled,276114
+Snowflake/snowflake-arctic-embed-l-v2.0,GOPubMedRetrieval,118418
 Snowflake/snowflake-arctic-embed-l-v2.0,GOProteinPairCls,178762
 Qwen/Qwen3-Embedding-0.6B,LLMBIOSSES,7549
 Qwen/Qwen3-Embedding-0.6B,LLMSTSBenchmark,13319
@@ -75,6 +81,7 @@ Qwen/Qwen3-Embedding-0.6B,LLMPublicHealthQA,30444
 Qwen/Qwen3-Embedding-0.6B,BioMeSHClassification,808263
 Qwen/Qwen3-Embedding-0.6B,PubChemSynonymPC500,13051
 Qwen/Qwen3-Embedding-0.6B,R2MEDBiologyPooled,242469
+Qwen/Qwen3-Embedding-0.6B,GOPubMedRetrieval,102756
 Qwen/Qwen3-Embedding-0.6B,GOProteinPairCls,162705
 Qwen/Qwen3-Embedding-4B,LLMBIOSSES,7549
 Qwen/Qwen3-Embedding-4B,LLMSTSBenchmark,13319
@@ -86,6 +93,7 @@ Qwen/Qwen3-Embedding-4B,LLMPublicHealthQA,30444
 Qwen/Qwen3-Embedding-4B,BioMeSHClassification,808263
 Qwen/Qwen3-Embedding-4B,PubChemSynonymPC500,13051
 Qwen/Qwen3-Embedding-4B,R2MEDBiologyPooled,242469
+Qwen/Qwen3-Embedding-4B,GOPubMedRetrieval,102756
 Qwen/Qwen3-Embedding-4B,GOProteinPairCls,162705
 Qwen/Qwen3-Embedding-8B,LLMBIOSSES,7549
 Qwen/Qwen3-Embedding-8B,LLMSTSBenchmark,13319
@@ -97,6 +105,7 @@ Qwen/Qwen3-Embedding-8B,LLMPublicHealthQA,30444
 Qwen/Qwen3-Embedding-8B,BioMeSHClassification,808263
 Qwen/Qwen3-Embedding-8B,PubChemSynonymPC500,13051
 Qwen/Qwen3-Embedding-8B,R2MEDBiologyPooled,242469
+Qwen/Qwen3-Embedding-8B,GOPubMedRetrieval,102756
 Qwen/Qwen3-Embedding-8B,GOProteinPairCls,162705
 NeuML/pubmedbert-base-embeddings,LLMBIOSSES,6499
 NeuML/pubmedbert-base-embeddings,LLMSTSBenchmark,15439
@@ -108,6 +117,7 @@ NeuML/pubmedbert-base-embeddings,LLMPublicHealthQA,30715
 NeuML/pubmedbert-base-embeddings,BioMeSHClassification,702341
 NeuML/pubmedbert-base-embeddings,PubChemSynonymPC500,12386
 NeuML/pubmedbert-base-embeddings,R2MEDBiologyPooled,227662
+NeuML/pubmedbert-base-embeddings,GOPubMedRetrieval,87720
 NeuML/pubmedbert-base-embeddings,GOProteinPairCls,133346
 ncbi/MedCPT-Query-Encoder,LLMBIOSSES,6499
 ncbi/MedCPT-Query-Encoder,LLMSTSBenchmark,15439
@@ -119,6 +129,7 @@ ncbi/MedCPT-Query-Encoder,LLMPublicHealthQA,30715
 ncbi/MedCPT-Query-Encoder,BioMeSHClassification,702341
 ncbi/MedCPT-Query-Encoder,PubChemSynonymPC500,12386
 ncbi/MedCPT-Query-Encoder,R2MEDBiologyPooled,227662
+ncbi/MedCPT-Query-Encoder,GOPubMedRetrieval,87720
 ncbi/MedCPT-Query-Encoder,GOProteinPairCls,133346
 abhinand/MedEmbed-small-v0.1,LLMBIOSSES,7861
 abhinand/MedEmbed-small-v0.1,LLMSTSBenchmark,14009
@@ -130,6 +141,7 @@ abhinand/MedEmbed-small-v0.1,LLMPublicHealthQA,30881
 abhinand/MedEmbed-small-v0.1,BioMeSHClassification,821393
 abhinand/MedEmbed-small-v0.1,PubChemSynonymPC500,14819
 abhinand/MedEmbed-small-v0.1,R2MEDBiologyPooled,245575
+abhinand/MedEmbed-small-v0.1,GOPubMedRetrieval,108074
 abhinand/MedEmbed-small-v0.1,GOProteinPairCls,167835
 abhinand/MedEmbed-base-v0.1,LLMBIOSSES,7861
 abhinand/MedEmbed-base-v0.1,LLMSTSBenchmark,14009
@@ -141,6 +153,7 @@ abhinand/MedEmbed-base-v0.1,LLMPublicHealthQA,30881
 abhinand/MedEmbed-base-v0.1,BioMeSHClassification,821393
 abhinand/MedEmbed-base-v0.1,PubChemSynonymPC500,14819
 abhinand/MedEmbed-base-v0.1,R2MEDBiologyPooled,245575
+abhinand/MedEmbed-base-v0.1,GOPubMedRetrieval,108074
 abhinand/MedEmbed-base-v0.1,GOProteinPairCls,167835
 abhinand/MedEmbed-large-v0.1,LLMBIOSSES,7861
 abhinand/MedEmbed-large-v0.1,LLMSTSBenchmark,14009
@@ -152,6 +165,7 @@ abhinand/MedEmbed-large-v0.1,LLMPublicHealthQA,30881
 abhinand/MedEmbed-large-v0.1,BioMeSHClassification,821393
 abhinand/MedEmbed-large-v0.1,PubChemSynonymPC500,14819
 abhinand/MedEmbed-large-v0.1,R2MEDBiologyPooled,245575
+abhinand/MedEmbed-large-v0.1,GOPubMedRetrieval,108074
 abhinand/MedEmbed-large-v0.1,GOProteinPairCls,167835
 FremyCompany/BioLORD-2023,LLMBIOSSES,7861
 FremyCompany/BioLORD-2023,LLMSTSBenchmark,14009
@@ -163,4 +177,5 @@ FremyCompany/BioLORD-2023,LLMPublicHealthQA,30881
 FremyCompany/BioLORD-2023,BioMeSHClassification,821393
 FremyCompany/BioLORD-2023,PubChemSynonymPC500,14819
 FremyCompany/BioLORD-2023,R2MEDBiologyPooled,245575
+FremyCompany/BioLORD-2023,GOPubMedRetrieval,108074
 FremyCompany/BioLORD-2023,GOProteinPairCls,167835
