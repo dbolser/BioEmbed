@@ -1,0 +1,16 @@
+model,tokens,cost_usd_per_mtok,total_cost_usd,throughput_proxy
+BAAI/bge-base-en-v1.5,5573651,0.00016,0.0008917841600000001,intfloat/multilingual-e5-small
+BAAI/bge-large-en-v1.5,5573651,0.001845,0.010283386095,google/embeddinggemma-300m
+BAAI/bge-small-en-v1.5,5573651,0.00016,0.0008917841600000001,intfloat/multilingual-e5-small
+FremyCompany/BioLORD-2023,5573651,0.00016,0.0008917841600000001,intfloat/multilingual-e5-small
+NeuML/pubmedbert-base-embeddings,5581391,0.00016,0.0008930225600000001,intfloat/multilingual-e5-small
+Qwen/Qwen3-Embedding-0.6B,5445790,0.003937,0.02144007523,
+Qwen/Qwen3-Embedding-4B,5445790,0.01501,0.0817413079,
+Qwen/Qwen3-Embedding-8B,5445790,0.023637,0.12872213822999998,
+Snowflake/snowflake-arctic-embed-l-v2.0,6086634,0.00108,0.00657356472,
+abhinand/MedEmbed-base-v0.1,5573651,0.00016,0.0008917841600000001,intfloat/multilingual-e5-small
+abhinand/MedEmbed-large-v0.1,5573651,0.001845,0.010283386095,google/embeddinggemma-300m
+abhinand/MedEmbed-small-v0.1,5573651,0.00016,0.0008917841600000001,intfloat/multilingual-e5-small
+intfloat/multilingual-e5-small,6086634,0.00016,0.0009738614400000001,
+ncbi/MedCPT-Query-Encoder,5581391,0.00016,0.0008930225600000001,intfloat/multilingual-e5-small
+sentence-transformers/all-MiniLM-L6-v2,5573651,0.00016,0.0008917841600000001,intfloat/multilingual-e5-small
