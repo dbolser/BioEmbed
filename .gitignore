@@ -1,0 +1,16 @@
+# Third-party paper materials (not ours to redistribute)
+docs/The-Embedders-Dilemma-2026/
+docs/The-Embedders-Dilemma-2026.pdf
+
+# Data and model caches
+data/
+*.tar.gz
+
+# Python
+.venv/
+__pycache__/
+*.egg-info/
+dist/
+
+# Scratch
+*.log
