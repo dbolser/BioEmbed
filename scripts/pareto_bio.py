@@ -68,6 +68,69 @@ def llm_bio_costs() -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+# current OpenRouter prices per MTok (in, cache_read, out) for models we run
+OR_PRICES = {
+    "deepseek__deepseek-v4-flash": (0.066, 0.013, 0.131),
+    "qwen__qwen3.6-35b-a3b": (0.100, 0.050, 0.900),
+    "qwen3.6-35b-a3b": (0.100, 0.050, 0.900),  # paper slug for the same model
+    "google__gemini-3.1-flash-lite": (0.250, 0.025, 1.500),
+    "google__gemini-3.1-flash-lite-preview": (0.250, 0.025, 1.500),
+}
+
+
+def our_llm_task_costs() -> pd.DataFrame:
+    """Cost of OUR five tasks per LLM from measured usage at OpenRouter rates."""
+    rows = []
+    root = REPO / "results" / "llm"
+    if not root.exists():
+        return pd.DataFrame(columns=["model", "our_cost_usd", "n_our_tasks"])
+    for mdir in root.iterdir():
+        prices = OR_PRICES.get(mdir.name)
+        if prices is None:
+            continue
+        r_in, r_cache, r_out = prices
+        cost, n = 0.0, 0
+        for f in mdir.rglob("*.json"):
+            if f.name == "model_meta.json" or f.stem.endswith("_samples"):
+                continue
+            u = json.loads(f.read_text())["scores"]["test"][0].get("usage_stats")
+            if not u:
+                continue
+            fresh = u["input_tokens"] - u.get("cached_tokens", 0)
+            gen = u["total_tokens"] - u["input_tokens"]
+            cost += (fresh * r_in + u.get("cached_tokens", 0) * r_cache
+                     + gen * r_out) / 1e6
+            n += 1
+        rows.append({"model": mdir.name, "our_cost_usd": cost, "n_our_tasks": n})
+    return pd.DataFrame(rows)
+
+
+def _pareto_panel(ax, bio, title, ylab):
+    front = bio.sort_values("cost")
+    best = -1
+    fx, fy = [], []
+    for _, r in front.iterrows():
+        is_llm = r["model_type"] == "llm"
+        is_bio = r["model"] in BIO_SPECIALISTS
+        ax.scatter(r["cost"], r["bio_score"],
+                   marker="^" if is_llm else ("s" if is_bio else "o"),
+                   s=70, alpha=0.85,
+                   color="#d62728" if is_llm else ("#2ca02c" if is_bio else "#1f77b4"))
+        if r["bio_score"] > best:
+            best = r["bio_score"]
+            fx.append(r["cost"]); fy.append(r["bio_score"])
+            ax.annotate(r["model"].split("__")[-1], (r["cost"], r["bio_score"]),
+                        textcoords="offset points", xytext=(6, 4), fontsize=8)
+    ax.step(fx, fy, where="post", color="gray", lw=1, ls="--", zorder=0)
+    ax.set_xscale("log")
+    ax.set_xlabel("USD per bio-benchmark pass (log)")
+    ax.set_ylabel(ylab)
+    ax.set_title(title)
+    ax.grid(alpha=0.3)
+    return [m.split("__")[-1] for m, sc in zip(front["model"], front["bio_score"])
+            if sc in fy]
+
+
 def main() -> None:
     scores = pd.read_csv(REPO / "results" / "bio_scores.csv")
     lifted = list(LLM_FILES)
@@ -94,35 +157,44 @@ def main() -> None:
     bio = bio.dropna(subset=["cost"])
     bio.to_csv(REPO / "results" / "bio_pareto.csv", index=False)
 
-    fig, ax = plt.subplots(figsize=(9, 6))
-    for _, r in bio.iterrows():
-        is_llm = r["model_type"] == "llm"
-        is_bio = r["model"] in BIO_SPECIALISTS
-        ax.scatter(r["cost"], r["bio_score"],
-                   marker="^" if is_llm else ("s" if is_bio else "o"),
-                   s=70, alpha=0.85,
-                   color="#d62728" if is_llm else ("#2ca02c" if is_bio else "#1f77b4"))
+    # full 12-task suite panel: models with complete coverage
+    all_tasks = scores["task"].unique()
+    pivot_full = scores.pivot_table(index=["model", "model_type"],
+                                    columns="task", values="score")
+    pivot_full = pivot_full.dropna()
+    full = pivot_full.mean(axis=1).rename("bio_score").reset_index()
+    # full-suite LLM cost = lifted-task cost (paper usage, OpenRouter rates
+    # where known, else paper prices) + our-task measured cost
+    ours = our_llm_task_costs().set_index("model")
+    lifted_llm = llm_bio_costs().set_index("model")
+    full_cost = {}
+    for _, r in full.iterrows():
+        m = r["model"]
+        if r["model_type"] == "embedding":
+            if m in cost_map:
+                full_cost[m] = cost_map[m]
+        else:
+            # match our slug to the paper's slug for the lifted share
+            paper_slug = {"deepseek__deepseek-v4-flash": "deepseek__deepseek-v4-flash",
+                          "qwen__qwen3.6-35b-a3b": "qwen3.6-35b-a3b",
+                          "google__gemini-3.1-flash-lite": "google__gemini-3.1-flash-lite-preview",
+                          }.get(m, m)
+            lift = lifted_llm["bio_cost_usd"].get(paper_slug, None)
+            our = ours["our_cost_usd"].get(m, None)
+            if lift is not None and our is not None:
+                full_cost[m] = lift + our
+    full["cost"] = full["model"].map(full_cost)
+    full = full.dropna(subset=["cost"])
 
-    # Pareto frontier
-    front = bio.sort_values("cost")
-    best = -1
-    fx, fy = [], []
-    for _, r in front.iterrows():
-        if r["bio_score"] > best:
-            best = r["bio_score"]
-            fx.append(r["cost"]); fy.append(r["bio_score"])
-            short = r["model"].split("__")[-1]
-            ax.annotate(short, (r["cost"], r["bio_score"]),
-                        textcoords="offset points", xytext=(6, 4), fontsize=8)
-    ax.step(fx, fy, where="post", color="gray", lw=1, ls="--", zorder=0)
-
-    ax.set_xscale("log")
-    ax.set_xlabel("USD per bio-benchmark pass (log)")
-    ax.set_ylabel(f"BioScore (mean over {len(lifted)} lifted bio tasks)")
-    ax.set_title("The Embedder's Dilemma, biology slice — Tier A (lifted) tasks")
-    ax.grid(alpha=0.3)
+    fig, axes = plt.subplots(1, 2, figsize=(15, 6))
+    f1 = _pareto_panel(axes[0], bio,
+                       f"Tier A subset ({len(lifted)} lifted tasks, paper LLM results)",
+                       "BioScore (lifted subset)")
+    f2 = _pareto_panel(axes[1], full,
+                       f"Full BioMTEB suite ({pivot_full.shape[1]} tasks)",
+                       "BioScore (full suite)")
     from matplotlib.lines import Line2D
-    ax.legend(handles=[
+    axes[0].legend(handles=[
         Line2D([], [], marker="^", ls="", color="#d62728", label="LLM (API cost)"),
         Line2D([], [], marker="o", ls="", color="#1f77b4", label="Embedding, general"),
         Line2D([], [], marker="s", ls="", color="#2ca02c", label="Embedding, bio-specialised"),
@@ -133,9 +205,8 @@ def main() -> None:
     fig.tight_layout()
     fig.savefig(out / "bio_pareto.png", dpi=160)
     fig.savefig(out / "bio_pareto.pdf")
-    print(f"{len(bio)} models plotted; frontier: "
-          + " -> ".join(m.split('__')[-1] for m in
-                        front[front['bio_score'].isin(fy)]['model']))
+    print(f"panel A: {len(bio)} models, frontier {' -> '.join(f1)}")
+    print(f"panel B: {len(full)} models, frontier {' -> '.join(f2)}")
 
 
 if __name__ == "__main__":
