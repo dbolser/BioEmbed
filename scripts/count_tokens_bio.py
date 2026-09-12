@@ -44,7 +44,7 @@ MODELS = [
     "Snowflake/snowflake-arctic-embed-l-v2.0",
     "Qwen/Qwen3-Embedding-0.6B", "Qwen/Qwen3-Embedding-4B", "Qwen/Qwen3-Embedding-8B",
     "NeuML/pubmedbert-base-embeddings",
-    "ncbi/MedCPT-Query-Encoder",
+    "ncbi/MedCPT",
     "abhinand/MedEmbed-small-v0.1", "abhinand/MedEmbed-base-v0.1", "abhinand/MedEmbed-large-v0.1",
     "FremyCompany/BioLORD-2023",
 ]
@@ -102,10 +102,12 @@ def main() -> None:
         else:
             print(f"(skipping {name} — not built yet)")
 
+    tokenizer_overrides = {"ncbi/MedCPT": "ncbi/MedCPT-Query-Encoder"}
     rows = []
     for model in MODELS:
         try:
-            tok = AutoTokenizer.from_pretrained(model, trust_remote_code=True)
+            tok = AutoTokenizer.from_pretrained(
+                tokenizer_overrides.get(model, model), trust_remote_code=True)
         except OSError as e:
             print(f"SKIP {model}: {str(e).splitlines()[0]}")
             continue
@@ -128,7 +130,7 @@ def main() -> None:
         "Snowflake/snowflake-arctic-embed-l-v2.0": 568,
         "Qwen/Qwen3-Embedding-0.6B": 596, "Qwen/Qwen3-Embedding-4B": 4000,
         "Qwen/Qwen3-Embedding-8B": 7570, "NeuML/pubmedbert-base-embeddings": 109,
-        "ncbi/MedCPT-Query-Encoder": 109, "abhinand/MedEmbed-small-v0.1": 33,
+        "ncbi/MedCPT": 109, "abhinand/MedEmbed-small-v0.1": 33,
         "abhinand/MedEmbed-base-v0.1": 109, "abhinand/MedEmbed-large-v0.1": 335,
         "FremyCompany/BioLORD-2023": 109,
     }

@@ -12,5 +12,5 @@ abhinand/MedEmbed-base-v0.1,5681725,0.00016,0.0009090760000000001,intfloat/multi
 abhinand/MedEmbed-large-v0.1,5681725,0.001845,0.010482782625000001,google/embeddinggemma-300m
 abhinand/MedEmbed-small-v0.1,5681725,0.00016,0.0009090760000000001,intfloat/multilingual-e5-small
 intfloat/multilingual-e5-small,6205052,0.00016,0.0009928083200000002,
-ncbi/MedCPT-Query-Encoder,5669111,0.00016,0.0009070577600000001,intfloat/multilingual-e5-small
+ncbi/MedCPT,5669111,0.00016,0.0009070577600000001,intfloat/multilingual-e5-small
 sentence-transformers/all-MiniLM-L6-v2,5681725,0.00016,0.0009090760000000001,intfloat/multilingual-e5-small

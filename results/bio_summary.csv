@@ -50,5 +50,5 @@ NeuML__pubmedbert-base-embeddings,embedding,0.5517044999999999,12
 intfloat__multilingual-e5-small,embedding,0.5503969166666668,12
 google__gemini-3.1-flash-lite-preview,llm,0.5380038333333333,12
 intfloat__e5-mistral-7b-instruct,embedding,0.5356568571428572,7
+ncbi__MedCPT,embedding,0.5156029166666667,12
 GritLM__GritLM-7B,embedding,0.4835394285714285,7
-ncbi__MedCPT,embedding,0.294895,2
