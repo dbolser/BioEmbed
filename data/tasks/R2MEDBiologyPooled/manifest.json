@@ -1,0 +1,19 @@
+{
+  "name": "R2MEDBiologyPooled",
+  "category": "Retrieval",
+  "sizes": {
+    "queries": 100,
+    "corpus": 363,
+    "qrels": 363,
+    "gold_docs": 363,
+    "distractor_docs": 0
+  },
+  "provenance": {
+    "dataset": "R2MED/Biology",
+    "revision": "8b9fec2db9eda4b5742d03732213fbaee8169556",
+    "via": "mteb.get_task('R2MEDBiologyRetrieval').load_data()",
+    "original_corpus_size": 57359,
+    "original_queries": 103
+  },
+  "protocol": "Seed-42 sample of 100 of 103 queries. Corpus pool = every gold doc of the selected queries + random distractors from the full corpus up to 300 total (seed 42). Qrels = all original judgments restricted to selected queries (all gold docs are in the pool). LOFT layout: corpus(_id,title,text), queries(_id,text), qrels(query-id,corpus-id,score). NOTE: pooling the corpus from 57359 to 363 docs reduces difficulty vs full-corpus R2MED-Biology; scores are not comparable to published R2MED numbers. The gold docs alone exceeded the 300-doc cap, so the pool contains no distractors: every corpus doc is relevant to some selected query."
+}

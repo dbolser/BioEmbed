@@ -1,0 +1,20 @@
+{
+  "name": "BioMeSHClassification",
+  "category": "Classification",
+  "sizes": {
+    "train": 2000,
+    "test": 500,
+    "n_classes": 30
+  },
+  "provenance": {
+    "dataset": "allenai/scirepeval",
+    "config": "mesh_descriptors",
+    "split": "evaluation",
+    "revision": "781d35d1bf87253b3dcd0fadcb82bfbee9c244f1",
+    "rows_raw": 258678,
+    "rows_after_doc_id_dedup": 258678,
+    "rows_in_top30_pool": 258677,
+    "descriptors_in_source_after_dedup": 30
+  },
+  "protocol": "Deduplicated by doc_id (then by exact text as leakage safety). text = title + '\\n\\n' + abstract, matching mteb 2.20 SciRepEvalMeSHDescriptorsClassification.dataset_transform. Labels are the 30 most frequent descriptor NAME strings. Seed-42 stratified sample via sklearn train_test_split: 2500 rows, split 2000 train / 500 test (no doc overlap; train feeds the embedder kNN protocol)."
+}

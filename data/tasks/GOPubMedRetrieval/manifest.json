@@ -1,0 +1,56 @@
+{
+  "name": "GOPubMedRetrieval",
+  "category": "Retrieval",
+  "sizes": {
+    "corpus": 300,
+    "queries": 75,
+    "qrels": 238
+  },
+  "provenance": {
+    "gold_links": "/outsee5/home/danbolser/Work/IUK-IPF/data/sources/goa/pmid-links.jsonl",
+    "gold_link_type": "goa_annotation_reference (GAF-derived; uniprot_entry_reference rows excluded: entry-level, not per-PMID evidence)",
+    "texts": "/outsee5/home/danbolser/Work/IUK-IPF/data/embeddings-catalogue/records/*.parquet",
+    "evidence_codes_used": [
+      "EXP",
+      "IDA",
+      "IPI",
+      "IMP",
+      "IGI",
+      "IEP",
+      "HTP",
+      "HDA",
+      "HMP",
+      "HGI",
+      "HEP"
+    ],
+    "evidence_code_counts_gold_pairs": {
+      "IDA": 110,
+      "IMP": 104,
+      "IGI": 12,
+      "IEP": 11,
+      "EXP": 10,
+      "IPI": 6
+    },
+    "species_coverage_gold_pairs": {
+      "human": 65,
+      "mouse": 61,
+      "yeast": 30,
+      "drosophila": 28,
+      "rat": 25,
+      "ecoli": 21,
+      "zebrafish": 12,
+      "nematode": 3
+    },
+    "species_note": "a (term, PMID) pair annotated in several species counts once per species"
+  },
+  "protocol": {
+    "seed": 42,
+    "query_text": "'{GO name}: {GO definition}'",
+    "doc_text": "'{title}\\n\\n{abstract}' if title else abstract; text is self-contained -- do NOT re-prepend the title column",
+    "candidate_terms": "non-empty name+definition, 2-15 distinct experimental-evidence PMIDs with abstracts in the records table",
+    "selection": "seeded shuffle of 13517 candidates, greedily accept terms under a paced gold budget (union <= 240 * (accepted+1)/75), stop at 75",
+    "distractors": "sampled (seed 42) from other experimental GO-evidence PMIDs present in records, to 300 docs total",
+    "qrels": "score=1 for every curated (term, PMID) evidence pair; all gold docs are in the corpus",
+    "mean_golds_per_query": 3.173
+  }
+}

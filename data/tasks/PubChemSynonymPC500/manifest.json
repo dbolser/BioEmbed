@@ -1,0 +1,20 @@
+{
+  "name": "PubChemSynonymPC500",
+  "category": "PairClassification",
+  "sizes": {
+    "test": 500,
+    "positives": 50,
+    "negatives": 450
+  },
+  "provenance": {
+    "dataset": "BASF-AI/PubChemSynonymPC",
+    "revision": "5037d69d177c9628fb79cb57eea1299178b28c1b",
+    "via": "mteb.get_task('PubChemSynonymPC').load_data()",
+    "source_pairs": 2048,
+    "source_label_counts": {
+      "0": 1844,
+      "1": 204
+    }
+  },
+  "protocol": "Seed-42 per-class random sample of 500 pairs preserving the original label balance (204/2048 positive -> 50/500). Kept in original dataset order. label: 1 = synonym pair."
+}
