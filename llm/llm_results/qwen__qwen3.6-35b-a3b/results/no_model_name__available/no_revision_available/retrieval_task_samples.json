@@ -1,0 +1,83 @@
+[
+  {
+    "query_id": "GO:0001805",
+    "query_text": "positive regulation of type III hypersensitivity: Any process that activates or increases the frequency, rate or extent of type III hypersensitivity, a type of inflammatory response.",
+    "model_raw_output": "Title: RN486, a selective Bruton's tyrosine kinase inhibitor, abrogates immune hypersensitivity responses and arthritis in rodents.\nID: 176\n\nFinal Answer: [176]",
+    "parsed_ids": [
+      "22228807"
+    ],
+    "gold_ids": [
+      "8769481",
+      "8976192",
+      "11911823",
+      "22228807"
+    ],
+    "is_correct": true
+  },
+  {
+    "query_id": "GO:0002418",
+    "query_text": "immune response to tumor cell: An immune system process that functions in the response of an organism to a tumor cell.",
+    "model_raw_output": "Based on the provided documents, the most relevant document that directly addresses the immune system's recognition and response to tumor cells (specifically through natural killer cell receptors) is:\n\n**TITLE:** Membrane-associated heparan sulfate proteoglycans are involved in the recognition of cellular targets by NKp30 and NKp46.\n**ID:** 77\n\nFinal Answer: [77]",
+    "parsed_ids": [
+      "15294952"
+    ],
+    "gold_ids": [
+      "8164737",
+      "10359807",
+      "22505472"
+    ],
+    "is_correct": false
+  },
+  {
+    "query_id": "GO:0003788",
+    "query_text": "actin monomer sequestering activity: Binding to an actin monomer to prevent it from interacting with other partners or to inhibit its localization to the area of the cell or complex where it is active.",
+    "model_raw_output": "Final Answer: [67]",
+    "parsed_ids": [
+      "1447300"
+    ],
+    "gold_ids": [
+      "1447300",
+      "19233202"
+    ],
+    "is_correct": true
+  },
+  {
+    "query_id": "GO:0003968",
+    "query_text": "RNA-directed RNA polymerase activity: Catalysis of the reaction: nucleoside triphosphate + RNA(n) = diphosphate + RNA(n+1); uses an RNA template, i.e. the catalysis of RNA-template-directed extension of the 3'-end of an RNA strand by one nucleotide at a time.",
+    "model_raw_output": "Based on the query regarding RNA-directed RNA polymerase (RdRP) activity and the catalysis of RNA-template-directed extension, the following documents are most relevant:\n\nID 121: Molecular basis of RNA-dependent RNA polymerase II activity.\nID 145: An RNA-dependent RNA polymerase formed by TERT and the RMRP RNA.\nID 192: RNA polymerase II acts as an RNA-dependent RNA polymerase to extend and destabilize a non-coding RNA.\n\nFinal Answer: [121, 145, 192]",
+    "parsed_ids": [
+      "18004386",
+      "19701182",
+      "23395899"
+    ],
+    "gold_ids": [
+      "18004386",
+      "19701182",
+      "23395899"
+    ],
+    "is_correct": true
+  },
+  {
+    "query_id": "GO:0004042",
+    "query_text": "L-glutamate N-acetyltransferase activity, acting on acetyl-CoA as donor: Catalysis of the reaction: L-glutamate + acetyl-CoA = N-acetyl-L-glutamate + CoA + H+.",
+    "model_raw_output": "Final Answer: [37, 45, 201, 208, 272]",
+    "parsed_ids": [
+      "12049647",
+      "12459178",
+      "23894642",
+      "24465614",
+      "7126172"
+    ],
+    "gold_ids": [
+      "391804",
+      "7126172",
+      "9428669",
+      "11553611",
+      "12049647",
+      "12459178",
+      "23894642",
+      "24465614"
+    ],
+    "is_correct": true
+  }
+]
