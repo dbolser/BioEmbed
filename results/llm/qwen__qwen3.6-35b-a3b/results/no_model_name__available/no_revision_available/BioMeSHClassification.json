@@ -1,0 +1,54 @@
+{
+  "dataset_revision": "local",
+  "task_name": "BioMeSHClassification",
+  "mteb_version": "2.6.5",
+  "scores": {
+    "test": [
+      {
+        "scores_per_experiment": [
+          {
+            "accuracy": 0.818,
+            "f1": 0.800441,
+            "f1_weighted": 0.819501,
+            "precision": 0.832646,
+            "precision_weighted": 0.845152,
+            "recall": 0.797767,
+            "recall_weighted": 0.818,
+            "ap": null,
+            "ap_weighted": null
+          }
+        ],
+        "accuracy": 0.818,
+        "f1": 0.800441,
+        "f1_weighted": 0.819501,
+        "precision": 0.832646,
+        "precision_weighted": 0.845152,
+        "recall": 0.797767,
+        "recall_weighted": 0.818,
+        "ap": NaN,
+        "ap_weighted": NaN,
+        "main_score": 0.818,
+        "input_tokens": 263488,
+        "cached_tokens": 53376,
+        "output_tokens": 831220,
+        "thinking_tokens": 794489,
+        "total_tokens": 1094708,
+        "cost": 0.0,
+        "usage_stats": {
+          "input_tokens": 263488,
+          "cached_tokens": 53376,
+          "output_tokens": 831220,
+          "thinking_tokens": 794489,
+          "total_tokens": 1094708,
+          "cost": 0.0
+        },
+        "hf_subset": "default",
+        "languages": [
+          "eng-Latn"
+        ]
+      }
+    ]
+  },
+  "evaluation_time": 1880.5500137805939,
+  "kg_co2_emissions": null
+}

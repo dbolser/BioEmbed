@@ -1,0 +1,37 @@
+{
+  "dataset_revision": "local",
+  "task_name": "GOPubMedRetrieval",
+  "mteb_version": "2.6.5",
+  "scores": {
+    "test": [
+      {
+        "recall@1": 0.305794,
+        "recall@2": 0.359905,
+        "recall@3": 0.386905,
+        "recall@5": 0.408238,
+        "mrecall@1": 0.866667,
+        "mrecall@2": 0.2,
+        "mrecall@3": 0.146667,
+        "mrecall@5": 0.106667,
+        "capped_recall@1": 0.866667,
+        "main_score": 0.305794,
+        "usage_stats": {
+          "input_tokens": 7787216,
+          "cached_tokens": 7055680,
+          "output_tokens": 212295,
+          "thinking_tokens": 206098,
+          "total_tokens": 7999511,
+          "cost": 0.0,
+          "rlm_total_calls": 0,
+          "rlm_wall_time_s": 0.0
+        },
+        "hf_subset": "default",
+        "languages": [
+          "eng-Latn"
+        ]
+      }
+    ]
+  },
+  "evaluation_time": 423.09244561195374,
+  "kg_co2_emissions": null
+}

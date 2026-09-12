@@ -20,6 +20,13 @@ sys.path.insert(0, str(Path(__file__).parent))
 from tasks_tier_a import TIER_A_TASKS
 from tasks_local import LOCAL_TASKS
 
+# Register our task classes in mteb's registry so instruct-style models
+# (Qwen3-Embedding etc.) can resolve task instructions by task name.
+import importlib  # noqa: E402
+_gt_mod = importlib.import_module("mteb.get_tasks")
+for _t in TIER_A_TASKS + LOCAL_TASKS:
+    _gt_mod._TASKS_REGISTRY.setdefault(_t.metadata.name, type(_t))
+
 REPO = Path(__file__).resolve().parent.parent
 DEFAULT_MODELS = [
     "sentence-transformers/all-MiniLM-L6-v2",
@@ -39,6 +46,9 @@ DEFAULT_MODELS = [
 
 
 def get_model(name: str):
+    if name == "ncbi/MedCPT":
+        from medcpt_model import MedCPT
+        return MedCPT()
     try:
         return mteb.get_model(name)
     except Exception as e:
