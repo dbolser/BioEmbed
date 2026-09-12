@@ -1,0 +1,82 @@
+"""Run embedding models over the BioMTEB(LLM) suite.
+
+Usage:
+    uv run python run_embedders.py --models intfloat/multilingual-e5-small \
+        --tasks LLMBIOSSES LLMPublicHealthQA
+    uv run python run_embedders.py            # everything in the registry
+
+Results land in ../results/embedding/<model>/<task>.json (mteb layout).
+mteb.get_model() is used so known models get their correct prompts/prefixes
+(e5 "query:/passage:", Qwen3 instructions, etc.).
+"""
+
+import argparse
+import sys
+from pathlib import Path
+
+import mteb
+
+sys.path.insert(0, str(Path(__file__).parent))
+from tasks_tier_a import TIER_A_TASKS
+
+REPO = Path(__file__).resolve().parent.parent
+DEFAULT_MODELS = [
+    "sentence-transformers/all-MiniLM-L6-v2",
+    "BAAI/bge-small-en-v1.5",
+    "BAAI/bge-base-en-v1.5",
+    "BAAI/bge-large-en-v1.5",
+    "intfloat/multilingual-e5-small",
+    "google/embeddinggemma-300m",
+    "Snowflake/snowflake-arctic-embed-l-v2.0",
+    "Qwen/Qwen3-Embedding-0.6B",
+    "NeuML/pubmedbert-base-embeddings",
+    "abhinand/MedEmbed-small-v0.1",
+    "abhinand/MedEmbed-base-v0.1",
+    "abhinand/MedEmbed-large-v0.1",
+    "FremyCompany/BioLORD-2023",
+]
+
+
+def get_model(name: str):
+    try:
+        return mteb.get_model(name)
+    except Exception as e:
+        print(f"  mteb.get_model failed ({e!r}); falling back to SentenceTransformer")
+        from sentence_transformers import SentenceTransformer
+        return SentenceTransformer(name)
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--models", nargs="*", default=DEFAULT_MODELS)
+    ap.add_argument("--tasks", nargs="*", default=None,
+                    help="task names; default = all Tier A")
+    ap.add_argument("--batch-size", type=int, default=32)
+    args = ap.parse_args()
+
+    tasks = TIER_A_TASKS
+    if args.tasks:
+        tasks = [t for t in tasks if t.metadata.name in args.tasks]
+
+    out = REPO / "results" / "embedding"
+    failures = []
+    for name in args.models:
+        print(f"=== {name} ===", flush=True)
+        try:
+            model = get_model(name)
+            evaluation = mteb.MTEB(tasks=tasks)
+            evaluation.run(
+                model,
+                output_folder=str(out),
+                encode_kwargs={"batch_size": args.batch_size},
+                verbosity=1,
+            )
+        except Exception as e:
+            print(f"!!! FAILED {name}: {e!r}", flush=True)
+            failures.append(name)
+    if failures:
+        print("FAILED MODELS:", failures)
+
+
+if __name__ == "__main__":
+    main()

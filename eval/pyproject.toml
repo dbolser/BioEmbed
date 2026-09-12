@@ -1,0 +1,22 @@
+[project]
+name = "bioembed-eval"
+version = "0.1.0"
+description = "Embedding-side evaluation env, pinned to the mteb version behind the paper's embedding results"
+requires-python = ">=3.12"
+dependencies = [
+    "mteb==2.11.6",
+    "sentence-transformers>=3.0",
+    "torch>=2.4",
+    "pandas>=2.2",
+]
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv]
+package = false
