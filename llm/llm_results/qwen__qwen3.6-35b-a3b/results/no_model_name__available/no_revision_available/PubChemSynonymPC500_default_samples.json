@@ -2,8 +2,8 @@
   {
     "sentence1": "2-Butyne-1,4-diol",
     "sentence2": "1,4-Dimethoxyacetylene",
-    "model_raw_output": "{\n  \"output\": 0,\n  \"reasoning\": \"Sentence 1 refers to 2-butyne-1,4-diol, which has hydroxyl (-OH) functional groups at the terminal carbons of a butyne chain. Sentence 2, 1,4-dimethoxyacetylene, contains methoxy (-OCH3) groups instead of hydroxyls, indicating it is an ether derivative rather than an alcohol. The distinct functional groups and molecular structures confirm they are different chemical compounds.\"\n}",
-    "reasoning": "Sentence 1 refers to 2-butyne-1,4-diol, which has hydroxyl (-OH) functional groups at the terminal carbons of a butyne chain. Sentence 2, 1,4-dimethoxyacetylene, contains methoxy (-OCH3) groups instead of hydroxyls, indicating it is an ether derivative rather than an alcohol. The distinct functional groups and molecular structures confirm they are different chemical compounds.",
+    "model_raw_output": "{\n \"output\": 0,\n \"reasoning\": \"Sentence 1, '2-Butyne-1,4-diol', has the chemical formula C4H6O2 and contains two hydroxyl (-OH) groups. Sentence 2, '1,4-Dimethoxyacetylene' (more commonly known as 1,4-dimethoxy-2-butyne), has the chemical formula C6H10O2 and contains two methoxy (-OCH3) groups. Although they share the same carbon backbone structure (a butyne chain), the functional groups are different (alcohols vs. ethers/methyl esters), meaning they are distinct chemical compounds.\"\n}",
+    "reasoning": "Sentence 1, '2-Butyne-1,4-diol', has the chemical formula C4H6O2 and contains two hydroxyl (-OH) groups. Sentence 2, '1,4-Dimethoxyacetylene' (more commonly known as 1,4-dimethoxy-2-butyne), has the chemical formula C6H10O2 and contains two methoxy (-OCH3) groups. Although they share the same carbon backbone structure (a butyne chain), the functional groups are different (alcohols vs. ethers/methyl esters), meaning they are distinct chemical compounds.",
     "predicted_label": 0,
     "gold_label": 1,
     "is_correct": false
@@ -11,8 +11,8 @@
   {
     "sentence1": "Promoxolane",
     "sentence2": "WLN: T5O COTJ BY1&1 BY1&1 D1Q",
-    "model_raw_output": "{\n  \"reasoning\": \"Promoxolane is a recognized chemical/trade name for a specific benzotriazole-based UV stabilizer. The WLN (Systematic Index Name) string provided is the structured code that uniquely describes the exact same molecular framework. Both identifiers map to the identical chemical compound in standard chemical databases.\",\n  \"output\": 1\n}",
-    "reasoning": "Promoxolane is a recognized chemical/trade name for a specific benzotriazole-based UV stabilizer. The WLN (Systematic Index Name) string provided is the structured code that uniquely describes the exact same molecular framework. Both identifiers map to the identical chemical compound in standard chemical databases.",
+    "model_raw_output": "{\n  \"output\": 1,\n  \"reasoning\": \"Promoxolane is the INN (International Nonproprietary Name) for the drug compound. The WLN (Wizard Layout Name) 'T5O COTJ BY1&1 BY1&1 D1Q' corresponds to the chemical structure of promoxolane (also known as promethoxan). Both identifiers refer to the same chemical entity, which is a dopamine reuptake inhibitor.\"\n}",
+    "reasoning": "Promoxolane is the INN (International Nonproprietary Name) for the drug compound. The WLN (Wizard Layout Name) 'T5O COTJ BY1&1 BY1&1 D1Q' corresponds to the chemical structure of promoxolane (also known as promethoxan). Both identifiers refer to the same chemical entity, which is a dopamine reuptake inhibitor.",
     "predicted_label": 1,
     "gold_label": 1,
     "is_correct": true
@@ -20,8 +20,8 @@
   {
     "sentence1": "Diazepam",
     "sentence2": "DIAZEPAM (IARC)",
-    "model_raw_output": "{\n  \"output\": 1,\n  \"reasoning\": \"Both terms refer to the exact same chemical compound, Diazepam. The suffix '(IARC)' in the second sentence merely denotes its classification or listing by the International Agency for Research on Cancer, which does not alter the chemical identity.\"\n}",
-    "reasoning": "Both terms refer to the exact same chemical compound, Diazepam. The suffix '(IARC)' in the second sentence merely denotes its classification or listing by the International Agency for Research on Cancer, which does not alter the chemical identity.",
+    "model_raw_output": "{\n  \"reasoning\": \"Sentence 1 is the standard International Nonproprietary Name (INN) for the drug. Sentence 2 is the same name followed by '(IARC)', which likely refers to the International Agency for Research on Cancer, an organization that classifies chemicals. The chemical entity described in both sentences is identical (C16H13ClN2O).\",\n  \"output\": 1\n}",
+    "reasoning": "Sentence 1 is the standard International Nonproprietary Name (INN) for the drug. Sentence 2 is the same name followed by '(IARC)', which likely refers to the International Agency for Research on Cancer, an organization that classifies chemicals. The chemical entity described in both sentences is identical (C16H13ClN2O).",
     "predicted_label": 1,
     "gold_label": 1,
     "is_correct": true
@@ -29,8 +29,8 @@
   {
     "sentence1": "Helium",
     "sentence2": "HELIUM [WHO-DD]",
-    "model_raw_output": "{\n  \"reasoning\": \"Both terms refer to the chemical element Helium. The '[WHO-DD]' suffix in Sentence 2 is a nomenclature tag indicating the World Health Organization Drug Dictionary, which does not alter the chemical identity of the substance. Therefore, they are synonyms for the exact same compound.\",\n  \"output\": 1\n}",
-    "reasoning": "Both terms refer to the chemical element Helium. The '[WHO-DD]' suffix in Sentence 2 is a nomenclature tag indicating the World Health Organization Drug Dictionary, which does not alter the chemical identity of the substance. Therefore, they are synonyms for the exact same compound.",
+    "model_raw_output": "{\n\"output\": 1,\n\"reasoning\": \"Both sentences refer to the chemical element Helium (atomic number 2). Sentence 2 includes the qualifier '[WHO-DD]', which indicates that the term is sourced from or defined by the World Health Organization Drug Dictionary. However, this qualifier denotes the source or classification context rather than changing the chemical identity of the substance. Therefore, both sentences identify the same chemical compound.\"\n}",
+    "reasoning": "Both sentences refer to the chemical element Helium (atomic number 2). Sentence 2 includes the qualifier '[WHO-DD]', which indicates that the term is sourced from or defined by the World Health Organization Drug Dictionary. However, this qualifier denotes the source or classification context rather than changing the chemical identity of the substance. Therefore, both sentences identify the same chemical compound.",
     "predicted_label": 1,
     "gold_label": 1,
     "is_correct": true
@@ -38,8 +38,8 @@
   {
     "sentence1": "Triclocarban",
     "sentence2": "DG BodyAntibacterial Deodorant 3.5 oz bar",
-    "model_raw_output": "{\n  \"reasoning\": \"Sentence 1 identifies a specific chemical compound (Triclocarban), an antibacterial agent. Sentence 2 refers to a commercial product name (a deodorant bar), which is a branded item that may contain the chemical as an ingredient but is not a chemical identifier or synonym for the compound itself. Therefore, they do not name the same chemical compound.\",\n  \"output\": 0\n}",
-    "reasoning": "Sentence 1 identifies a specific chemical compound (Triclocarban), an antibacterial agent. Sentence 2 refers to a commercial product name (a deodorant bar), which is a branded item that may contain the chemical as an ingredient but is not a chemical identifier or synonym for the compound itself. Therefore, they do not name the same chemical compound.",
+    "model_raw_output": "{\n\"reasoning\": \"Sentence 1 refers to 'Triclocarban', which is a specific chemical compound (3,4,4'-trichlorocarbanilide) commonly used as an antibacterial agent. Sentence 2 refers to a commercial product name, 'DG BodyAntibacterial Deodorant', which is a bar soap or deodorant item. While the product in Sentence 2 may contain Triclocarban as an ingredient, the two sentences do not refer to the same entity; one is a pure chemical substance and the other is a finished consumer good. Therefore, they are not synonyms.\",\n\"output\": 0\n}",
+    "reasoning": "Sentence 1 refers to 'Triclocarban', which is a specific chemical compound (3,4,4'-trichlorocarbanilide) commonly used as an antibacterial agent. Sentence 2 refers to a commercial product name, 'DG BodyAntibacterial Deodorant', which is a bar soap or deodorant item. While the product in Sentence 2 may contain Triclocarban as an ingredient, the two sentences do not refer to the same entity; one is a pure chemical substance and the other is a finished consumer good. Therefore, they are not synonyms.",
     "predicted_label": 0,
     "gold_label": 1,
     "is_correct": false

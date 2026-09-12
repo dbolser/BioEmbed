@@ -2,8 +2,8 @@
   {
     "sentence1": "2-Butyne-1,4-diol",
     "sentence2": "1,4-Dimethoxyacetylene",
-    "model_raw_output": "{\n  \"reasoning\": \"2-Butyne-1,4-diol has hydroxyl groups (-OH) at positions 1 and 4 of a butyne chain, while 1,4-Dimethoxyacetylene (likely 1,4-dimethoxy-2-butyne) has methoxy groups (-OCH3) at the same positions. These are different functional groups, so they are not the same compound.\",\n  \"output\": 0\n}",
-    "reasoning": "2-Butyne-1,4-diol has hydroxyl groups (-OH) at positions 1 and 4 of a butyne chain, while 1,4-Dimethoxyacetylene (likely 1,4-dimethoxy-2-butyne) has methoxy groups (-OCH3) at the same positions. These are different functional groups, so they are not the same compound.",
+    "model_raw_output": "{\n  \"output\": 0,\n  \"reasoning\": \"2-Butyne-1,4-diol is a compound with the formula HOCH2C\u2261CCH2OH, containing two hydroxyl groups. 1,4-Dimethoxyacetylene (also known as 1,4-dimethoxy-2-butyne) has the structure CH3OCH2C\u2261CCH2OCH3, where the hydroxyl groups are replaced by methoxy groups (-OCH3). They are different functional group derivatives of the same butyne backbone, not the same compound.\"\n}",
+    "reasoning": "2-Butyne-1,4-diol is a compound with the formula HOCH2C\u2261CCH2OH, containing two hydroxyl groups. 1,4-Dimethoxyacetylene (also known as 1,4-dimethoxy-2-butyne) has the structure CH3OCH2C\u2261CCH2OCH3, where the hydroxyl groups are replaced by methoxy groups (-OCH3). They are different functional group derivatives of the same butyne backbone, not the same compound.",
     "predicted_label": 0,
     "gold_label": 1,
     "is_correct": false
@@ -11,8 +11,8 @@
   {
     "sentence1": "Promoxolane",
     "sentence2": "WLN: T5O COTJ BY1&1 BY1&1 D1Q",
-    "model_raw_output": "{\n  \"output\": 1,\n  \"reasoning\": \"Promoxolane is a chemical compound with the structure 2,2-diisopropyl-1,3-dioxolane-4-methanol. The WLN notation 'T5O COTJ BY1&1 BY1&1 D1Q' decodes to a five-membered oxygen-containing heterocycle (T5O), with a ring fusion (COTJ) substitution pattern including two isopropyl groups (BY1&1 BY1&1) and a -CH2OH group (D1Q). This matches the structure of Promoxolane.\"\n}",
-    "reasoning": "Promoxolane is a chemical compound with the structure 2,2-diisopropyl-1,3-dioxolane-4-methanol. The WLN notation 'T5O COTJ BY1&1 BY1&1 D1Q' decodes to a five-membered oxygen-containing heterocycle (T5O), with a ring fusion (COTJ) substitution pattern including two isopropyl groups (BY1&1 BY1&1) and a -CH2OH group (D1Q). This matches the structure of Promoxolane.",
+    "model_raw_output": "{\n  \"output\": 1,\n  \"reasoning\": \"Both 'Promoxolane' and the WLN (Wiswesser Line Notation) code 'T5O COTJ BY1&1 BY1&1 D1Q' refer to the same compound. Promoxolane is a chemical name, and the WLN is a systematic notation that uniquely identifies the molecular structure of that compound.\"\n}",
+    "reasoning": "Both 'Promoxolane' and the WLN (Wiswesser Line Notation) code 'T5O COTJ BY1&1 BY1&1 D1Q' refer to the same compound. Promoxolane is a chemical name, and the WLN is a systematic notation that uniquely identifies the molecular structure of that compound.",
     "predicted_label": 1,
     "gold_label": 1,
     "is_correct": true
@@ -20,8 +20,8 @@
   {
     "sentence1": "Diazepam",
     "sentence2": "DIAZEPAM (IARC)",
-    "model_raw_output": "{\"reasoning\":\"Both 'Diazepam' and 'DIAZEPAM (IARC)' refer to the same chemical compound, with the latter including an annotation for the International Agency for Research on Cancer. The core chemical identifier is identical.\", \"output\": 1}",
-    "reasoning": "Both 'Diazepam' and 'DIAZEPAM (IARC)' refer to the same chemical compound, with the latter including an annotation for the International Agency for Research on Cancer. The core chemical identifier is identical.",
+    "model_raw_output": "{\n  \"output\": 1,\n  \"reasoning\": \"Both sentences refer to the same chemical compound (diazepam), with the second including '(IARC)' which is an organization designation and does not change the identity of the compound.\"\n}",
+    "reasoning": "Both sentences refer to the same chemical compound (diazepam), with the second including '(IARC)' which is an organization designation and does not change the identity of the compound.",
     "predicted_label": 1,
     "gold_label": 1,
     "is_correct": true
@@ -29,8 +29,8 @@
   {
     "sentence1": "Helium",
     "sentence2": "HELIUM [WHO-DD]",
-    "model_raw_output": "{\n  \"output\": 1,\n  \"reasoning\": \"Both 'Helium' and 'HELIUM [WHO-DD]' refer to the same chemical element (helium), with the latter being a notation used by the World Health Organization for defined daily doses. They are synonymous for the same compound.\"\n}",
-    "reasoning": "Both 'Helium' and 'HELIUM [WHO-DD]' refer to the same chemical element (helium), with the latter being a notation used by the World Health Organization for defined daily doses. They are synonymous for the same compound.",
+    "model_raw_output": "{\n  \"output\": 1,\n  \"reasoning\": \"Both sentences refer to the same chemical element, Helium. 'HELIUM [WHO-DD]' is simply the World Health Organization's designated display name for Helium, but it is the same substance.\"\n}",
+    "reasoning": "Both sentences refer to the same chemical element, Helium. 'HELIUM [WHO-DD]' is simply the World Health Organization's designated display name for Helium, but it is the same substance.",
     "predicted_label": 1,
     "gold_label": 1,
     "is_correct": true
@@ -38,8 +38,8 @@
   {
     "sentence1": "Triclocarban",
     "sentence2": "DG BodyAntibacterial Deodorant 3.5 oz bar",
-    "model_raw_output": "{\n  \"output\": 0,\n  \"reasoning\": \"Triclocarban is a specific chemical compound (an antimicrobial agent), while 'DG BodyAntibacterial Deodorant 3.5 oz bar' is a commercial product name that likely contains triclocarban as an ingredient but is not itself a chemical identifier. They are not synonyms for the same compound.\"\n}",
-    "reasoning": "Triclocarban is a specific chemical compound (an antimicrobial agent), while 'DG BodyAntibacterial Deodorant 3.5 oz bar' is a commercial product name that likely contains triclocarban as an ingredient but is not itself a chemical identifier. They are not synonyms for the same compound.",
+    "model_raw_output": "{\"reasoning\":\"Triclocarban is a specific chemical compound used as an antibacterial agent, while 'DG BodyAntibacterial Deodorant 3.5 oz bar' is a commercial product name that may contain triclocarban as an ingredient but is not itself a chemical compound. They are not synonyms for the same chemical compound.\",\"output\":0}",
+    "reasoning": "Triclocarban is a specific chemical compound used as an antibacterial agent, while 'DG BodyAntibacterial Deodorant 3.5 oz bar' is a commercial product name that may contain triclocarban as an ingredient but is not itself a chemical compound. They are not synonyms for the same chemical compound.",
     "predicted_label": 0,
     "gold_label": 1,
     "is_correct": false

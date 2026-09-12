@@ -100,6 +100,9 @@ NeuML__pubmedbert-base-embeddings,embedding,LLMSTSBenchmark,STS,0.685441,ours
 NeuML__pubmedbert-base-embeddings,embedding,LLMToxicConversationsClassification,Classification,0.5786,ours
 NeuML__pubmedbert-base-embeddings,embedding,PubChemSynonymPC500,PairClassification,0.636726,ours
 NeuML__pubmedbert-base-embeddings,embedding,R2MEDBiologyPooled,Retrieval,0.15579,ours
+Qwen__Qwen3-Embedding-0.6B,embedding,BioMeSHClassification,Classification,0.4012,ours
+Qwen__Qwen3-Embedding-0.6B,embedding,GOProteinPairCls,PairClassification,0.827367,ours
+Qwen__Qwen3-Embedding-0.6B,embedding,GOPubMedRetrieval,Retrieval,0.28757,ours
 Qwen__Qwen3-Embedding-0.6B,embedding,LLMBIOSSES,STS,0.845598,paper
 Qwen__Qwen3-Embedding-0.6B,embedding,LLMBiorxivClusteringP2PV2,Clustering,0.618442,paper
 Qwen__Qwen3-Embedding-0.6B,embedding,LLMMedrxivClusteringP2PV2,Clustering,0.529052,paper
@@ -107,6 +110,8 @@ Qwen__Qwen3-Embedding-0.6B,embedding,LLMMedrxivClusteringS2SV2,Clustering,0.5111
 Qwen__Qwen3-Embedding-0.6B,embedding,LLMPublicHealthQA,Retrieval,0.68,paper
 Qwen__Qwen3-Embedding-0.6B,embedding,LLMSTSBenchmark,STS,0.912924,paper
 Qwen__Qwen3-Embedding-0.6B,embedding,LLMToxicConversationsClassification,Classification,0.8188,paper
+Qwen__Qwen3-Embedding-0.6B,embedding,PubChemSynonymPC500,PairClassification,0.703716,ours
+Qwen__Qwen3-Embedding-0.6B,embedding,R2MEDBiologyPooled,Retrieval,0.25206,ours
 Qwen__Qwen3-Embedding-4B,embedding,LLMBIOSSES,STS,0.847754,paper
 Qwen__Qwen3-Embedding-4B,embedding,LLMBiorxivClusteringP2PV2,Clustering,0.63979,paper
 Qwen__Qwen3-Embedding-4B,embedding,LLMMedrxivClusteringP2PV2,Clustering,0.554543,paper

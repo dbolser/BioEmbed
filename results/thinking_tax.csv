@@ -1,0 +1,7 @@
+model,task,score_think_on,gen_tokens_on,score_think_off,gen_tokens_off,delta,token_saving
+deepseek__deepseek-v4-flash,GOProteinPairCls,0.7862,150173,0.7744,61046,-0.0118,0.593
+deepseek__deepseek-v4-flash,BioMeSHClassification,0.804,172636,0.81,55693,0.006,0.677
+deepseek__deepseek-v4-flash,PubChemSynonymPC500,0.4749,122364,0.4461,43423,-0.0288,0.645
+qwen__qwen3.6-35b-a3b,GOProteinPairCls,0.7921,685503,0.7801,147293,-0.012,0.785
+qwen__qwen3.6-35b-a3b,BioMeSHClassification,0.818,831220,0.75,206891,-0.068,0.751
+qwen__qwen3.6-35b-a3b,PubChemSynonymPC500,0.4606,567646,0.4161,69261,-0.0445,0.878
