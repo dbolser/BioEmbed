@@ -1,0 +1,37 @@
+{
+  "dataset_revision": "local",
+  "task_name": "R2MEDBiologyPooled",
+  "mteb_version": "2.6.5",
+  "scores": {
+    "test": [
+      {
+        "recall@1": 0.310347,
+        "recall@2": 0.44842,
+        "recall@3": 0.518994,
+        "recall@5": 0.569974,
+        "mrecall@1": 0.82,
+        "mrecall@2": 0.49,
+        "mrecall@3": 0.43,
+        "mrecall@5": 0.41,
+        "capped_recall@1": 0.82,
+        "main_score": 0.310347,
+        "usage_stats": {
+          "input_tokens": 22498983,
+          "cached_tokens": 20004352,
+          "output_tokens": 24294,
+          "thinking_tokens": 5827,
+          "total_tokens": 22523277,
+          "cost": 0.0,
+          "rlm_total_calls": 0,
+          "rlm_wall_time_s": 0.0
+        },
+        "hf_subset": "default",
+        "languages": [
+          "eng-Latn"
+        ]
+      }
+    ]
+  },
+  "evaluation_time": 160.5913622379303,
+  "kg_co2_emissions": null
+}

@@ -1,0 +1,36 @@
+{
+  "dataset_revision": "local",
+  "task_name": "PubChemSynonymPC500",
+  "mteb_version": "2.6.5",
+  "scores": {
+    "test": [
+      {
+        "similarity_ap": 0.474897,
+        "similarity_accuracy": 0.972,
+        "similarity_f1": 0.837209,
+        "max_ap": 0.474897,
+        "max_accuracy": 0.972,
+        "max_f1": 0.837209,
+        "max_precision": 1.0,
+        "max_recall": 0.72,
+        "usage_stats": {
+          "input_tokens": 75352,
+          "cached_tokens": 22784,
+          "output_tokens": 122364,
+          "thinking_tokens": 80907,
+          "total_tokens": 197716,
+          "cost": 0.0,
+          "rlm_total_calls": 0,
+          "rlm_wall_time_s": 0.0
+        },
+        "main_score": 0.474897,
+        "hf_subset": "default",
+        "languages": [
+          "eng-Latn"
+        ]
+      }
+    ]
+  },
+  "evaluation_time": 524.3052470684052,
+  "kg_co2_emissions": null
+}

@@ -1,0 +1,81 @@
+[
+  {
+    "query_id": "0",
+    "query_text": "Claim in article about why insects are attracted to light\nIn this article they are addressing the reason insects are attracted to light when they say\nHeat radiation as an attractive component is refuted by the effect of LED lighting, which supplies negligible infrared radiation yet still entraps vast numbers of insects.\nI don't see why attraction to LEDs shows they're not seeking heat. Could they for example be evolutionarily programmed to associate light with heat? So that even though they don't encounter heat near/on the LEDs they still \"expect\" to?",
+    "model_raw_output": "ID: 188 | TITLE: Phototaxis in invertebrates\nFinal Answer: [188]",
+    "parsed_ids": [
+      "insects_attracted_to_light/Phototaxis_3.txt"
+    ],
+    "gold_ids": [
+      "insects_attracted_to_light/Phototaxis_0.txt",
+      "insects_attracted_to_light/Phototaxis_3.txt",
+      "insects_attracted_to_light/Phototaxis_4.txt",
+      "insects_attracted_to_light/Proximate_and_ultimate_causation_0.txt",
+      "insects_attracted_to_light/Proximate_and_ultimate_causation_1.txt"
+    ],
+    "is_correct": true
+  },
+  {
+    "query_id": "1",
+    "query_text": "Why do I only breathe out of one nostril?\nI was just sitting with my hand next to my nose and I realized that air was only coming out of the right nostril. Why is that? I would think I would use both, it seems much more efficient. Have I always only been breathing out of my right nostril?",
+    "model_raw_output": "ID: 65 | TITLE: The nasal cycle  \nID: 66 | TITLE: Description  \nID: 67 | TITLE: Benefits for breathing  \nID: 68 | TITLE: Benefits for olfaction  \nID: 69 | TITLE: Distinction  \nID: 70 | TITLE: Research on the effects  \n\nFinal Answer: [65, 66, 67, 68, 69, 70]",
+    "parsed_ids": [
+      "breathe_out_of_one_nostril/Nasal_cycle_0.txt",
+      "breathe_out_of_one_nostril/Nasal_cycle_1.txt",
+      "breathe_out_of_one_nostril/Nasal_cycle_2.txt",
+      "breathe_out_of_one_nostril/Nasal_cycle_3.txt",
+      "breathe_out_of_one_nostril/Nasal_cycle_4.txt",
+      "breathe_out_of_one_nostril/Nasal_cycle_5.txt"
+    ],
+    "gold_ids": [
+      "breathe_out_of_one_nostril/Nasal_cycle_0.txt",
+      "breathe_out_of_one_nostril/Nasal_cycle_1.txt",
+      "breathe_out_of_one_nostril/Nasal_cycle_2.txt",
+      "breathe_out_of_one_nostril/Nasal_cycle_3.txt",
+      "breathe_out_of_one_nostril/Nasal_cycle_4.txt",
+      "breathe_out_of_one_nostril/Nasal_cycle_5.txt"
+    ],
+    "is_correct": true
+  },
+  {
+    "query_id": "10",
+    "query_text": "If the brain has no pain receptors, how come you can get a headache?\nI've read many years ago in books, that the brain has no nerves on it, and if someone was touching your brain, you couldn't feel a thing.\nJust two days before now, I had a very bad migraine, due to a cold. It's become better now, but when I had it I felt my head was going to literally split in half, as the pain was literally coming from my brain.\nSo it lead me to the question: How come people can get headaches if the brain has no nerves?",
+    "model_raw_output": "The documents that best answer the query are those that explain the pathophysiology of headaches, specifically that the brain itself lacks pain receptors but surrounding structures such as the meninges and blood vessels do have them, leading to headache pain.\n\nID: 60 | TITLE: Headache (cephalalgia)  \nID: 61 | TITLE: Pathophysiology of headache  \n\nFinal Answer: [60, 61]",
+    "parsed_ids": [
+      "brain_no_pain_receptors_headache/Headache_0.txt",
+      "brain_no_pain_receptors_headache/Headache_2.txt"
+    ],
+    "gold_ids": [
+      "brain_no_pain_receptors_headache/Headache_0.txt",
+      "brain_no_pain_receptors_headache/Headache_2.txt",
+      "brain_no_pain_receptors_headache/Psychogenic_pain_0.txt"
+    ],
+    "is_correct": true
+  },
+  {
+    "query_id": "100",
+    "query_text": "What types of light can't a plant photosynthesize in?\nI have a plant on my desk, and it got me to wondering: Can my plant use the light from my monitors to photosynthesize? If so, what light (apart from green light, to a degree) can't plants use to perform photosynthesis?\nI know that plants have the photosynthetic pigments to absorb many different wavelengths of light (primarily red and blue) but would there be certain types of light it can't use?\n(The specific plant by the way is Schlumbergera truncata)",
+    "model_raw_output": "Document ID 259: Chlorophyll  \nThis document explains that chlorophyll absorbs light most strongly in the blue and red portions of the spectrum, but is a poor absorber of green and near-green light.\n\nFinal Answer: [259]",
+    "parsed_ids": [
+      "plant_light_pho/Chlorophyll_0.txt"
+    ],
+    "gold_ids": [
+      "plant_light_pho/Chlorophyll_0.txt",
+      "plant_light_pho/Chlorophyll_2.txt"
+    ],
+    "is_correct": true
+  },
+  {
+    "query_id": "101",
+    "query_text": "Which part of human eyes is getting tired?\nIt's a thing of common sense that if you read, drive or look at computer screen for too long your eyes will get tired. They burn, itch and try to close all the time.\nBut I was wondering which part(s) of them need rest so much... Blinking muscles? Lense muscles? Or the eyeball is drying out?",
+    "model_raw_output": "ID: 131 | TITLE: Computer vision syndrome (CVS) is a condition resulting from focusing the eyes on a computer or other display device for protracted, uninterrupted periods of time and the eye's muscles being unable to recover from the constant tension required to maintain focus on a close object.\n\nThis document directly addresses your query by explaining that Computer Vision Syndrome (CVS) is caused by the eye's muscles (specifically the ciliary muscles that control the lens for focusing) becoming fatigued from sustained tension.\n\nFinal Answer: [131]",
+    "parsed_ids": [
+      "eyes_tired/Computer_vision_syndrome_0.txt"
+    ],
+    "gold_ids": [
+      "eyes_tired/Computer_vision_syndrome_0.txt",
+      "eyes_tired/Computer_vision_syndrome_1.txt"
+    ],
+    "is_correct": true
+  }
+]
