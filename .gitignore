@@ -16,3 +16,7 @@ dist/
 # Scratch
 *.log
 vendor/
+
+# Secrets
+.env
+llm/.env

@@ -59,7 +59,16 @@ def our_rows(kind: str) -> pd.DataFrame:
             continue
         d = json.loads(f.read_text())
         try:
-            score = d["scores"]["test"][0]["main_score"]
+            s = d["scores"]["test"][0]
+            # Retrieval: recall@1 on both paradigms (the paper's common
+            # metric — LLM results' main_score is already recall@1; the
+            # embedding-side mteb main_score is nDCG@10 and must not be mixed)
+            if SUITE[task] == "Retrieval":
+                score = s.get("recall_at_1", s.get("recall@1"))
+            else:
+                score = s["main_score"]
+            if score is None:
+                continue
         except (KeyError, IndexError):
             continue
         model = f.relative_to(root).parts[0]  # mteb layout: <model>/<rev>/<task>.json
