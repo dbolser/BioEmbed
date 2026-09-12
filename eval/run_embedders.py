@@ -18,6 +18,7 @@ import mteb
 
 sys.path.insert(0, str(Path(__file__).parent))
 from tasks_tier_a import TIER_A_TASKS
+from tasks_local import LOCAL_TASKS
 
 REPO = Path(__file__).resolve().parent.parent
 DEFAULT_MODELS = [
@@ -50,11 +51,13 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--models", nargs="*", default=DEFAULT_MODELS)
     ap.add_argument("--tasks", nargs="*", default=None,
-                    help="task names; default = all Tier A")
+                    help="task names; default = whole suite")
+    ap.add_argument("--suite", choices=["tier_a", "local", "all"], default="all")
     ap.add_argument("--batch-size", type=int, default=32)
     args = ap.parse_args()
 
-    tasks = TIER_A_TASKS
+    tasks = {"tier_a": TIER_A_TASKS, "local": LOCAL_TASKS,
+             "all": TIER_A_TASKS + LOCAL_TASKS}[args.suite]
     if args.tasks:
         tasks = [t for t in tasks if t.metadata.name in args.tasks]
 
