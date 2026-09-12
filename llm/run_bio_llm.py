@@ -76,6 +76,13 @@ class _DummyEncoder:
 
 
 def main() -> None:
+    import argparse
+
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--tasks", nargs="*", default=None,
+                    help="task class names to run (default: all five)")
+    args = ap.parse_args()
+
     settings = Settings()
 
     if settings.token in ("", "dummy") or settings.token.endswith("..."):
@@ -89,7 +96,8 @@ def main() -> None:
     model_folder = REPO_ROOT / "results" / "llm" / model_slug
     model_folder.mkdir(parents=True, exist_ok=True)
 
-    tasks = [cls() for cls in BIO_TASKS]
+    tasks = [cls() for cls in BIO_TASKS
+             if args.tasks is None or cls.__name__ in args.tasks]
     print(f"Running {len(tasks)} bio tasks against {settings.model} "
           f"(base_url={settings.base_url}, max_concurrency={settings.max_concurrency})")
     print(f"Results -> {model_folder}")
