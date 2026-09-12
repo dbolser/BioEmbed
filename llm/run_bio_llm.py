@@ -81,6 +81,8 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--tasks", nargs="*", default=None,
                     help="task class names to run (default: all five)")
+    ap.add_argument("--output-suffix", default="",
+                    help="suffix for the results folder (e.g. __nothink for ablations)")
     args = ap.parse_args()
 
     settings = Settings()
@@ -92,7 +94,7 @@ def main() -> None:
             "(see llm/.env.example) before running."
         )
 
-    model_slug = settings.model.replace("/", "__")
+    model_slug = settings.model.replace("/", "__") + args.output_suffix
     model_folder = REPO_ROOT / "results" / "llm" / model_slug
     model_folder.mkdir(parents=True, exist_ok=True)
 

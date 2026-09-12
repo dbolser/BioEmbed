@@ -1,0 +1,81 @@
+[
+  {
+    "query_id": "0",
+    "query_text": "Claim in article about why insects are attracted to light\nIn this article they are addressing the reason insects are attracted to light when they say\nHeat radiation as an attractive component is refuted by the effect of LED lighting, which supplies negligible infrared radiation yet still entraps vast numbers of insects.\nI don't see why attraction to LEDs shows they're not seeking heat. Could they for example be evolutionarily programmed to associate light with heat? So that even though they don't encounter heat near/on the LEDs they still \"expect\" to?",
+    "model_raw_output": "The query asks for a document that discusses why insects are attracted to light, specifically addressing and refuting the heat-seeking hypothesis using the example of LED lights (which emit little heat) and perhaps offering insights into the evolutionary programming or innate nature of this behavior.\n\nDocument 188 (ID: 188) discusses phototaxis in insects. It specifically states: \"Positive phototaxis can be found in many flying insects such as moths, grasshoppers, and flies... This innate response is common among insects that fly primarily during the night utilizing transverse orientation vis-\u00e0-vis the light of the moon for orientation.\" It further mentions that artificial lighting acts as a \"supernormal stimulus.\" This provides the evolutionary/innate explanation for why they are attracted to light sources, regardless of heat.\n\nFinal Answer: [188]",
+    "parsed_ids": [
+      "insects_attracted_to_light/Phototaxis_3.txt"
+    ],
+    "gold_ids": [
+      "insects_attracted_to_light/Phototaxis_0.txt",
+      "insects_attracted_to_light/Phototaxis_3.txt",
+      "insects_attracted_to_light/Phototaxis_4.txt",
+      "insects_attracted_to_light/Proximate_and_ultimate_causation_0.txt",
+      "insects_attracted_to_light/Proximate_and_ultimate_causation_1.txt"
+    ],
+    "is_correct": true
+  },
+  {
+    "query_id": "1",
+    "query_text": "Why do I only breathe out of one nostril?\nI was just sitting with my hand next to my nose and I realized that air was only coming out of the right nostril. Why is that? I would think I would use both, it seems much more efficient. Have I always only been breathing out of my right nostril?",
+    "model_raw_output": "The following documents are most relevant to answering the query regarding why breathing occurs primarily through one nostril at a time:\n\n*   **ID: 65 | TITLE: The nasal cycle** - Explains that this is an unconscious, alternating physiological process known as the \"nasal cycle.\"\n*   **ID: 66 | TITLE: Description** - Details the mechanism of this cycle, noting that turbinates in one nasal fossa fill with blood while the opposite ones decongest, and that the airflow alternation is controlled by the autonomic nervous system.\n*   **ID: 67 | TITLE: Benefits for breathing** - Explains that this cycle helps keep one side of the nose moist to facilitate humidification, filtration, and warming of inspired air.\n*   **ID: 68 | TITLE: Benefits for olfaction** - Explains how the different airflow rates through each nostril allow for a greater range of smells to be detected.\n*   **ID: 69 | TITLE: Distinction** - Clarifies that this is a normal physiological process, distinct from pathological nasal congestion.\n\nFinal Answer: [65, 66, 67, 68, 69]",
+    "parsed_ids": [
+      "breathe_out_of_one_nostril/Nasal_cycle_0.txt",
+      "breathe_out_of_one_nostril/Nasal_cycle_1.txt",
+      "breathe_out_of_one_nostril/Nasal_cycle_2.txt",
+      "breathe_out_of_one_nostril/Nasal_cycle_3.txt",
+      "breathe_out_of_one_nostril/Nasal_cycle_4.txt"
+    ],
+    "gold_ids": [
+      "breathe_out_of_one_nostril/Nasal_cycle_0.txt",
+      "breathe_out_of_one_nostril/Nasal_cycle_1.txt",
+      "breathe_out_of_one_nostril/Nasal_cycle_2.txt",
+      "breathe_out_of_one_nostril/Nasal_cycle_3.txt",
+      "breathe_out_of_one_nostril/Nasal_cycle_4.txt",
+      "breathe_out_of_one_nostril/Nasal_cycle_5.txt"
+    ],
+    "is_correct": true
+  },
+  {
+    "query_id": "10",
+    "query_text": "If the brain has no pain receptors, how come you can get a headache?\nI've read many years ago in books, that the brain has no nerves on it, and if someone was touching your brain, you couldn't feel a thing.\nJust two days before now, I had a very bad migraine, due to a cold. It's become better now, but when I had it I felt my head was going to literally split in half, as the pain was literally coming from my brain.\nSo it lead me to the question: How come people can get headaches if the brain has no nerves?",
+    "model_raw_output": "The query asks for an explanation of how a headache occurs if the brain itself lacks pain receptors. Document 60 (HEADACHE) and Document 61 (PATHOPHYSIOLOGY) directly address this. They clarify that while the brain tissue itself lacks pain receptors (nociceptors), the pain felt during a headache arises from the stimulation of pain receptors in surrounding structures such as the meninges, blood vessels, and muscles of the head and neck.\n\nFinal Answer: [60, 61]",
+    "parsed_ids": [
+      "brain_no_pain_receptors_headache/Headache_0.txt",
+      "brain_no_pain_receptors_headache/Headache_2.txt"
+    ],
+    "gold_ids": [
+      "brain_no_pain_receptors_headache/Headache_0.txt",
+      "brain_no_pain_receptors_headache/Headache_2.txt",
+      "brain_no_pain_receptors_headache/Psychogenic_pain_0.txt"
+    ],
+    "is_correct": true
+  },
+  {
+    "query_id": "100",
+    "query_text": "What types of light can't a plant photosynthesize in?\nI have a plant on my desk, and it got me to wondering: Can my plant use the light from my monitors to photosynthesize? If so, what light (apart from green light, to a degree) can't plants use to perform photosynthesis?\nI know that plants have the photosynthetic pigments to absorb many different wavelengths of light (primarily red and blue) but would there be certain types of light it can't use?\n(The specific plant by the way is Schlumbergera truncata)",
+    "model_raw_output": "The provided documents explain that chlorophyll, the primary pigment in plants, absorbs light most strongly in the red and blue portions of the electromagnetic spectrum. Conversely, it is a poor absorber of green and near-green light, which is why plants appear green to the human eye. Document 259 explicitly states that chlorophyll is a poor absorber of green and near-green portions of the spectrum. Additionally, Document 260 notes that red and blue light are the primary drivers for photosystems.\n\nID: 259 | TITLE: Chlorophyll\nID: 260 | TITLE: Photosynthesis\n\nFinal Answer: [259, 260]",
+    "parsed_ids": [
+      "plant_light_pho/Chlorophyll_0.txt",
+      "plant_light_pho/Chlorophyll_2.txt"
+    ],
+    "gold_ids": [
+      "plant_light_pho/Chlorophyll_0.txt",
+      "plant_light_pho/Chlorophyll_2.txt"
+    ],
+    "is_correct": true
+  },
+  {
+    "query_id": "101",
+    "query_text": "Which part of human eyes is getting tired?\nIt's a thing of common sense that if you read, drive or look at computer screen for too long your eyes will get tired. They burn, itch and try to close all the time.\nBut I was wondering which part(s) of them need rest so much... Blinking muscles? Lense muscles? Or the eyeball is drying out?",
+    "model_raw_output": "The document that most specifically addresses the question regarding which parts of the eye get \"tired\" during prolonged tasks like looking at a computer screen is ID 131. It explicitly identifies the eye's muscles as the part unable to recover from the constant tension required for close-up focus.\n\nID: 131 | TITLE: Computer vision syndrome (CVS)\n\nFinal Answer: [131]",
+    "parsed_ids": [
+      "eyes_tired/Computer_vision_syndrome_0.txt"
+    ],
+    "gold_ids": [
+      "eyes_tired/Computer_vision_syndrome_0.txt",
+      "eyes_tired/Computer_vision_syndrome_1.txt"
+    ],
+    "is_correct": true
+  }
+]

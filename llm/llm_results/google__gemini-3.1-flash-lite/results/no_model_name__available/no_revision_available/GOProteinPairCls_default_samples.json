@@ -1,0 +1,47 @@
+[
+  {
+    "sentence1": "endoplasmic reticulum quality control compartment: A subcompartment of the endoplasmic reticulum in which proteins with improper or incorrect folding accumulate. Enzymes in this compartment direct proteins with major folding problems to translocation to the cytosol and degradation, and proteins with minor folding problems to the ER, to interact with chaperon proteins.",
+    "sentence2": "E3-ubiquitin ligase; acts as a negative regulator of cell proliferation through mechanisms involving G2/M arrest and cell death (PubMed:10500182, PubMed:12032852, PubMed:17016439). Required for MHC class I ubiquitination in cells expressing the cytomegalovirus protein US2 before dislocation from the endoplasmic reticulum (ER) (PubMed:19720873). Affects SREBP processing by hindering the SREBP-SCAP complex translocation from the ER to the Golgi, thereby reducing SREBF2 target gene expression (PubMed:19706601, PubMed:20068067). Involved in the sterol-accelerated degradation of HMGCR (PubMed:22143767, PubMed:23223569). This is achieved through binding of RNF139 to INSIG1 and/or INSIG2 at the ER membrane (PubMed:22143767). In addition, interaction of RNF139 with AUP1 facilitates interaction of RNF139 with ubiquitin-conjugating enzyme UBE2G2 and ubiquitin ligase AMFR, leading to ubiquitination of HMGCR (PubMed:23223569). The ubiquitinated HMGCR is then released from the ER into the cytosol for subsequent destruction (PubMed:22143767, PubMed:23223569). Required for INSIG1 ubiquitination (PubMed:20068067). May be required for EIF3 complex ubiquitination (PubMed:20068067)..",
+    "model_raw_output": "{\n \"reasoning\": \"The protein RNF139 (TRC8) is involved in ER-associated degradation (ERAD) pathways, specifically functioning in the ubiquitination and dislocation of proteins (such as HMGCR and MHC class I) from the endoplasmic reticulum to the cytosol for degradation. The 'endoplasmic reticulum quality control compartment' (ERQC) is the site where such misfolded proteins are sequestered and processed. As RNF139 is an E3-ubiquitin ligase localized to the ER membrane that mediates the degradation of proteins handled by the ERQC machinery, it functions within this cellular component.\",\n \"output\": 1\n}",
+    "reasoning": "The protein RNF139 (TRC8) is involved in ER-associated degradation (ERAD) pathways, specifically functioning in the ubiquitination and dislocation of proteins (such as HMGCR and MHC class I) from the endoplasmic reticulum to the cytosol for degradation. The 'endoplasmic reticulum quality control compartment' (ERQC) is the site where such misfolded proteins are sequestered and processed. As RNF139 is an E3-ubiquitin ligase localized to the ER membrane that mediates the degradation of proteins handled by the ERQC machinery, it functions within this cellular component.",
+    "predicted_label": 1,
+    "gold_label": 1,
+    "is_correct": true
+  },
+  {
+    "sentence1": "B cell activation: The change in morphology and behavior of a mature or immature B cell resulting from exposure to a mitogen, cytokine, chemokine, cellular ligand, or an antigen for which it is specific.",
+    "sentence2": "Required in cooperation with CD79B for initiation of the signal transduction cascade activated by binding of antigen to the B-cell antigen receptor complex (BCR) which leads to internalization of the complex, trafficking to late endosomes and antigen presentation. Also required for BCR surface expression and for efficient differentiation of pro- and pre-B-cells. Stimulates SYK autophosphorylation and activation. Binds to BLNK, bringing BLNK into proximity with SYK and allowing SYK to phosphorylate BLNK. Also interacts with and increases activity of some Src-family tyrosine kinases. Represses BCR signaling during development of immature B-cells..",
+    "model_raw_output": "{\n \"reasoning\": \"The protein described (CD79A) is a core component of the B-cell antigen receptor (BCR) complex. Its function is explicitly stated as initiating the signal transduction cascade that follows antigen binding, which is the triggering event for B cell activation. Therefore, the protein is intrinsically involved in the biological process of B cell activation.\",\n \"output\": 1\n}",
+    "reasoning": "The protein described (CD79A) is a core component of the B-cell antigen receptor (BCR) complex. Its function is explicitly stated as initiating the signal transduction cascade that follows antigen binding, which is the triggering event for B cell activation. Therefore, the protein is intrinsically involved in the biological process of B cell activation.",
+    "predicted_label": 1,
+    "gold_label": 1,
+    "is_correct": true
+  },
+  {
+    "sentence1": "regulation of actin polymerization or depolymerization: Any process that modulates the frequency, rate or extent of the assembly or disassembly of actin filaments by the addition or removal of actin monomers from a filament.",
+    "sentence2": "Protein phosphatase which regulates actin filament dynamics (PubMed:11832213, PubMed:16169194). Dephosphorylates and activates the actin binding/depolymerizing factor tsr/cofilin, which subsequently binds to actin filaments and stimulates their disassembly (PubMed:11832213, PubMed:25411210). Required for axon growth (PubMed:15572110)..",
+    "model_raw_output": "{\n \"reasoning\": \"The protein (Slingshot phosphatase/SSH) is explicitly described as a protein phosphatase that regulates actin filament dynamics by dephosphorylating and activating the actin-depolymerizing factor cofilin, which subsequently stimulates actin disassembly. Therefore, the protein is directly involved in the regulation of actin polymerization or depolymerization.\",\n \"output\": 1\n}",
+    "reasoning": "The protein (Slingshot phosphatase/SSH) is explicitly described as a protein phosphatase that regulates actin filament dynamics by dephosphorylating and activating the actin-depolymerizing factor cofilin, which subsequently stimulates actin disassembly. Therefore, the protein is directly involved in the regulation of actin polymerization or depolymerization.",
+    "predicted_label": 1,
+    "gold_label": 1,
+    "is_correct": true
+  },
+  {
+    "sentence1": "positive regulation of DNA-templated transcription: Any process that activates or increases the frequency, rate or extent of cellular DNA-templated transcription.",
+    "sentence2": "Transcription factor expressed in neurons of the brain that regulates the excitatory-inhibitory balance within neural circuits and is required for contextual memory in the hippocampus. Plays a key role in the structural and functional plasticity of neurons. Acts as an early-response transcription factor in both excitatory and inhibitory neurons, where it induces distinct but overlapping sets of late-response genes in these two types of neurons, allowing the synapses that form on inhibitory and excitatory neurons to be modified by neuronal activity in a manner specific to their function within a circuit, thereby facilitating appropriate circuit responses to sensory experience..",
+    "model_raw_output": "{\n \"reasoning\": \"The protein is explicitly described as a 'transcription factor' that 'induces... late-response genes'. Since it functions as a transcription factor that induces gene expression, it inherently performs the function of positive regulation of DNA-templated transcription.\",\n \"output\": 1\n}",
+    "reasoning": "The protein is explicitly described as a 'transcription factor' that 'induces... late-response genes'. Since it functions as a transcription factor that induces gene expression, it inherently performs the function of positive regulation of DNA-templated transcription.",
+    "predicted_label": 1,
+    "gold_label": 1,
+    "is_correct": true
+  },
+  {
+    "sentence1": "heparan sulfate binding: Binding to heparan sulfate.",
+    "sentence2": "Acts as a decoy receptor for TNFSF11/RANKL and thereby neutralizes its function in osteoclastogenesis. Inhibits the activation of osteoclasts and promotes osteoclast apoptosis in vitro. Bone homeostasis seems to depend on the local ratio between TNFSF11 and TNFRSF11B. May also play a role in preventing arterial calcification. May act as decoy receptor for TNFSF10/TRAIL and protect against apoptosis. TNFSF10/TRAIL binding blocks the inhibition of osteoclastogenesis (By similarity)..",
+    "model_raw_output": "{\n \"reasoning\": \"The protein described is Osteoprotegerin (TNFRSF11B). While it is a well-characterized decoy receptor for TNFSF11/RANKL and TNFSF10/TRAIL, scientific literature (such as UniProt and GO database annotations) does not define heparan sulfate binding as a primary or annotated molecular function for this specific protein. The function descriptions provided focus on its role as a decoy receptor for specific TNF superfamily ligands, not on binding to heparan sulfate.\",\n \"output\": 0\n}",
+    "reasoning": "The protein described is Osteoprotegerin (TNFRSF11B). While it is a well-characterized decoy receptor for TNFSF11/RANKL and TNFSF10/TRAIL, scientific literature (such as UniProt and GO database annotations) does not define heparan sulfate binding as a primary or annotated molecular function for this specific protein. The function descriptions provided focus on its role as a decoy receptor for specific TNF superfamily ligands, not on binding to heparan sulfate.",
+    "predicted_label": 0,
+    "gold_label": 1,
+    "is_correct": false
+  }
+]
