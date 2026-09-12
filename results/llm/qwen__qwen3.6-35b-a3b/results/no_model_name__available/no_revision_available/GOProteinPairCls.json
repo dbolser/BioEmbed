@@ -1,0 +1,36 @@
+{
+  "dataset_revision": "local",
+  "task_name": "GOProteinPairCls",
+  "mteb_version": "2.6.5",
+  "scores": {
+    "test": [
+      {
+        "similarity_ap": 0.792105,
+        "similarity_accuracy": 0.804,
+        "similarity_f1": 0.763636,
+        "max_ap": 0.792105,
+        "max_accuracy": 0.804,
+        "max_f1": 0.763636,
+        "max_precision": 0.884211,
+        "max_recall": 0.672,
+        "usage_stats": {
+          "input_tokens": 211795,
+          "cached_tokens": 18048,
+          "output_tokens": 685503,
+          "thinking_tokens": 647584,
+          "total_tokens": 897298,
+          "cost": 0.0,
+          "rlm_total_calls": 0,
+          "rlm_wall_time_s": 0.0
+        },
+        "main_score": 0.792105,
+        "hf_subset": "default",
+        "languages": [
+          "eng-Latn"
+        ]
+      }
+    ]
+  },
+  "evaluation_time": 1737.9743745326996,
+  "kg_co2_emissions": null
+}

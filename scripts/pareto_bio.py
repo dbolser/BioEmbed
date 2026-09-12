@@ -85,6 +85,8 @@ def our_llm_task_costs() -> pd.DataFrame:
     if not root.exists():
         return pd.DataFrame(columns=["model", "our_cost_usd", "n_our_tasks"])
     for mdir in root.iterdir():
+        if mdir.name.endswith("__nothink"):
+            continue
         prices = OR_PRICES.get(mdir.name)
         if prices is None:
             continue
@@ -174,13 +176,13 @@ def main() -> None:
             if m in cost_map:
                 full_cost[m] = cost_map[m]
         else:
-            # match our slug to the paper's slug for the lifted share
-            paper_slug = {"deepseek__deepseek-v4-flash": "deepseek__deepseek-v4-flash",
-                          "qwen__qwen3.6-35b-a3b": "qwen3.6-35b-a3b",
-                          "google__gemini-3.1-flash-lite": "google__gemini-3.1-flash-lite-preview",
-                          }.get(m, m)
-            lift = lifted_llm["bio_cost_usd"].get(paper_slug, None)
-            our = ours["our_cost_usd"].get(m, None)
+            # scores use the paper's slug; our results/llm dirs use the
+            # OpenRouter slug for the same model
+            our_slug = {"qwen3.6-35b-a3b": "qwen__qwen3.6-35b-a3b",
+                        "google__gemini-3.1-flash-lite-preview": "google__gemini-3.1-flash-lite",
+                        }.get(m, m)
+            lift = lifted_llm["bio_cost_usd"].get(m, None)
+            our = ours["our_cost_usd"].get(our_slug, None)
             if lift is not None and our is not None:
                 full_cost[m] = lift + our
     full["cost"] = full["model"].map(full_cost)

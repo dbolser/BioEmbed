@@ -46,6 +46,13 @@ def paper_rows() -> pd.DataFrame:
     return df[["model", "model_type", "task", "category", "score", "source"]]
 
 
+# our OpenRouter/local slugs -> the paper's model slugs, so results join
+ALIASES = {
+    "qwen__qwen3.6-35b-a3b": "qwen3.6-35b-a3b",
+    "google__gemini-3.1-flash-lite": "google__gemini-3.1-flash-lite-preview",
+}
+
+
 def our_rows(kind: str) -> pd.DataFrame:
     rows = []
     root = REPO / "results" / kind
@@ -53,6 +60,8 @@ def our_rows(kind: str) -> pd.DataFrame:
         return pd.DataFrame(columns=["model", "model_type", "task", "category", "score", "source"])
     for f in root.rglob("*.json"):
         if f.name in ("model_meta.json",):
+            continue
+        if "__nothink" in str(f):  # ablation runs aggregate separately
             continue
         task = f.stem
         if task not in SUITE:
@@ -72,6 +81,7 @@ def our_rows(kind: str) -> pd.DataFrame:
         except (KeyError, IndexError):
             continue
         model = f.relative_to(root).parts[0]  # mteb layout: <model>/<rev>/<task>.json
+        model = ALIASES.get(model, model)
         rows.append({
             "model": model,
             "model_type": "embedding" if kind == "embedding" else "llm",
