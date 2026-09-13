@@ -112,6 +112,9 @@ Qwen__Qwen3-Embedding-0.6B,embedding,LLMSTSBenchmark,STS,0.912924,paper
 Qwen__Qwen3-Embedding-0.6B,embedding,LLMToxicConversationsClassification,Classification,0.8188,paper
 Qwen__Qwen3-Embedding-0.6B,embedding,PubChemSynonymPC500,PairClassification,0.703716,ours
 Qwen__Qwen3-Embedding-0.6B,embedding,R2MEDBiologyPooled,Retrieval,0.25206,ours
+Qwen__Qwen3-Embedding-4B,embedding,BioMeSHClassification,Classification,0.5056,ours
+Qwen__Qwen3-Embedding-4B,embedding,GOProteinPairCls,PairClassification,0.785882,ours
+Qwen__Qwen3-Embedding-4B,embedding,GOPubMedRetrieval,Retrieval,0.2909,ours
 Qwen__Qwen3-Embedding-4B,embedding,LLMBIOSSES,STS,0.847754,paper
 Qwen__Qwen3-Embedding-4B,embedding,LLMBiorxivClusteringP2PV2,Clustering,0.63979,paper
 Qwen__Qwen3-Embedding-4B,embedding,LLMMedrxivClusteringP2PV2,Clustering,0.554543,paper
@@ -119,6 +122,8 @@ Qwen__Qwen3-Embedding-4B,embedding,LLMMedrxivClusteringS2SV2,Clustering,0.541027
 Qwen__Qwen3-Embedding-4B,embedding,LLMPublicHealthQA,Retrieval,0.75,paper
 Qwen__Qwen3-Embedding-4B,embedding,LLMSTSBenchmark,STS,0.937118,paper
 Qwen__Qwen3-Embedding-4B,embedding,LLMToxicConversationsClassification,Classification,0.9226,paper
+Qwen__Qwen3-Embedding-4B,embedding,PubChemSynonymPC500,PairClassification,0.70659,ours
+Qwen__Qwen3-Embedding-4B,embedding,R2MEDBiologyPooled,Retrieval,0.26068,ours
 Qwen__Qwen3-Embedding-8B,embedding,LLMBIOSSES,STS,0.819663,paper
 Qwen__Qwen3-Embedding-8B,embedding,LLMBiorxivClusteringP2PV2,Clustering,0.652991,paper
 Qwen__Qwen3-Embedding-8B,embedding,LLMMedrxivClusteringP2PV2,Clustering,0.55876,paper

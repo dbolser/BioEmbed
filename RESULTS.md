@@ -11,7 +11,8 @@ domain twist. On the full 12-task bio suite:
 
 | model | type | params | BioScore | $/pass |
 |---|---|---|---|---|
-| **Qwen3-Embedding-0.6B** | embedding | 596M | **0.616** | $0.022 |
+| **Qwen3-Embedding-4B** | embedding | 4B | **0.645** | $0.083 |
+| Qwen3-Embedding-0.6B | embedding | 596M | 0.616 | $0.022 |
 | MedEmbed-base (bio fine-tune of bge-base) | embedding | 109M | 0.592 | $0.0009 |
 | bge-large-en-v1.5 | embedding | 335M | 0.590 | $0.010 |
 | MedEmbed-large | embedding | 335M | 0.590 | $0.010 |
@@ -35,15 +36,18 @@ carries over to biology.
   GO-evidence retrieval (DeepSeek 0.331 vs bge-large 0.292, recall@1) and
   pooled R2MED biology (Flash-Lite 0.319 vs MiniLM 0.244). Reproduces the
   paper's "LLMs lead reasoning-heavy retrieval".
-- **Classification — LLMs win on this suite** (Qwen35B 0.818 vs arctic
-  0.687 on 30-class MeSH; 0.910 vs 0.665 on ToxicConversations). This
-  *diverges* from the paper, where 7B-class embedders won classification —
-  we have not yet run 4B/8B embedders on the new tasks (Qwen3-E-4B in
-  progress), and MTEB's few-shot-per-label protocol is hard on 30 classes.
+- **Classification — split.** On 30-class MeSH, LLMs win big (Qwen35B
+  0.818 vs best embedder MedCPT 0.689; MTEB's 8-samples-per-label logreg
+  protocol is hard on 30 classes, and the Qwen3-E family curiously scores
+  lowest of all embedders here, ~0.51). On binary ToxicConversations,
+  Qwen3-E-4B (0.923) beats the best LLM (0.910) — the paper's
+  big-embedders-win-classification result returns with embedder scale.
 - **Clustering — embedders win** (0.51 vs 0.50/0.32/0.20). The non-reasoning
   Flash-Lite collapses to 0.196 — the paper's exact finding.
 - **Pair classification — embedders win** (0.71 vs 0.63–0.66 category mean).
-  BioLORD wins chemical synonymy (0.657) — its literal training objective.
+  Qwen3-E-4B tops chemical synonymy (0.707) ahead of BioLORD (0.657),
+  whose concept-synonymy training objective makes it the best sub-300M
+  model there; every LLM sits at ~0.46–0.48.
 - **STS — a tie** (Flash-Lite 0.900 vs bge-large 0.877 on suite means).
 
 ## Thinking tax (`results/thinking_tax.csv`)
@@ -56,7 +60,8 @@ budgets often preserve quality, but it is model-dependent.
 ## The domain twist
 
 Bio-specialised models occupy the cheap end of the bio Pareto frontier
-(pubmedbert-emb → BioLORD → bge-base → MedEmbed-base → Qwen3-E-0.6B).
+(pubmedbert-emb → BioLORD → bge-base → MedEmbed-base → Qwen3-E-0.6B →
+Qwen3-E-4B).
 MedEmbed's ~$20-of-compute synthetic-triplet fine-tunes beat their bge
 parents at every size (small +0.016, base +0.004, large +0.000 BioScore) —
 domain fine-tuning of small embedders is real but its margin shrinks as
@@ -77,6 +82,6 @@ nothing outside PubMed-style retrieval.
   out-of-pool distractors) — scores are not comparable to the R2MED paper.
 - GOPubMedRetrieval gold is GO-Consortium experimental-evidence GAF links
   (human-curated); GOProteinPairCls negatives are GO-hierarchy-aware.
-- Not yet run: Qwen3-E-4B/8B and gated embeddinggemma on the new tasks;
+- Not yet run: Qwen3-E-8B and gated embeddinggemma on the new tasks;
   Gemini Pro/Flash on the new tasks (would cost $32–76). Single seed, no
   bootstrap CIs yet.
