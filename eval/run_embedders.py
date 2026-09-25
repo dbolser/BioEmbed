@@ -49,6 +49,11 @@ def get_model(name: str):
     if name == "ncbi/MedCPT":
         from medcpt_model import MedCPT
         return MedCPT()
+    if name.startswith("bioembed/"):  # our fine-tunes: models/bioembed-<x> -> results/embedding/bioembed__<x>
+        from sentence_transformers import SentenceTransformer
+        model = SentenceTransformer(str(REPO / "models" / f"bioembed-{name.split('/', 1)[1]}"))
+        model.model_card_data.model_name = name
+        return model
     try:
         return mteb.get_model(name)
     except Exception as e:

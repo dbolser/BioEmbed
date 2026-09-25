@@ -1,27 +1,31 @@
 # Results v1 — The Embedder's Dilemma, for Biology
 
-*2026-09-13. 16 embedding models + 4 LLMs (3 run by us on OpenRouter, the
+*Updated 2026-09-25. 21 embedding models + 4 LLMs (3 run by us on OpenRouter, the
 rest lifted from the paper's published results) on the 12-task BioMTEB(LLM)
-suite. Total LLM API spend: $6.22.*
+suite. LLM spend: $8.8 OpenRouter + ~$14 Vertex (Gemini Pro); GPU: $0.82 AWS + ~$1.35 GCP.*
 
 ## Headline
 
 The paper's division of labour **reproduces on biological text**, with one
 domain twist. On the full 12-task bio suite:
 
-| model | type | params | BioScore | $/pass |
+| model | type | params | BioScore | $/pass (measured L4) |
 |---|---|---|---|---|
-| **Qwen3-Embedding-4B** | embedding | 4B | **0.645** | $0.083 |
-| Qwen3-Embedding-0.6B | embedding | 596M | 0.616 | $0.022 |
-| MedEmbed-base (bio fine-tune of bge-base) | embedding | 109M | 0.592 | $0.0009 |
-| bge-large-en-v1.5 | embedding | 335M | 0.590 | $0.010 |
-| MedEmbed-large | embedding | 335M | 0.590 | $0.010 |
-| bge-base-en-v1.5 | embedding | 109M | 0.589 | $0.0009 |
+| **Qwen3-Embedding-8B** | embedding | 7.6B | **0.662** | $0.28 |
+| F2LLM-v2-1.7B | embedding | 1.7B | 0.656 | $0.08 |
+| Qwen3-Embedding-4B | embedding | 4B | 0.645 | $0.18 |
+| F2LLM-v2-0.6B | embedding | 596M | 0.631 | $0.045 |
+| Qwen3-Embedding-0.6B | embedding | 596M | 0.616 | $0.044 |
+| **bge-base-gaf (ours: bge-base + 172k GAF pairs)** | embedding | 109M | 0.604 | $0.006 |
+| bge-small-gaf (ours) | embedding | 33M | 0.598 | $0.002 |
+| MedEmbed-base | embedding | 109M | 0.592 | $0.006 |
 | DeepSeek-V4-Flash | LLM | — | 0.566 | $0.94 |
 | Gemini 3.1 Flash-Lite | LLM | — | 0.538 | $2.34 |
 
-(Full table: `results/bio_summary.csv`. Qwen3.6-35B-A3B scores 0.683 over
-11 tasks but cannot run R2MED-pooled — its 271k-token corpus-in-context
+(Full table: `results/bio_summary.csv`. Gemini 3.1 Pro (via Vertex, ~$14)
+scores 0.719 on the 11 tasks it shares with Qwen3-E-4B (0.680) — the
+frontier LLM wins by ~4 points at ~80× the cost; it lacks R2MED-pooled.
+Qwen3.6-35B-A3B scores 0.683 over 11 tasks but cannot run R2MED-pooled — its 271k-token corpus-in-context
 prompt exceeds the 262k context window; cost $4.85.)
 
 The best affordable LLM is **43× the cost of the best embedder and 1,000×
@@ -57,6 +61,21 @@ carries over to biology.
   tie artifacts; trust AP and F1 only.
 - **STS — a tie** (Flash-Lite 0.900 vs bge-large 0.877 on suite means).
 
+## Retrieval pipelines (nDCG@10, both paradigms scored identically)
+
+| protocol | GO-evidence | R2MED-bio | LLM cost/task |
+|---|---|---|---|
+| best embedder alone (Qwen3-E-8B) | 0.841 | 0.786 | — |
+| LLM reads whole corpus, ranked list (DeepSeek) | 0.835 | 0.840 | $0.15–0.45 |
+| Qwen3-E-0.6B top-20 → Flash-Lite rerank | **0.871** | **0.870** | $0.13–0.31 |
+| MiniLM top-20 → Flash-Lite rerank | 0.828 | 0.851 | same |
+
+Retrieve-then-rerank with a $0.04 embedder and a non-reasoning reranker
+beats both the 8B embedder and corpus-in-context, and it scales to real
+corpora. DeepSeek reranking spent 200–370k thinking tokens per task for
+the same nDCG Flash-Lite reached with ~4k output tokens and no thinking.
+(`results/llm_ranked`, `results/llm_rerank`.)
+
 ## Thinking tax (`results/thinking_tax.csv`)
 
 Disabling reasoning on DeepSeek-V4-Flash cut generated tokens ~66% at
@@ -66,9 +85,15 @@ budgets often preserve quality, but it is model-dependent.
 
 ## The domain twist
 
-Bio-specialised models occupy the cheap end of the bio Pareto frontier
-(pubmedbert-emb → BioLORD → bge-base → MedEmbed-base → Qwen3-E-0.6B →
-Qwen3-E-4B).
+Full-suite Pareto frontier (measured L4 costs): MiniLM → **bge-small-gaf** →
+**bge-base-gaf** → Qwen3-E-0.6B → F2LLM-0.6B → F2LLM-1.7B → Qwen3-E-8B.
+No LLM on it. Our own fine-tunes — bge-small/base trained one epoch on
+172k human-curated (GO term ↔ evidence abstract / protein function) pairs
+from the GAF, strict test exclusion, ~1 GPU-hour total — sit on the frontier,
+beating MedEmbed and their parents (+0.026 small, +0.015 base). Gains
+concentrate on the GO tasks that share the training pair type (+0.07–0.11
+on GO–protein pairs, +0.03–0.07 on GO-evidence retrieval), with ±0.01 noise
+elsewhere: a targeted fine-tune buys exactly the task family you train.
 MedEmbed's ~$20-of-compute synthetic-triplet fine-tunes beat their bge
 parents at every size (small +0.016, base +0.004, large +0.000 BioScore) —
 domain fine-tuning of small embedders is real but its margin shrinks as
@@ -116,14 +141,17 @@ nothing outside PubMed-style retrieval.
   reproducing the paper's multilingual-e5-small numbers exactly.
 - LLM costs: measured OpenRouter usage at current prices (lifted-task share
   recomputed from the paper's raw per-task usage at the same prices).
-  Embedding costs: own-tokenizer tokens × the paper's measured H100
-  $/MTok; params-nearest proxy (flagged) where unmeasured.
+  Embedding costs: own-tokenizer tokens × $/MTok from throughput measured
+  on one GCP Spot L4 ($0.48/hr, seq 512, largest batch; results/
+  embedding_throughput_gpu.csv). L4 rates run 2–5× the paper's H100
+  proxies with the same ordering; the LLM/embedder cost ratios above are
+  therefore conservative.
 - R2MED-pooled is far easier than full-corpus R2MED (363-doc pool, no
   out-of-pool distractors) — scores are not comparable to the R2MED paper.
 - GOPubMedRetrieval gold is GO-Consortium experimental-evidence GAF links
   (human-curated); GOProteinPairCls negatives are GO-hierarchy-aware.
-- Not yet run: Qwen3-E-8B and gated embeddinggemma on the new tasks;
-  Gemini Pro/Flash on the new tasks (would cost $32–76). Single seed.
+- Not yet run: gated embeddinggemma on the new tasks; Gemini Pro on
+  R2MED-pooled (~$10); Gemini 3 Flash anywhere new. Single seed.
 
 ### Uncertainty (`scripts/bootstrap_bio.py`)
 

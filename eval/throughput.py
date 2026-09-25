@@ -3,7 +3,7 @@ data/embedding_throughput.csv method: seq len 512 (pad/truncate), largest
 batch that fits (doubling until OOM), median/p5/p95 tok/s over timed
 batches of bio-suite corpus texts.
 
-Usage: uv run python throughput.py --rate 0.97 --out ../results/embedding_throughput_a10g.csv
+Usage: uv run python throughput.py --rate 0.97 --out ../results/embedding_throughput_gpu.csv
 """
 import argparse, csv, json, sys, time
 from pathlib import Path
@@ -51,7 +51,7 @@ def run_batches(model, batches):
 
 def measure(hf_id, texts, seq_len, dtype):
     tok = AutoTokenizer.from_pretrained(hf_id)
-    model = AutoModel.from_pretrained(hf_id, torch_dtype=dtype, trust_remote_code=True).cuda().eval()
+    model = AutoModel.from_pretrained(hf_id, dtype=dtype, device_map="cuda", trust_remote_code=True).eval()  # device_map: stream weights to GPU (8B OOMs host RAM otherwise)
     params = sum(p.numel() for p in model.parameters())
     enc = tok(texts, padding="max_length", truncation=True, max_length=seq_len, return_tensors="pt")
     keys = [k for k in ("input_ids", "attention_mask") if k in enc]
@@ -81,7 +81,7 @@ def measure(hf_id, texts, seq_len, dtype):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--rate", type=float, required=True, help="GPU $/hr actually paid")
-    ap.add_argument("--out", default=str(REPO / "results" / "embedding_throughput_a10g.csv"))
+    ap.add_argument("--out", default=str(REPO / "results" / "embedding_throughput_gpu.csv"))
     ap.add_argument("--seq-len", type=int, default=512)
     ap.add_argument("--models", nargs="*")
     args = ap.parse_args()

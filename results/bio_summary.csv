@@ -3,7 +3,6 @@ glm-5.1,llm,0.898,1
 Qwen__Qwen3.5-397B-A17B-FP8,llm,0.882,1
 zai-org__GLM-4.7-FP8,llm,0.868,1
 deepseek__deepseek-v4-pro,llm,0.751714,2
-Qwen__Qwen3-Embedding-8B,embedding,0.7452618571428571,7
 jinaai__jina-embeddings-v5-text-small,embedding,0.7449795714285713,7
 bflhc__Octen-Embedding-8B,embedding,0.7447727142857143,7
 jinaai__jina-embeddings-v5-text-nano,embedding,0.7403728571428572,7
@@ -25,6 +24,7 @@ Salesforce__SFR-Embedding-Mistral,embedding,0.6830271666666666,6
 intfloat__multilingual-e5-large-instruct,embedding,0.6781511428571428,7
 kimi-k2.6,llm,0.6737798571428572,7
 qwen3.6-35b-a3b,llm,0.6656647272727272,11
+Qwen__Qwen3-Embedding-8B,embedding,0.6616050833333332,12
 codefuse-ai__F2LLM-v2-1.7B,embedding,0.6559979166666666,12
 MiniMaxAI__MiniMax-M2.5,llm,0.6543998,5
 Qwen__Qwen3-Embedding-4B,embedding,0.645207,12
@@ -35,6 +35,8 @@ minimax-m2.7,llm,0.6293204285714287,7
 glm-4.7,llm,0.6240644285714286,7
 Qwen__Qwen3-Embedding-0.6B,embedding,0.6156561666666667,12
 intfloat__multilingual-e5-base,embedding,0.6134187142857143,7
+bioembed__bge-base-gaf,embedding,0.603632,12
+bioembed__bge-small-gaf,embedding,0.5983519166666667,12
 abhinand__MedEmbed-base-v0.1,embedding,0.5923870000000001,12
 deepseek-r1,llm,0.5910971428571428,7
 BAAI__bge-large-en-v1.5,embedding,0.5902349166666666,12

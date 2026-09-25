@@ -1,0 +1,20 @@
+model_id,params,batch_size_used,seq_len,tokens_per_batch,median_tok_per_sec,p5_tok_per_sec,p95_tok_per_sec,cost_usd_per_mtok,gpu,gpu_rate_usd_per_hr,status,error
+BAAI/bge-base-en-v1.5,109482240,1024,512,524288,133460.4,132255.7,135855.0,0.000999,NVIDIA L4,0.48,success,
+BAAI/bge-large-en-v1.5,335141888,1024,512,524288,45377.6,45244.3,45448.6,0.002938,NVIDIA L4,0.48,success,
+BAAI/bge-small-en-v1.5,33360000,1024,512,524288,326407.0,322174.2,329871.0,0.000408,NVIDIA L4,0.48,success,
+FremyCompany/BioLORD-2023,109486464,512,512,262144,73399.9,73052.2,73716.4,0.001817,NVIDIA L4,0.48,success,
+NeuML/pubmedbert-base-embeddings,109482240,1024,512,524288,136698.8,136480.4,137126.6,0.000975,NVIDIA L4,0.48,success,
+Qwen/Qwen3-Embedding-0.6B,595776512,256,512,131072,16682.9,16622.6,16709.7,0.007992,NVIDIA L4,0.48,success,
+Qwen/Qwen3-Embedding-4B,4021774336,64,512,32768,4128.0,4118.7,4149.4,0.032299,NVIDIA L4,0.48,success,
+Qwen/Qwen3-Embedding-8B,7567295488,32,512,16384,2608.5,2596.5,2650.4,0.051115,NVIDIA L4,0.48,success,
+Snowflake/snowflake-arctic-embed-l-v2.0,567754752,1024,512,524288,46323.2,45815.8,47120.8,0.002878,NVIDIA L4,0.48,success,
+abhinand/MedEmbed-base-v0.1,109482240,1024,512,524288,136327.1,135893.1,136794.6,0.000978,NVIDIA L4,0.48,success,
+abhinand/MedEmbed-large-v0.1,335141888,1024,512,524288,45295.5,44992.6,45995.6,0.002944,NVIDIA L4,0.48,success,
+abhinand/MedEmbed-small-v0.1,33360000,1024,512,524288,325274.0,323594.8,330707.3,0.00041,NVIDIA L4,0.48,success,
+bioembed/bge-base-gaf,,,512,,,,,,NVIDIA L4,0.48,error,"OSError(""Repo id must be in the form 'repo_name' or 'namespace/repo_name': '/home/danbolser/BioEmbed/models/bge-base-gaf'. Use `repo_type` argument if needed."")"
+bioembed/bge-small-gaf,,,512,,,,,,NVIDIA L4,0.48,error,"OSError(""Repo id must be in the form 'repo_name' or 'namespace/repo_name': '/home/danbolser/BioEmbed/models/bge-small-gaf'. Use `repo_type` argument if needed."")"
+codefuse-ai/F2LLM-v2-0.6B,596049920,1024,512,524288,16444.1,16389.2,16506.2,0.008108,NVIDIA L4,0.48,success,
+codefuse-ai/F2LLM-v2-1.7B,1720574976,512,512,262144,9318.9,9269.0,9326.6,0.014308,NVIDIA L4,0.48,success,
+intfloat/multilingual-e5-small,117653760,1024,512,524288,314111.9,310017.1,323133.2,0.000424,NVIDIA L4,0.48,success,
+ncbi/MedCPT,109482240,1024,512,524288,139125.6,136634.6,140344.0,0.000958,NVIDIA L4,0.48,success,
+sentence-transformers/all-MiniLM-L6-v2,22713216,1024,512,524288,657140.5,653068.1,661651.9,0.000203,NVIDIA L4,0.48,success,

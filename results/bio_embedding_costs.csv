@@ -1,16 +1,20 @@
-model,tokens,cost_usd_per_mtok,total_cost_usd,throughput_proxy
-BAAI/bge-base-en-v1.5,5681725,0.00016,0.0009090760000000001,intfloat/multilingual-e5-small
-BAAI/bge-large-en-v1.5,5681725,0.001845,0.010482782625000001,google/embeddinggemma-300m
-BAAI/bge-small-en-v1.5,5681725,0.00016,0.0009090760000000001,intfloat/multilingual-e5-small
-FremyCompany/BioLORD-2023,5681725,0.00016,0.0009090760000000001,intfloat/multilingual-e5-small
-NeuML/pubmedbert-base-embeddings,5669111,0.00016,0.0009070577600000001,intfloat/multilingual-e5-small
-Qwen/Qwen3-Embedding-0.6B,5548546,0.003937,0.021844625602,
-Qwen/Qwen3-Embedding-4B,5548546,0.01501,0.08328367546,
-Qwen/Qwen3-Embedding-8B,5548546,0.023637,0.131150981802,
-Snowflake/snowflake-arctic-embed-l-v2.0,6205052,0.00108,0.00670145616,
-abhinand/MedEmbed-base-v0.1,5681725,0.00016,0.0009090760000000001,intfloat/multilingual-e5-small
-abhinand/MedEmbed-large-v0.1,5681725,0.001845,0.010482782625000001,google/embeddinggemma-300m
-abhinand/MedEmbed-small-v0.1,5681725,0.00016,0.0009090760000000001,intfloat/multilingual-e5-small
-intfloat/multilingual-e5-small,6205052,0.00016,0.0009928083200000002,
-ncbi/MedCPT,5669111,0.00016,0.0009070577600000001,intfloat/multilingual-e5-small
-sentence-transformers/all-MiniLM-L6-v2,5681725,0.00016,0.0009090760000000001,intfloat/multilingual-e5-small
+model,tokens,cost_usd_per_mtok,total_cost_usd,throughput_proxy,basis
+BAAI/bge-base-en-v1.5,5681725,0.000999,0.005676043275000001,,measured L4 spot $0.48/hr
+BAAI/bge-large-en-v1.5,5681725,0.002938,0.01669290805,,measured L4 spot $0.48/hr
+BAAI/bge-small-en-v1.5,5681725,0.000408,0.0023181438,,measured L4 spot $0.48/hr
+FremyCompany/BioLORD-2023,5681725,0.001817,0.010323694325,,measured L4 spot $0.48/hr
+NeuML/pubmedbert-base-embeddings,5669111,0.000975,0.005527383225,,measured L4 spot $0.48/hr
+Qwen/Qwen3-Embedding-0.6B,5548546,0.007992,0.044343979632000007,,measured L4 spot $0.48/hr
+Qwen/Qwen3-Embedding-4B,5548546,0.032299,0.17921248725400002,,measured L4 spot $0.48/hr
+Qwen/Qwen3-Embedding-8B,5548546,0.051115,0.28361392879,,measured L4 spot $0.48/hr
+Snowflake/snowflake-arctic-embed-l-v2.0,6205052,0.002878,0.017858139656,,measured L4 spot $0.48/hr
+abhinand/MedEmbed-base-v0.1,5681725,0.000978,0.00555672705,,measured L4 spot $0.48/hr
+abhinand/MedEmbed-large-v0.1,5681725,0.002944,0.016726998400000002,,measured L4 spot $0.48/hr
+abhinand/MedEmbed-small-v0.1,5681725,0.00041,0.00232950725,,measured L4 spot $0.48/hr
+bioembed/bge-base-gaf,5681725,0.000999,0.005676043275000001,,measured L4 spot $0.48/hr
+bioembed/bge-small-gaf,5681725,0.000408,0.0023181438,,measured L4 spot $0.48/hr
+codefuse-ai/F2LLM-v2-0.6B,5548546,0.008108,0.044987610968000004,,measured L4 spot $0.48/hr
+codefuse-ai/F2LLM-v2-1.7B,5548546,0.014308,0.079388596168,,measured L4 spot $0.48/hr
+intfloat/multilingual-e5-small,6205052,0.000424,0.002630942048,,measured L4 spot $0.48/hr
+ncbi/MedCPT,5669111,0.000958,0.005431008338,,measured L4 spot $0.48/hr
+sentence-transformers/all-MiniLM-L6-v2,5681725,0.000203,0.001153390175,,measured L4 spot $0.48/hr

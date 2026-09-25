@@ -24,3 +24,4 @@ eval/.first_stage_scratch/
 llm/llm_results/
 llm/dryrun_results/
 llm/.env.or-*
+models/
