@@ -14,11 +14,11 @@ tencent__KaLM-Embedding-Gemma3-12B-2511,embedding,0.7275752857142858,7
 codefuse-ai__F2LLM-v2-14B,embedding,0.7269811428571428,7
 codefuse-ai__F2LLM-v2-8B,embedding,0.7267367142857142,7
 codefuse-ai__F2LLM-v2-4B,embedding,0.724391,7
-google__gemini-3.1-pro-preview,llm,0.7189542727272727,11
 google__embeddinggemma-300m,embedding,0.7165075714285714,7
 Alibaba-NLP__gte-Qwen2-1.5B-instruct,embedding,0.7079118571428571,7
 qwen3.6-27b,llm,0.7004364285714286,7
 Linq-AI-Research__Linq-Embed-Mistral,embedding,0.6984157142857141,7
+google__gemini-3.1-pro-preview,llm,0.6885425833333333,12
 google__gemini-3-flash-preview,llm,0.6872055714285714,7
 Salesforce__SFR-Embedding-Mistral,embedding,0.6830271666666666,6
 intfloat__multilingual-e5-large-instruct,embedding,0.6781511428571428,7

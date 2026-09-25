@@ -2,7 +2,7 @@
 
 *Updated 2026-09-25. 21 embedding models + 4 LLMs (3 run by us on OpenRouter, the
 rest lifted from the paper's published results) on the 12-task BioMTEB(LLM)
-suite. LLM spend: $8.8 OpenRouter + ~$14 Vertex (Gemini Pro); GPU: $0.82 AWS + ~$1.35 GCP.*
+suite. LLM spend: $8.8 OpenRouter + ~$26 Vertex (Gemini Pro); GPU: $0.82 AWS + ~$1.35 GCP.*
 
 ## Headline
 
@@ -11,7 +11,8 @@ domain twist. On the full 12-task bio suite:
 
 | model | type | params | BioScore | $/pass (measured L4) |
 |---|---|---|---|---|
-| **Qwen3-Embedding-8B** | embedding | 7.6B | **0.662** | $0.28 |
+| **Gemini 3.1 Pro** (Vertex) | LLM | — | **0.689** | $39 |
+| Qwen3-Embedding-8B | embedding | 7.6B | 0.662 | $0.28 |
 | F2LLM-v2-1.7B | embedding | 1.7B | 0.656 | $0.08 |
 | Qwen3-Embedding-4B | embedding | 4B | 0.645 | $0.18 |
 | F2LLM-v2-0.6B | embedding | 596M | 0.631 | $0.045 |
@@ -22,10 +23,9 @@ domain twist. On the full 12-task bio suite:
 | DeepSeek-V4-Flash | LLM | — | 0.566 | $0.94 |
 | Gemini 3.1 Flash-Lite | LLM | — | 0.538 | $2.34 |
 
-(Full table: `results/bio_summary.csv`. Gemini 3.1 Pro (via Vertex, ~$14)
-scores 0.719 on the 11 tasks it shares with Qwen3-E-4B (0.680) — the
-frontier LLM wins by ~4 points at ~80× the cost; it lacks R2MED-pooled.
-Qwen3.6-35B-A3B scores 0.683 over 11 tasks but cannot run R2MED-pooled — its 271k-token corpus-in-context
+(Full table: `results/bio_summary.csv`. Gemini 3.1 Pro now covers all 12
+tasks (~$26 on Vertex): it leads by 2.7 points at ~140× the cost of
+Qwen3-E-8B — the paper's dilemma, exactly. Qwen3.6-35B-A3B scores 0.683 over 11 tasks but cannot run R2MED-pooled — its 271k-token corpus-in-context
 prompt exceeds the 262k context window; cost $4.85.)
 
 The best affordable LLM is **43× the cost of the best embedder and 1,000×
@@ -86,8 +86,8 @@ budgets often preserve quality, but it is model-dependent.
 ## The domain twist
 
 Full-suite Pareto frontier (measured L4 costs): MiniLM → **bge-small-gaf** →
-**bge-base-gaf** → Qwen3-E-0.6B → F2LLM-0.6B → F2LLM-1.7B → Qwen3-E-8B.
-No LLM on it. Our own fine-tunes — bge-small/base trained one epoch on
+**bge-base-gaf** → Qwen3-E-0.6B → F2LLM-0.6B → F2LLM-1.7B → Qwen3-E-8B → Gemini 3.1 Pro.
+As in the paper: all embedders plus one frontier LLM at the top. Our own fine-tunes — bge-small/base trained one epoch on
 172k human-curated (GO term ↔ evidence abstract / protein function) pairs
 from the GAF, strict test exclusion, ~1 GPU-hour total — sit on the frontier,
 beating MedEmbed and their parents (+0.026 small, +0.015 base). Gains
@@ -150,8 +150,7 @@ nothing outside PubMed-style retrieval.
   out-of-pool distractors) — scores are not comparable to the R2MED paper.
 - GOPubMedRetrieval gold is GO-Consortium experimental-evidence GAF links
   (human-curated); GOProteinPairCls negatives are GO-hierarchy-aware.
-- Not yet run: gated embeddinggemma on the new tasks; Gemini Pro on
-  R2MED-pooled (~$10); Gemini 3 Flash anywhere new. Single seed.
+- Not yet run: gated embeddinggemma on the new tasks; Gemini 3 Flash anywhere new. Single seed.
 
 ### Uncertainty (`scripts/bootstrap_bio.py`)
 

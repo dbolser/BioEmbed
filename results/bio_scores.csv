@@ -437,6 +437,7 @@ google__gemini-3.1-pro-preview,llm,LLMPublicHealthQA,Retrieval,0.9,paper
 google__gemini-3.1-pro-preview,llm,LLMSTSBenchmark,STS,0.926244,paper
 google__gemini-3.1-pro-preview,llm,LLMToxicConversationsClassification,Classification,0.896,paper
 google__gemini-3.1-pro-preview,llm,PubChemSynonymPC500,PairClassification,0.562373,ours
+google__gemini-3.1-pro-preview,llm,R2MEDBiologyPooled,Retrieval,0.354014,ours
 kimi-k2.6,llm,LLMBIOSSES,STS,0.863853,paper
 kimi-k2.6,llm,LLMBiorxivClusteringP2PV2,Clustering,0.519343,paper
 kimi-k2.6,llm,LLMMedrxivClusteringP2PV2,Clustering,0.505597,paper
