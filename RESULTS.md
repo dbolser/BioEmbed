@@ -123,5 +123,29 @@ nothing outside PubMed-style retrieval.
 - GOPubMedRetrieval gold is GO-Consortium experimental-evidence GAF links
   (human-curated); GOProteinPairCls negatives are GO-hierarchy-aware.
 - Not yet run: Qwen3-E-8B and gated embeddinggemma on the new tasks;
-  Gemini Pro/Flash on the new tasks (would cost $32–76). Single seed, no
-  bootstrap CIs yet.
+  Gemini Pro/Flash on the new tasks (would cost $32–76). Single seed.
+
+### Uncertainty (`scripts/bootstrap_bio.py`)
+
+Task-level paired bootstrap, the paper's method (10k resamples of the task
+set, seed 42; `results/bootstrap_scores.csv`, `results/bootstrap_pairs.csv`).
+Item-level CIs are not possible: the result JSONs hold only aggregate
+metrics, and the paper's lifted scores are one number per task.
+
+With 12 (full) or 7 (lifted) tasks, each model's BioScore has a 95% CI
+about ±0.12 wide (median width 0.23 on both suites) — wider than most gaps
+between models. Paired differences are tighter, since the same tasks hit
+both models. Of the headline comparisons only one survives at 95%:
+
+- **Qwen3-E-4B > Qwen3-E-0.6B**: +0.030 [+0.007, +0.054], p=0.008 — significant.
+- Qwen3-E-0.6B > MedEmbed-base: +0.023 [−0.040, +0.073], p=0.42 — not.
+- MedEmbed-base > DeepSeek-V4-Flash: +0.027 [−0.038, +0.096], p=0.43 — not.
+  Even Qwen3-E-4B > DeepSeek (+0.080 [−0.016, +0.171], p=0.11) is not.
+- MedEmbed vs bge parents: small +0.015 [−0.001, +0.033], p=0.06 (borderline);
+  base +0.004, p=0.71; large −0.000, p=0.94 — none significant.
+- Gemini 3.1 Pro > Qwen3-E-8B (lifted): +0.013 [−0.024, +0.057], p=0.61 — not.
+
+Read the rankings as suggestive orderings, not settled ones. The
+embedder-vs-LLM ordering on the full suite rests on where each side wins
+(category-level), not on a significant BioScore gap; and the paper's own
+Pro-vs-best-embedder gap is a tie here too.
