@@ -11,6 +11,6 @@ from openai import OpenAI
 tok, proj = get_vertex_credentials()
 print("ADC project:", proj, "| token:", "ok" if tok else "MISSING")
 c = OpenAI(api_key=tok, base_url=settings.base_url)
-r = c.chat.completions.create(model=settings.model, max_tokens=50,
+r = c.chat.completions.create(model=settings.model, max_tokens=2000,
         messages=[{"role": "user", "content": "Reply with the single word: ready"}])
-print("reply:", r.choices[0].message.content.strip(), "| usage:", r.usage)
+print("reply:", (r.choices[0].message.content or "").strip()[:80], "| usage:", r.usage)
