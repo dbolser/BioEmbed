@@ -1,0 +1,57 @@
+{
+ "dataset_revision": "local",
+ "task_name": "R2MEDBiologyPooled",
+ "mteb_version": "2.6.5",
+ "scores": {
+  "test": [
+   {
+    "ndcg_at_1": 0.89,
+    "ndcg_at_3": 0.8637,
+    "ndcg_at_5": 0.84448,
+    "ndcg_at_10": 0.83992,
+    "ndcg_at_20": 0.83601,
+    "map_at_1": 0.34768,
+    "map_at_3": 0.69513,
+    "map_at_5": 0.76896,
+    "map_at_10": 0.79796,
+    "map_at_20": 0.79796,
+    "recall_at_1": 0.34768,
+    "recall_at_3": 0.70902,
+    "recall_at_5": 0.78626,
+    "recall_at_10": 0.81939,
+    "recall_at_20": 0.81939,
+    "precision_at_1": 0.89,
+    "precision_at_3": 0.72,
+    "precision_at_5": 0.52,
+    "precision_at_10": 0.286,
+    "precision_at_20": 0.143,
+    "mrr_at_1": 0.89,
+    "mrr_at_3": 0.91,
+    "mrr_at_5": 0.91,
+    "mrr_at_10": 0.91,
+    "mrr_at_20": 0.91,
+    "n_empty": 0,
+    "mean_list_len": 3.91,
+    "main_score": 0.83992,
+    "usage_stats": {
+     "input_tokens": 22501104,
+     "cached_tokens": 20903424,
+     "output_tokens": 164202,
+     "thinking_tokens": 150564,
+     "total_tokens": 22665306,
+     "cost": 0.0,
+     "rlm_total_calls": 0,
+     "rlm_wall_time_s": 0.0
+    },
+    "hf_subset": "default",
+    "languages": [
+     "eng-Latn"
+    ]
+   }
+  ]
+ },
+ "evaluation_time": 529.4,
+ "protocol": "corpus_in_context_ranked",
+ "max_ranked": 10,
+ "dry_run": false
+}
