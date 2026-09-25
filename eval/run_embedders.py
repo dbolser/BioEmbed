@@ -54,7 +54,9 @@ def get_model(name: str):
     except Exception as e:
         print(f"  mteb.get_model failed ({e!r}); falling back to SentenceTransformer")
         from sentence_transformers import SentenceTransformer
-        return SentenceTransformer(name)
+        model = SentenceTransformer(name)
+        model.model_card_data.model_name = name  # results dir = name, not base_model
+        return model
 
 
 def main() -> None:
