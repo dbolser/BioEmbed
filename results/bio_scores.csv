@@ -199,6 +199,9 @@ bflhc__Octen-Embedding-8B,embedding,LLMMedrxivClusteringS2SV2,Clustering,0.53265
 bflhc__Octen-Embedding-8B,embedding,LLMPublicHealthQA,Retrieval,0.81,paper
 bflhc__Octen-Embedding-8B,embedding,LLMSTSBenchmark,STS,0.932476,paper
 bflhc__Octen-Embedding-8B,embedding,LLMToxicConversationsClassification,Classification,0.919,paper
+codefuse-ai__F2LLM-v2-0.6B,embedding,BioMeSHClassification,Classification,0.5846,ours
+codefuse-ai__F2LLM-v2-0.6B,embedding,GOProteinPairCls,PairClassification,0.812153,ours
+codefuse-ai__F2LLM-v2-0.6B,embedding,GOPubMedRetrieval,Retrieval,0.24868,ours
 codefuse-ai__F2LLM-v2-0.6B,embedding,LLMBIOSSES,STS,0.878412,paper
 codefuse-ai__F2LLM-v2-0.6B,embedding,LLMBiorxivClusteringP2PV2,Clustering,0.711398,paper
 codefuse-ai__F2LLM-v2-0.6B,embedding,LLMMedrxivClusteringP2PV2,Clustering,0.586742,paper
@@ -206,6 +209,11 @@ codefuse-ai__F2LLM-v2-0.6B,embedding,LLMMedrxivClusteringS2SV2,Clustering,0.5453
 codefuse-ai__F2LLM-v2-0.6B,embedding,LLMPublicHealthQA,Retrieval,0.8,paper
 codefuse-ai__F2LLM-v2-0.6B,embedding,LLMSTSBenchmark,STS,0.876194,paper
 codefuse-ai__F2LLM-v2-0.6B,embedding,LLMToxicConversationsClassification,Classification,0.5972,paper
+codefuse-ai__F2LLM-v2-0.6B,embedding,PubChemSynonymPC500,PairClassification,0.693777,ours
+codefuse-ai__F2LLM-v2-0.6B,embedding,R2MEDBiologyPooled,Retrieval,0.23872,ours
+codefuse-ai__F2LLM-v2-1.7B,embedding,BioMeSHClassification,Classification,0.6584,ours
+codefuse-ai__F2LLM-v2-1.7B,embedding,GOProteinPairCls,PairClassification,0.821175,ours
+codefuse-ai__F2LLM-v2-1.7B,embedding,GOPubMedRetrieval,Retrieval,0.28202,ours
 codefuse-ai__F2LLM-v2-1.7B,embedding,LLMBIOSSES,STS,0.884665,paper
 codefuse-ai__F2LLM-v2-1.7B,embedding,LLMBiorxivClusteringP2PV2,Clustering,0.772534,paper
 codefuse-ai__F2LLM-v2-1.7B,embedding,LLMMedrxivClusteringP2PV2,Clustering,0.607255,paper
@@ -213,6 +221,8 @@ codefuse-ai__F2LLM-v2-1.7B,embedding,LLMMedrxivClusteringS2SV2,Clustering,0.5612
 codefuse-ai__F2LLM-v2-1.7B,embedding,LLMPublicHealthQA,Retrieval,0.82,paper
 codefuse-ai__F2LLM-v2-1.7B,embedding,LLMSTSBenchmark,STS,0.876265,paper
 codefuse-ai__F2LLM-v2-1.7B,embedding,LLMToxicConversationsClassification,Classification,0.6106,paper
+codefuse-ai__F2LLM-v2-1.7B,embedding,PubChemSynonymPC500,PairClassification,0.702385,ours
+codefuse-ai__F2LLM-v2-1.7B,embedding,R2MEDBiologyPooled,Retrieval,0.27541,ours
 codefuse-ai__F2LLM-v2-14B,embedding,LLMBIOSSES,STS,0.881972,paper
 codefuse-ai__F2LLM-v2-14B,embedding,LLMBiorxivClusteringP2PV2,Clustering,0.755783,paper
 codefuse-ai__F2LLM-v2-14B,embedding,LLMMedrxivClusteringP2PV2,Clustering,0.576984,paper
@@ -387,6 +397,9 @@ google__gemini-3.1-flash-lite-preview,llm,LLMSTSBenchmark,STS,0.903116,paper
 google__gemini-3.1-flash-lite-preview,llm,LLMToxicConversationsClassification,Classification,0.886,paper
 google__gemini-3.1-flash-lite-preview,llm,PubChemSynonymPC500,PairClassification,0.469353,ours
 google__gemini-3.1-flash-lite-preview,llm,R2MEDBiologyPooled,Retrieval,0.31868,ours
+google__gemini-3.1-pro-preview,llm,BioMeSHClassification,Classification,0.876,ours
+google__gemini-3.1-pro-preview,llm,GOProteinPairCls,PairClassification,0.830024,ours
+google__gemini-3.1-pro-preview,llm,GOPubMedRetrieval,Retrieval,0.331349,ours
 google__gemini-3.1-pro-preview,llm,LLMBIOSSES,STS,0.896214,paper
 google__gemini-3.1-pro-preview,llm,LLMBiorxivClusteringP2PV2,Clustering,0.625399,paper
 google__gemini-3.1-pro-preview,llm,LLMMedrxivClusteringP2PV2,Clustering,0.525138,paper
@@ -394,6 +407,7 @@ google__gemini-3.1-pro-preview,llm,LLMMedrxivClusteringS2SV2,Clustering,0.539756
 google__gemini-3.1-pro-preview,llm,LLMPublicHealthQA,Retrieval,0.9,paper
 google__gemini-3.1-pro-preview,llm,LLMSTSBenchmark,STS,0.926244,paper
 google__gemini-3.1-pro-preview,llm,LLMToxicConversationsClassification,Classification,0.896,paper
+google__gemini-3.1-pro-preview,llm,PubChemSynonymPC500,PairClassification,0.562373,ours
 kimi-k2.6,llm,LLMBIOSSES,STS,0.863853,paper
 kimi-k2.6,llm,LLMBiorxivClusteringP2PV2,Clustering,0.519343,paper
 kimi-k2.6,llm,LLMMedrxivClusteringP2PV2,Clustering,0.505597,paper
