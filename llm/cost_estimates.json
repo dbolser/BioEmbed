@@ -1,0 +1,90 @@
+[
+ {
+  "task": "GOPubMedRetrieval",
+  "model": "deepseek/deepseek-v4-flash",
+  "protocol": "ranked_list",
+  "input_tokens": 7115996,
+  "cached_tokens": 6062080,
+  "output_tokens": 17310,
+  "cost": 0.15063310599999996,
+  "calib": 0.8956472789003268,
+  "per_query_in": 94879
+ },
+ {
+  "task": "GOPubMedRetrieval",
+  "model": "deepseek/deepseek-v4-flash",
+  "protocol": "rerank_top20",
+  "input_tokens": 487163,
+  "cached_tokens": 0,
+  "output_tokens": 5250,
+  "cost": 0.03284052793714267,
+  "calib": 0.8956472789003268,
+  "per_query_in": 6495
+ },
+ {
+  "task": "GOPubMedRetrieval",
+  "model": "google/gemini-3.1-flash-lite",
+  "protocol": "ranked_list",
+  "input_tokens": 7177186,
+  "cached_tokens": 6308854,
+  "output_tokens": 21333,
+  "cost": 0.40680384999999997,
+  "calib": 0.9033488932626608,
+  "per_query_in": 95695
+ },
+ {
+  "task": "GOPubMedRetrieval",
+  "model": "google/gemini-3.1-flash-lite",
+  "protocol": "rerank_top20",
+  "input_tokens": 491223,
+  "cached_tokens": 0,
+  "output_tokens": 5250,
+  "cost": 0.13068085112004746,
+  "calib": 0.9033488932626608,
+  "per_query_in": 6549
+ },
+ {
+  "task": "R2MEDBiologyPooled",
+  "model": "deepseek/deepseek-v4-flash",
+  "protocol": "ranked_list",
+  "input_tokens": 22498983,
+  "cached_tokens": 20004352,
+  "output_tokens": 42121,
+  "cost": 0.43022007300000004,
+  "calib": 0.829473177772432,
+  "per_query_in": 224989
+ },
+ {
+  "task": "R2MEDBiologyPooled",
+  "model": "deepseek/deepseek-v4-flash",
+  "protocol": "rerank_top20",
+  "input_tokens": 1161878,
+  "cached_tokens": 0,
+  "output_tokens": 7000,
+  "cost": 0.07760096666623527,
+  "calib": 0.829473177772432,
+  "per_query_in": 11618
+ },
+ {
+  "task": "R2MEDBiologyPooled",
+  "model": "google/gemini-3.1-flash-lite",
+  "protocol": "ranked_list",
+  "input_tokens": 22842299,
+  "cached_tokens": 21008233,
+  "output_tokens": 29614,
+  "cost": 1.028144825,
+  "calib": 0.8421302571390914,
+  "per_query_in": 228422
+ },
+ {
+  "task": "R2MEDBiologyPooled",
+  "model": "google/gemini-3.1-flash-lite",
+  "protocol": "rerank_top20",
+  "input_tokens": 1179302,
+  "cached_tokens": 0,
+  "output_tokens": 7000,
+  "cost": 0.30532560187077007,
+  "calib": 0.8421302571390914,
+  "per_query_in": 11793
+ }
+]
