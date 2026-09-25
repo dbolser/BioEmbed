@@ -2,7 +2,6 @@ model,model_type,bio_score,n_tasks
 glm-5.1,llm,0.898,1
 Qwen__Qwen3.5-397B-A17B-FP8,llm,0.882,1
 zai-org__GLM-4.7-FP8,llm,0.868,1
-google__gemini-3.1-pro-preview,llm,0.758393,7
 deepseek__deepseek-v4-pro,llm,0.751714,2
 Qwen__Qwen3-Embedding-8B,embedding,0.7452618571428571,7
 jinaai__jina-embeddings-v5-text-small,embedding,0.7449795714285713,7
@@ -11,14 +10,13 @@ jinaai__jina-embeddings-v5-text-nano,embedding,0.7403728571428572,7
 Salesforce__SFR-Embedding-2_R,embedding,0.7400525714285714,7
 ICT-TIME-and-Querit__BOOM_4B_v1,embedding,0.7394138333333333,6
 nvidia__llama-embed-nemotron-8b,embedding,0.7372198571428571,7
-codefuse-ai__F2LLM-v2-1.7B,embedding,0.7332264285714285,7
 Alibaba-NLP__gte-Qwen2-7B-instruct,embedding,0.731749857142857,7
 tencent__KaLM-Embedding-Gemma3-12B-2511,embedding,0.7275752857142858,7
 codefuse-ai__F2LLM-v2-14B,embedding,0.7269811428571428,7
 codefuse-ai__F2LLM-v2-8B,embedding,0.7267367142857142,7
 codefuse-ai__F2LLM-v2-4B,embedding,0.724391,7
+google__gemini-3.1-pro-preview,llm,0.7189542727272727,11
 google__embeddinggemma-300m,embedding,0.7165075714285714,7
-codefuse-ai__F2LLM-v2-0.6B,embedding,0.7136107142857143,7
 Alibaba-NLP__gte-Qwen2-1.5B-instruct,embedding,0.7079118571428571,7
 qwen3.6-27b,llm,0.7004364285714286,7
 Linq-AI-Research__Linq-Embed-Mistral,embedding,0.6984157142857141,7
@@ -27,8 +25,10 @@ Salesforce__SFR-Embedding-Mistral,embedding,0.6830271666666666,6
 intfloat__multilingual-e5-large-instruct,embedding,0.6781511428571428,7
 kimi-k2.6,llm,0.6737798571428572,7
 qwen3.6-35b-a3b,llm,0.6656647272727272,11
+codefuse-ai__F2LLM-v2-1.7B,embedding,0.6559979166666666,12
 MiniMaxAI__MiniMax-M2.5,llm,0.6543998,5
 Qwen__Qwen3-Embedding-4B,embedding,0.645207,12
+codefuse-ai__F2LLM-v2-0.6B,embedding,0.6311004166666666,12
 BAAI__bge-m3,embedding,0.6310137142857143,7
 intfloat__multilingual-e5-large,embedding,0.6303675714285715,7
 minimax-m2.7,llm,0.6293204285714287,7
