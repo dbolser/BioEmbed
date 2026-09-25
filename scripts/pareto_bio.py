@@ -75,6 +75,7 @@ OR_PRICES = {
     "qwen3.6-35b-a3b": (0.100, 0.050, 0.900),  # paper slug for the same model
     "google__gemini-3.1-flash-lite": (0.250, 0.025, 1.500),
     "google__gemini-3.1-flash-lite-preview": (0.250, 0.025, 1.500),
+    "google__gemini-3.1-pro-preview": (2.000, 0.200, 12.000),
 }
 
 
