@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 """Score GeneDiseaseHaystack runs and the PubTator lookup baselines.
 
-Ranked runs (<haystack>/runs/*.parquet: qid, pmid, rank) get recall@k and
+Ranked runs (<haystack>/runs/<system>__<track>.parquet: qid, pmid, rank;
+e.g. bm25-full-k1.2-b0.4__gene) get recall@k and
 nDCG@10 over the curated gold, raw and 'condensed' (silver-not-gold PMIDs,
 i.e. Europe PMC text-mined links absent from the gold, are dropped from the
 run before scoring so incomplete gold does not penalise them).
@@ -9,18 +10,19 @@ run before scoring so incomplete gold does not penalise them).
 Lookup baselines are unranked sets: scored by recall of the whole set and
 its median size per query.
 
-Run:  uv run python scripts/score_haystack.py
-Output: results/haystack/scores.csv
+Run:  uv run python scripts/score_haystack.py [--haystack GeneDiseaseHaystackDev]
+Output: results/haystack/scores.csv for the test haystack,
+        results/haystack/<haystack>/scores.csv for any other
 """
 
+import argparse
 import math
 from pathlib import Path
 
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parent.parent
-HAYSTACK = ROOT / "data" / "haystack" / "GeneDiseaseHaystack"
-OUT = ROOT / "results" / "haystack" / "scores.csv"
+TEST = "GeneDiseaseHaystack"
 KS = [10, 100, 1000]
 TIERS = ["exact", "descendants", "parents", "ancestors"]
 
@@ -41,14 +43,20 @@ def ranked_metrics(run: pd.DataFrame, gold: dict[str, set[str]]) -> dict[str, fl
 
 
 def main() -> None:
-    qrels = pd.read_parquet(HAYSTACK / "qrels.parquet")
-    silver = pd.read_parquet(HAYSTACK / "silver.parquet")
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--haystack", default=TEST)
+    args = ap.parse_args()
+    haystack = ROOT / "data" / "haystack" / args.haystack
+    out = ROOT / "results" / "haystack" / ("" if args.haystack == TEST else args.haystack) / "scores.csv"
+
+    qrels = pd.read_parquet(haystack / "qrels.parquet")
+    silver = pd.read_parquet(haystack / "silver.parquet")
     gold = qrels.groupby("qid").pmid.agg(set).to_dict()
     unlabelled = silver.merge(qrels, how="left", indicator=True).query("_merge == 'left_only'")
     drop = set(zip(unlabelled.qid, unlabelled.pmid))
 
     rows = []
-    for f in sorted((HAYSTACK / "runs").glob("*.parquet")):
+    for f in sorted((haystack / "runs").glob("*.parquet")):
         model, track = f.stem.rsplit("__", 1)
         run = pd.read_parquet(f)
         keep = [(q, p) not in drop for q, p in zip(run.qid, run.pmid)]
@@ -58,8 +66,8 @@ def main() -> None:
         rows.append({"system": model, "track": track, "variant": "condensed",
                      **ranked_metrics(condensed, gold)})
 
-    lookup = pd.read_parquet(HAYSTACK / "lookup.parquet")
-    gene = pd.read_parquet(HAYSTACK / "gene_pmids.parquet")
+    lookup = pd.read_parquet(haystack / "lookup.parquet")
+    gene = pd.read_parquet(haystack / "gene_pmids.parquet")
     sets = {"pubtator_gene": gene}
     for i, t in enumerate(TIERS):
         sets[f"pubtator_gene+disease<={t}"] = lookup[lookup.tier.isin(TIERS[: i + 1])]
@@ -72,8 +80,8 @@ def main() -> None:
         })
 
     df = pd.DataFrame(rows)
-    OUT.parent.mkdir(parents=True, exist_ok=True)
-    df.round(4).to_csv(OUT, index=False)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    df.round(4).to_csv(out, index=False)
     print(df.round(3).to_string(index=False))
 
 

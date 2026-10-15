@@ -9,18 +9,26 @@ Models are loaded exactly as for the 300-doc suite (run_embedders.get_model),
 and encode with GeneDiseaseRetrieval's task metadata so instruction prompts
 match. On GPU, weights run in bfloat16 (the measured L4 cost axis used
 half precision too; fp32 is ~8x slower). Doc vectors are cached in float16 chunks so a preempted Spot VM resumes
-where it stopped.
+where it stopped, under vectors/<model-slug>/<sha12 of the doc PMID list>/
+so a rebuilt docs file never loads stale vectors.
+
+--candidates swaps gene_pmids.parquet for any (qid, pmid) parquet, e.g. a
+BM25 top-1000 run, and only the union of its PMIDs is encoded.
 
 Usage (from eval/):
     uv run python haystack.py --models BAAI/bge-small-en-v1.5 ncbi/MedCPT
+    uv run python haystack.py --haystack GeneDiseaseHaystackDev --models ncbi/MedCPT \
+        --candidates runs/bm25-symbol_disease-k0.9-b0.75__gene.parquet
 
-Output: <haystack>/runs/<model-slug>__gene.parquet (qid, pmid, score, rank),
-top --top-k per query.
+Output: <haystack>/runs/<model-slug>__<track>.parquet (qid, pmid, score,
+rank), top --top-k per query. track is "gene", or for --candidates FILE the
+FILE stem with "__" replaced by "-".
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import os
 import time
 from pathlib import Path
@@ -38,7 +46,8 @@ from run_embedders import get_model
 from tasks_local import GeneDiseaseRetrieval
 
 REPO = Path(__file__).resolve().parent.parent
-HAYSTACK = REPO / "data" / "haystack" / "GeneDiseaseHaystack"
+HAYSTACKS = REPO / "data" / "haystack"
+GENE_CANDIDATES = "gene_pmids.parquet"
 CHUNK = 100_000
 
 
@@ -65,9 +74,11 @@ def encode(model, texts: list[str], prompt_type: PromptType, batch_size: int) ->
     return np.asarray(vecs, dtype=np.float32)
 
 
-def doc_vectors(model, name: str, docs: pd.DataFrame, batch_size: int) -> np.ndarray:
+def doc_vectors(model, name: str, docs: pd.DataFrame, batch_size: int,
+                haystack: Path) -> np.ndarray:
     """Encode docs in CHUNK-sized pieces, cached as float16 .npy files."""
-    cache = HAYSTACK / "vectors" / slug(name)
+    sha = hashlib.sha256("\n".join(docs.pmid).encode()).hexdigest()[:12]
+    cache = haystack / "vectors" / slug(name) / sha
     cache.mkdir(parents=True, exist_ok=True)
     parts = []
     for i in range(0, len(docs), CHUNK):
@@ -93,25 +104,30 @@ def doc_vectors(model, name: str, docs: pd.DataFrame, batch_size: int) -> np.nda
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--models", nargs="+", required=True)
+    ap.add_argument("--haystack", default="GeneDiseaseHaystack")
+    ap.add_argument("--candidates", default=GENE_CANDIDATES,
+                    help="(qid, pmid) parquet, relative to the haystack dir")
     ap.add_argument("--batch-size", type=int, default=64)
     ap.add_argument("--top-k", type=int, default=1000)
     ap.add_argument("--max-queries", type=int, default=None, help="smoke test on the first N queries")
     args = ap.parse_args()
+    haystack = HAYSTACKS / args.haystack
+    track = ("gene" if args.candidates == GENE_CANDIDATES
+             else Path(args.candidates).stem.replace("__", "-"))
 
-    queries = pd.read_parquet(HAYSTACK / "queries.parquet").sort_values("qid")
-    cands = pd.read_parquet(HAYSTACK / "gene_pmids.parquet")
-    docs = pd.read_parquet(HAYSTACK / "docs_gene.parquet")
+    queries = pd.read_parquet(haystack / "queries.parquet").sort_values("qid")
+    cands = pd.read_parquet(haystack / args.candidates, columns=["qid", "pmid"])
+    docs = pd.read_parquet(haystack / "docs_gene.parquet")
     if args.max_queries:
         queries = queries.head(args.max_queries)
         cands = cands[cands.qid.isin(queries.qid)]
-        docs = docs[docs.pmid.isin(cands.pmid)]
-    docs = docs.reset_index(drop=True)
+    docs = docs[docs.pmid.isin(cands.pmid)].reset_index(drop=True)
     row = pd.Series(docs.index, index=docs.pmid)
-    out_dir = HAYSTACK / ("runs" if not args.max_queries else "runs_smoke")
+    out_dir = haystack / ("runs" if not args.max_queries else "runs_smoke")
     out_dir.mkdir(exist_ok=True)
 
     for name in args.models:
-        out = out_dir / f"{slug(name)}__gene.parquet"
+        out = out_dir / f"{slug(name)}__{track}.parquet"
         if out.exists():
             print(f"=== {name}: done, skipping")
             continue
@@ -124,7 +140,7 @@ def main() -> None:
         if args.max_queries:  # smoke runs never touch the real vector cache
             dvec = encode(model, docs.text.tolist(), PromptType.document, args.batch_size)
         else:
-            dvec = doc_vectors(model, name, docs, args.batch_size)
+            dvec = doc_vectors(model, name, docs, args.batch_size, haystack)
         qvec = encode(model, queries.text.tolist(), PromptType.query, args.batch_size)
 
         qrow = dict(zip(queries.qid, range(len(queries))))

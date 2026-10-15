@@ -20,21 +20,25 @@ baselines and the filter-then-rank pipelines use:
 and docs_gene.parquet (pmid, text) for the union of gene_pmids, so models can
 rank the gene-filtered haystack without the 50 GB records table.
 
-Deterministic: SEED=42; candidate pairs sorted before sampling.
-Output: data/haystack/GeneDiseaseHaystack/ (untracked; rebuilt each run).
+Deterministic: --seed; candidate pairs sorted before sampling. A dev
+haystack is the same build with another seed, minus the test genes
+(--exclude-genes-from) and the largest gene sets (--max-gene-set).
+Output: data/haystack/<--name>/ (untracked). Only the files built here are
+overwritten; runs/, vectors/ and judgments are left alone.
 
-Run:  uv run python scripts/build_tier_c_haystack.py
+Run:  uv run python scripts/build_tier_c_haystack.py              # test (frozen)
+      uv run python scripts/build_tier_c_haystack.py --dry-run    # check selection only
+      uv run python scripts/build_tier_c_haystack.py --name GeneDiseaseHaystackDev \
+          --seed 43 --n-queries 200 --exclude-genes-from GeneDiseaseHaystack --max-gene-set 20000
 """
 
+import argparse
 import json
 import random
-import shutil
 from pathlib import Path
 
 import duckdb
 
-SEED = 42
-N_QUERIES = 500
 MAX_GOLD = 50
 
 IUK = "/outsee5/home/danbolser/Work/IUK-IPF/data"
@@ -44,7 +48,9 @@ HGNC = f"{IUK}/sources/hgnc/2026-10-14/hgnc_complete_set.txt"
 RECORDS = f"{IUK}/embeddings-catalogue/records/*.parquet"
 ROOT = Path(__file__).resolve().parent.parent
 GOLD = ROOT / "data" / "gold" / "ot_curated_gene_disease_pmid.parquet"
-OUT_DIR = ROOT / "data" / "haystack" / "GeneDiseaseHaystack"
+HAYSTACKS = ROOT / "data" / "haystack"
+OUTPUTS = [f"{t}.parquet" for t in ["queries", "qrels", "silver", "gene_pmids", "lookup", "docs_gene"]] \
+    + ["manifest.json"]
 
 ABSTRACT_MARK = "\nAbstract: "
 
@@ -56,8 +62,26 @@ TIERS = {
     "ancestors": "coalesce(d.ancestors, [])",
 }
 
+# PubTator gene tags, one row per (pmid, NCBI gene).
+PT_GENES = f"""(SELECT column0 AS pmid, unnest(string_split(column2, ';')) AS ncbi
+                FROM read_csv('{PT}/gene2pubtator3.gz', delim='\t', header=false,
+                              all_varchar=true, quote=''))"""
+
 
 def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--name", default="GeneDiseaseHaystack")
+    ap.add_argument("--seed", type=int, default=42)
+    ap.add_argument("--n-queries", type=int, default=500)
+    ap.add_argument("--exclude-genes-from", action="append", default=[], metavar="NAME",
+                    help="skip every gene used by this haystack's queries (repeatable)")
+    ap.add_argument("--max-gene-set", type=int, default=None, metavar="N",
+                    help="skip genes PubTator tags in more than N local abstracts")
+    ap.add_argument("--dry-run", action="store_true",
+                    help="print the selection and compare it to the existing queries.parquet")
+    args = ap.parse_args()
+    out_dir = HAYSTACKS / args.name
+
     con = duckdb.connect()
     con.sql("SET threads=48")
     con.sql(f"""
@@ -69,7 +93,7 @@ def main() -> None:
     n_local = con.sql("SELECT count(*) FROM local").fetchone()[0]
 
     # 1. Queries: seeded sample of curated pairs with 1..MAX_GOLD local golds
-    # and a gene that maps to NCBI Gene.
+    # and a gene that maps to NCBI Gene, minus excluded genes.
     con.sql(f"""
         CREATE TABLE gmap AS
         SELECT DISTINCT o.id AS targetId, h.entrez_id AS ncbi
@@ -89,7 +113,32 @@ def main() -> None:
         GROUP BY ALL HAVING count(*) <= {MAX_GOLD}
         ORDER BY ALL
     """).fetchall()
-    selected = sorted(random.Random(SEED).sample(pairs, N_QUERIES))
+    excluded = set()
+    for name in args.exclude_genes_from:
+        excluded |= {r[0] for r in con.sql(
+            f"SELECT DISTINCT targetId FROM '{HAYSTACKS / name / 'queries.parquet'}'").fetchall()}
+    if args.max_gene_set is not None:
+        excluded |= {r[0] for r in con.sql(f"""
+            SELECT targetId FROM gmap JOIN {PT_GENES} p USING (ncbi)
+            WHERE targetId IN (SELECT targetId FROM gold_all)
+              AND p.pmid IN (SELECT pmid FROM local)
+            GROUP BY 1 HAVING count(DISTINCT p.pmid) > {args.max_gene_set}
+        """).fetchall()}
+    n_pairs = len(pairs)
+    pairs = [p for p in pairs if p[0] not in excluded]
+    selected = sorted(random.Random(args.seed).sample(pairs, args.n_queries))
+    print(f"{len(selected)} of {len(pairs)} pairs ({n_pairs} before excluding "
+          f"{len(excluded)} genes)")
+    if args.dry_run:
+        qids = [f"{t}|{d}" for t, d in selected]
+        old = out_dir / "queries.parquet"
+        if old.exists():
+            frozen = [r[0] for r in con.sql(f"SELECT qid FROM '{old}' ORDER BY qid").fetchall()]
+            print(f"vs {old.relative_to(ROOT)}: "
+                  + ("identical qids" if qids == frozen else
+                     f"DIFFERENT ({len(set(qids) & set(frozen))} shared of {len(frozen)})"))
+        print("\n".join(qids[:5] + ["..."]))
+        return
     con.sql("CREATE TABLE sel (targetId VARCHAR, diseaseId VARCHAR)")
     con.executemany("INSERT INTO sel VALUES (?, ?)", selected)
     con.sql(f"""
@@ -101,7 +150,7 @@ def main() -> None:
         JOIN '{OT}/disease/*.parquet' d ON d.id = s.diseaseId
         ORDER BY qid
     """)
-    assert con.sql("SELECT count(*) FROM queries").fetchone()[0] == N_QUERIES
+    assert con.sql("SELECT count(*) FROM queries").fetchone()[0] == args.n_queries
 
     con.sql("""
         CREATE TABLE qrels AS
@@ -122,9 +171,7 @@ def main() -> None:
         CREATE TABLE gene_pmids AS
         SELECT DISTINCT q.qid, p.pmid
         FROM queries q JOIN gmap USING (targetId)
-        JOIN (SELECT column0 AS pmid, unnest(string_split(column2, ';')) AS ncbi
-              FROM read_csv('{PT}/gene2pubtator3.gz', delim='\t', header=false,
-                            all_varchar=true, quote='')) p USING (ncbi)
+        JOIN {PT_GENES} p USING (ncbi)
         WHERE p.pmid IN (SELECT pmid FROM local)
     """)
     tier_rows = " UNION ALL ".join(
@@ -152,13 +199,13 @@ def main() -> None:
         GROUP BY ALL
     """)
 
-    # 3. Save. Doc text as GeneDiseaseRetrieval; one record per PMID by
-    # record_hash.
-    if OUT_DIR.exists():
-        shutil.rmtree(OUT_DIR)
-    OUT_DIR.mkdir(parents=True)
+    # 3. Save, replacing only our own files. Doc text as GeneDiseaseRetrieval;
+    # one record per PMID by record_hash.
+    out_dir.mkdir(parents=True, exist_ok=True)
+    for f in OUTPUTS:  # a failed rebuild leaves gaps, never a stale mix
+        (out_dir / f).unlink(missing_ok=True)
     for t in ["queries", "qrels", "silver", "gene_pmids", "lookup"]:
-        con.sql(f"COPY (SELECT * FROM {t} ORDER BY ALL) TO '{OUT_DIR / t}.parquet' (FORMAT parquet)")
+        con.sql(f"COPY (SELECT * FROM {t} ORDER BY ALL) TO '{out_dir / t}.parquet' (FORMAT parquet)")
     con.sql(f"""
         COPY (
             SELECT pmid, CASE WHEN title <> '' THEN title || chr(10) || chr(10) || abstract
@@ -174,7 +221,7 @@ def main() -> None:
                   AND replace(record_id, 'PMID:', '') IN (SELECT DISTINCT pmid FROM gene_pmids)
             ) WHERE rn = 1
             ORDER BY pmid::BIGINT
-        ) TO '{OUT_DIR / "docs_gene.parquet"}' (FORMAT parquet, COMPRESSION zstd)
+        ) TO '{out_dir / "docs_gene.parquet"}' (FORMAT parquet, COMPRESSION zstd)
     """)
 
     # 4. Stats.
@@ -197,12 +244,12 @@ def main() -> None:
         stats[name] = {"recall": round(recall(cands), 4), "median_set": set_size(cands)}
     stats["gene_pmids_union"] = con.sql("SELECT count(DISTINCT pmid) FROM gene_pmids").fetchone()[0]
     stats["mean_golds_per_query"] = round(
-        con.sql("SELECT count(*) FROM qrels").fetchone()[0] / N_QUERIES, 3)
+        con.sql("SELECT count(*) FROM qrels").fetchone()[0] / args.n_queries, 3)
     stats["mean_silver_per_query"] = round(
-        con.sql("SELECT count(*) FROM silver").fetchone()[0] / N_QUERIES, 3)
+        con.sql("SELECT count(*) FROM silver").fetchone()[0] / args.n_queries, 3)
 
     manifest = {
-        "name": "GeneDiseaseHaystack",
+        "name": args.name,
         "category": "Retrieval",
         "provenance": {
             "gold": str(GOLD.relative_to(ROOT)),
@@ -214,18 +261,21 @@ def main() -> None:
                            "(exact, descendants, parents, ancestors)",
         },
         "protocol": {
-            "seed": SEED,
+            "seed": args.seed,
             "query_text": "'{SYMBOL} ({approved gene name}) in {OT disease name}'",
             "query_id": "'{Ensembl gene}|{disease id}'",
             "doc_text": "'{title}\\n\\n{abstract}' as GeneDiseaseRetrieval",
-            "selection": f"seeded sample of {N_QUERIES} from {len(pairs)} curated pairs with "
+            "selection": f"seeded sample of {args.n_queries} from {len(pairs)} curated pairs with "
                          f"1-{MAX_GOLD} local golds and an NCBI-mapped gene",
+            "exclude_genes_from": args.exclude_genes_from,
+            "max_gene_set": args.max_gene_set,
+            "excluded_genes": len(excluded),
             "metrics": "recall@k over gold; 'condensed' variant drops silver-not-gold "
                        "PMIDs from a run before scoring",
         },
         "stats": stats,
     }
-    (OUT_DIR / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
+    (out_dir / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     print(json.dumps(stats, indent=2))
 
 
