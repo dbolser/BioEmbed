@@ -1,0 +1,474 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Abstract labeller</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap">
+<style>
+  :root {
+    --fs: 20px; --bg: #ffffff; --panel: #f3f4f6; --fg: #1f1f1f; --muted: #4a4a4a; --line: #d4d4d8;
+    --accent: #0072b2;                              /* Okabe-Ito blue */
+    --gene-bg: #d4e8f7; --gene-ul: #0072b2;         /* gene: blue fill, solid underline */
+    --dis-bg: #fde0c5;  --dis-ul: #c24e00;          /* disease: vermillion fill, dashed underline */
+    --top-h: 6rem; --foot-h: 5rem;                  /* measured by JS */
+  }
+  body.big   { --fs: 24px; }
+  body.cream { --bg: #fbf6e8; --panel: #f1e9d4; --line: #d8ccb0; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: var(--fs)/1.65 "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+    letter-spacing: .01em; word-spacing: .06em;
+  }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  [hidden] { display: none !important; }
+
+  /* top bar: the pair stays in view while you read */
+  #top { position: sticky; top: 0; z-index: 3; background: var(--bg); border-bottom: 1px solid var(--line);
+         padding: .45rem 1.5rem .5rem; }
+  .bar { display: flex; align-items: center; gap: .4rem 1rem; }
+  #pairMini { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 700; }
+  .tog { border: 1px solid var(--line); background: var(--panel); border-radius: 6px; padding: .05rem .55rem; font-size: .8em; white-space: nowrap; }
+  .tog[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+  #who { font-size: .8em; cursor: pointer; }
+  .stats { display: flex; flex-wrap: wrap; align-items: center; gap: .2rem 1rem; margin-top: .25rem; font-size: .8em; color: var(--muted); }
+  .stats b { color: var(--fg); }
+  .track { flex: 1 1 8rem; height: .6rem; background: var(--panel); border: 1px solid var(--line); border-radius: 99px; overflow: hidden; }
+  #pbar { height: 100%; width: 0; background: var(--accent); transition: width .25s; }
+
+  /* layout */
+  main { padding: 1rem 1.5rem calc(var(--foot-h) + 2rem); }
+  .cols { display: grid; grid-template-columns: minmax(0, 70ch) minmax(16rem, 22rem); gap: 1rem 3rem; align-items: start; }
+
+  /* pair header */
+  #pair { display: grid; gap: .5rem; margin-bottom: 1.2rem; padding: .7rem 1rem; background: var(--panel); border-radius: 10px; }
+  .prow { display: grid; grid-template-columns: 5.5rem 1fr; align-items: baseline; }
+  .tag { font-size: .7em; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+  .what { font-size: 1.15em; font-weight: 700; }
+  .also { font-size: .9em; margin-top: .2rem; }
+  .also summary { cursor: pointer; color: var(--muted); }
+  .lbl { color: var(--muted); margin-right: .4rem; }
+  .chip { display: inline-block; margin: .15rem .35rem .15rem 0; padding: 0 .5em; line-height: 1.5;
+          border: 1px solid var(--line); border-radius: 99px; background: var(--bg); }
+
+  /* abstract */
+  #title { font-size: 1.1em; line-height: 1.45; margin: .2rem 0 1rem; }
+  #abs p { margin: 0 0 1em; }
+  .hl { border-radius: 3px; padding: 0 .08em; text-underline-offset: .22em; text-decoration-thickness: 2px; text-decoration-line: underline; }
+  .g  { background: var(--gene-bg); text-decoration-style: solid;  text-decoration-color: var(--gene-ul); }
+  .d  { background: var(--dis-bg);  text-decoration-style: dashed; text-decoration-color: var(--dis-ul); }
+  .dp { text-decoration-style: dotted; text-decoration-color: var(--dis-ul); text-decoration-thickness: 3px; }
+
+  /* rubric: sticky beside the abstract, kept clear of the top bar and the button bar */
+  #rubric { position: sticky; top: calc(var(--top-h) + 1rem); max-height: calc(100vh - var(--top-h) - var(--foot-h) - 2rem);
+            overflow-y: auto; background: var(--panel); border-radius: 10px; padding: .8rem 1rem; font-size: .8em; line-height: 1.5; }
+  #rubric h2 { font-size: 1em; margin: 0 0 .4rem; }
+  #rubric dl { display: grid; grid-template-columns: 1.4em 1fr; gap: .5rem .4rem; margin: 0 0 .8rem; }
+  #rubric dt { font-weight: 700; font-size: 1.15em; line-height: 1.35; }
+  #rubric dd { margin: 0; }
+  #rubric p { margin: .3rem 0; }
+  #tRubric { display: none; }
+  kbd { font: inherit; font-weight: 700; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px;
+        padding: 0 .3em; background: var(--bg); color: var(--fg); }
+
+  /* narrow windows: one column; the rubric opens over the page with R (after the #rubric rule on purpose) */
+  @media (max-width: 1100px) {
+    .cols { grid-template-columns: minmax(0, 70ch); }
+    #tRubric { display: inline-block; }
+    #rubric { display: none; position: fixed; z-index: 4; top: calc(var(--top-h) + .5rem); right: 1rem;
+              width: min(30rem, calc(100vw - 2rem)); border: 1px solid var(--line); box-shadow: 0 6px 24px rgba(0,0,0,.25); }
+    body.rubricOpen #rubric { display: block; }
+  }
+
+  /* controls */
+  #controls { position: fixed; left: 0; right: 0; bottom: 0; z-index: 3; background: var(--bg);
+              border-top: 1px solid var(--line); padding: .55rem 1.5rem .65rem; }
+  .row { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+  .rate { border: 2px solid var(--line); background: var(--panel); border-radius: 8px; padding: .3rem .8rem; }
+  .rate kbd { margin-right: .35em; }
+  .rate[aria-pressed="true"] { border-color: var(--accent); background: var(--accent); color: #fff; }
+  .rate.small { font-size: .85em; }
+  .gap { width: 1rem; }
+  #saved { position: fixed; right: 1.5rem; bottom: calc(var(--foot-h) + .5rem); font-size: .85em; padding: .15rem .7rem;
+           background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }  /* floats: no layout jump */
+  #saved:empty { display: none; }
+  #err { color: #b00020; font-weight: 700; font-size: .85em; }
+  #noteRow { margin-top: .5rem; }
+  #noteRow label { font-size: .85em; }
+  #note { flex: 1; min-width: 12rem; max-width: 60ch; font: inherit; font-size: .85em; padding: .3rem .6rem;
+          border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); }
+
+  /* full-screen messages */
+  .card { max-width: 40rem; margin: 3rem auto; text-align: center; }
+  .card h1 { font-size: 1.6em; margin: 0 0 .5rem; }
+  .card .big { font-size: 1.25em; }
+  .card button.go { margin: .4rem; padding: .5rem 1.3rem; border-radius: 8px; border: 2px solid var(--accent);
+                    background: var(--accent); color: #fff; }
+  .card button.go kbd { color: var(--fg); }
+  .card button.alt { background: var(--panel); color: var(--fg); border-color: var(--line); }
+  .card input { font: inherit; padding: .4rem .7rem; border-radius: 6px; border: 1px solid var(--line); }
+</style>
+</head>
+<body>
+<header id="top">
+  <div class="bar">
+    <span id="pairMini"></span>
+    <button class="tog" id="tRubric" aria-pressed="false" title="Show the rubric (R)">Rubric <kbd>R</kbd></button>
+    <button class="tog" id="tBig" aria-pressed="false" title="Larger text">A+</button>
+    <button class="tog" id="tCream" aria-pressed="false" title="Cream background">Cream</button>
+    <span id="who" title="Click to switch labeller"></span>
+  </div>
+  <div class="stats">
+    <b id="roundNo"></b><span id="level"></span><span id="rated"></span>
+    <span class="track" id="track" hidden><span id="pbar" style="display:block"></span></span><span id="pcount"></span>
+  </div>
+</header>
+
+<main>
+  <section id="sName" class="card" hidden>
+    <h1>Who is labelling?</h1>
+    <form id="nameForm"><input id="nameIn" autocomplete="off" placeholder="your name" required> <button class="go">Start</button></form>
+  </section>
+
+  <section id="sLabel" hidden>
+    <div class="cols">
+      <article><div id="pair"></div><h1 id="title"></h1><div id="abs"></div></article>
+      <aside id="rubric">
+        <h2>How to rate</h2>
+        <dl>
+          <dt>2</dt><dd><b>Evidence.</b> The abstract reports evidence that this gene is involved in this disease (or a synonym, subtype, or the same phenotype in a model organism of the gene).</dd>
+          <dt>1</dt><dd><b>Both, not evidence.</b> The abstract discusses both, but the link is not its evidence (a review mention, a candidate in a screen with no result, or a related disease).</dd>
+          <dt>0</dt><dd><b>Otherwise.</b></dd>
+        </dl>
+        <p><kbd>U</kbd> unsure &nbsp; <kbd>F</kbd> flag &nbsp; <kbd>N</kbd> note &nbsp; <kbd>&larr;</kbd> back &nbsp; <kbd>&rarr;</kbd> forward</p>
+        <p><span class="hl g">gene</span> &nbsp;<span class="hl d">disease</span> &nbsp;<span class="hl dp">part of the disease name</span> (broader or related)</p>
+      </aside>
+    </div>
+  </section>
+
+  <section id="sDone" class="card" hidden>
+    <h1 id="doneHead"></h1>
+    <p class="big" id="doneMsg"></p>
+    <p id="doneCount"></p>
+    <button class="go" id="nextBtn">Next round <kbd>Enter</kbd></button>
+    <button class="go alt" id="backBtn"><kbd>&larr;</kbd> Change an answer</button>
+  </section>
+
+  <section id="sWait" class="card" hidden>
+    <h1>That's all for this session</h1>
+    <p class="big" id="waitMsg"></p>
+  </section>
+
+  <section id="sEnd" class="card" hidden>
+    <h1>All rounds finished</h1>
+    <p class="big" id="endMsg"></p>
+  </section>
+</main>
+
+<footer id="controls" hidden>
+  <div class="row">
+    <button class="rate" data-g="2"><kbd>2</kbd>Evidence</button>
+    <button class="rate" data-g="1"><kbd>1</kbd>Both, not evidence</button>
+    <button class="rate" data-g="0"><kbd>0</kbd>Otherwise</button>
+    <button class="rate" data-g="U"><kbd>U</kbd>Unsure</button>
+    <span class="gap"></span>
+    <button class="rate small" id="flagBtn" aria-pressed="false"><kbd>F</kbd>Flag problem</button>
+    <button class="rate small" id="noteBtn"><kbd>N</kbd>Note</button>
+    <button class="rate small" id="prevBtn"><kbd>&larr;</kbd>Back</button>
+    <span id="saved" aria-live="polite"></span><span id="err" aria-live="assertive"></span>
+  </div>
+  <div class="row" id="noteRow" hidden>
+    <label for="note">Note</label>
+    <input id="note" autocomplete="off" placeholder="optional (Enter or Esc to leave the box)">
+  </div>
+</footer>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const NAMES = { 2: "2 Evidence", 1: "1 Both, not evidence", 0: "0 Otherwise", U: "Unsure" };
+const CHEERS = ["Nice and steady.", "You're in a rhythm now.", "Great focus.", "Lovely careful work.",
+                "Brilliant persistence.", "Still going strong.", "Superb stamina."];
+const VISIT_CAP = 600;  // seconds: a longer visit to one abstract counts as 10 minutes (left idle)
+const DWELL = 400;      // ms: ignore a rating this soon after the previous one moved on (double press)
+const S = { who: localStorage.getItem("labeller") || "", st: null, items: [], i: 0, flag: false,
+            screen: "", startLevel: 1, stats: null, shownAt: 0 };
+
+// Actions run one at a time, in order, so a save always finishes before the next key acts.
+let lock = Promise.resolve();
+const serial = (fn) => (...a) => (lock = lock.then(() => fn(...a)).catch(console.error));
+
+// Active-time timer: runs only while the tab is visible and the window has focus.
+const timer = {
+  acc: 0, since: null,
+  start() { this.acc = 0; this.since = document.hidden ? null : performance.now(); },
+  pause() { if (this.since !== null) { this.acc += performance.now() - this.since; this.since = null; } },
+  resume() { if (this.since === null && !document.hidden) this.since = performance.now(); },
+  secs() { return Math.min(VISIT_CAP, (this.acc + (this.since === null ? 0 : performance.now() - this.since)) / 1000); },
+};
+document.addEventListener("visibilitychange", () => document.hidden ? timer.pause() : timer.resume());
+window.addEventListener("blur", () => timer.pause());
+window.addEventListener("focus", () => timer.resume());
+
+// Keep the sticky rubric clear of the top bar and the button bar at any size.
+const bars = new ResizeObserver(() => {
+  const s = document.documentElement.style;
+  s.setProperty("--top-h", `${$("top").offsetHeight}px`);
+  s.setProperty("--foot-h", `${$("controls").offsetHeight}px`);
+});
+bars.observe($("top"));
+bars.observe($("controls"));
+
+// Display toggles, remembered in this browser.
+for (const [id, cls] of [["tBig", "big"], ["tCream", "cream"], ["tRubric", "rubricOpen"]]) {
+  const set = (on) => { document.body.classList.toggle(cls, on); $(id).setAttribute("aria-pressed", on);
+                        localStorage.setItem(cls, on ? "1" : ""); };
+  set(!!localStorage.getItem(cls));
+  $(id).onclick = (e) => { set(!document.body.classList.contains(cls)); e.currentTarget.blur(); };
+}
+
+async function api(path, body) {
+  const r = await fetch(path, body ? { method: "POST", headers: { "Content-Type": "application/json" },
+                                       body: JSON.stringify(body) } : {});
+  if (!r.ok) throw Object.assign(new Error(`${r.status} ${await r.text()}`), { status: r.status });
+  return r.json();
+}
+
+function show(screen) {
+  S.screen = screen;
+  if (document.activeElement !== $("note")) document.activeElement?.blur();  // no stray Enter/Space clicks
+  for (const [s, id] of [["name", "sName"], ["label", "sLabel"], ["done", "sDone"], ["wait", "sWait"], ["end", "sEnd"]])
+    $(id).hidden = s !== screen;
+  $("controls").hidden = screen !== "label";
+  $("track").hidden = $("pcount").hidden = $("pairMini").hidden = !(screen === "label" || screen === "done");
+}
+
+function el(tag, children, cls) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  e.append(...[].concat(children));
+  return e;
+}
+const segs = (ss) => ss.map(([t, k]) => k ? el("span", t, `hl ${k}`) : document.createTextNode(t));
+
+function renderBar() {
+  const s = S.stats, r = S.st?.round;
+  $("roundNo").textContent = !s ? "" : r ? `Round ${r.number} of ${s.n_rounds}` : `${s.rounds_done} of ${s.n_rounds} rounds done`;
+  $("level").textContent = s ? `Level ${s.level}` : "";
+  $("rated").textContent = s ? `${s.rated} rated` : "";
+  $("who").textContent = S.who;
+  if (r) {
+    const n = S.items.length, k = S.items.filter((it) => it.label).length;
+    $("pbar").style.width = `${100 * k / n}%`;
+    $("pcount").textContent = S.screen === "done" ? `${n} of ${n}` : `Abstract ${Math.min(S.i + 1, n)} of ${n}`;
+  }
+}
+
+function renderPair(r) {
+  const line = (tag, main, extra, cls, more, moreLabel) => {
+    const body = el("div", el("span", main, `what hl ${cls}`));
+    if (extra) body.append(" ", extra);
+    if (more.length) {
+      const chips = more.map((m) => el("span", m, "chip"));
+      body.append(more.length > 8
+        ? el("details", [el("summary", `${moreLabel} (${more.length})`), ...chips], "also")
+        : el("div", [el("span", moreLabel, "lbl"), ...chips], "also"));
+    }
+    return el("div", [el("span", tag, "tag"), body], "prow");
+  };
+  $("pair").replaceChildren(
+    line("Gene", r.gene.symbol, r.gene.name, "g", r.gene.aliases, "Also called"),
+    line("Disease", r.disease.name, "", "d", r.disease.synonyms, "Synonyms"));
+  $("pairMini").replaceChildren(el("span", r.gene.symbol, "hl g"), " × ", el("span", r.disease.name, "hl d"));
+  $("pairMini").title = `${r.gene.symbol} (${r.gene.name}) × ${r.disease.name}`;
+}
+
+async function load() {
+  if (!S.who) return show("name");
+  try { S.st = await api(`/api/state?labeller=${encodeURIComponent(S.who)}`); }
+  catch (e) { alert(`Can't reach the server: ${e.message}`); return; }
+  S.stats = S.st; S.startLevel = S.st.level;
+  const r = S.st.round;
+  if (r) {
+    S.items = r.items;
+    S.i = Math.max(0, S.items.findIndex((it) => !it.label));
+    renderPair(r);
+    showItem();
+  } else if (S.st.waiting) {
+    const at = new Date(S.st.waiting.next_at);
+    $("waitMsg").textContent = `Thank you! More rounds open ` +
+      `${at.toLocaleString([], { weekday: "long", hour: "2-digit", minute: "2-digit" })}.`;
+    show("wait");
+  } else {
+    $("endMsg").textContent = `You rated ${S.st.rated} abstracts. Thank you!`;
+    show("end");
+  }
+  renderBar();
+}
+
+// Flag/note typed on an unrated abstract are kept in this browser until it is rated.
+const draftKey = (it) => `draft|${S.who}|${S.st.round.key}|${it.key}`;
+function getDraft(it) { try { return JSON.parse(localStorage.getItem(draftKey(it))); } catch { return null; } }
+function putDraft(it) {
+  const d = { flag: S.flag, note: $("note").value };
+  if (d.flag || d.note.trim()) localStorage.setItem(draftKey(it), JSON.stringify(d));
+  else localStorage.removeItem(draftKey(it));
+}
+
+function showItem() {
+  if (S.i >= S.items.length) return showDone();
+  const it = S.items[S.i], lab = it.label, d = lab || getDraft(it) || {};
+  show("label");
+  $("title").replaceChildren(...segs(it.title));
+  $("abs").replaceChildren(...(it.abstract.length ? it.abstract.map((p) => el("p", segs(p)))
+                                                   : [el("p", el("em", "(No abstract)"))]));
+  for (const b of document.querySelectorAll(".rate[data-g]")) {
+    const g = b.dataset.g;
+    b.setAttribute("aria-pressed", !!lab && (g === "U" ? lab.unsure : !lab.unsure && +g === lab.grade));
+  }
+  S.flag = !!d.flag;
+  $("flagBtn").setAttribute("aria-pressed", S.flag);
+  $("note").value = d.note || "";
+  $("noteRow").hidden = !(S.flag || $("note").value);
+  $("err").textContent = "";
+  window.scrollTo(0, 0);
+  renderBar();
+  timer.start();
+}
+
+function showDone() {
+  const s = S.stats, r = S.st.round;
+  show("done");
+  $("doneHead").textContent = `Round ${r.number} of ${s.n_rounds} done`;
+  const left = 2 - (s.rounds_done % 2);
+  $("doneMsg").textContent = s.level > S.startLevel
+    ? `Level ${s.level} reached! ${CHEERS[(s.level - 2) % CHEERS.length]}`
+    : `${left} more round${left > 1 ? "s" : ""} to level ${s.level + 1}.`;
+  $("doneCount").textContent = `${s.rated} abstracts rated so far.`;
+  renderBar();
+}
+
+let savedTimer;
+function saidSaved(msg) {
+  $("saved").textContent = msg;
+  clearTimeout(savedTimer);
+  savedTimer = setTimeout(() => { $("saved").textContent = ""; }, 2500);
+}
+
+// Send a label. g: 0/1/2, "U", or undefined to resave the current answer (flag/note edits).
+async function save(g) {
+  const it = S.items[S.i], lab = it.label;
+  if (g === undefined) g = lab.unsure ? "U" : lab.grade;
+  const body = { labeller: S.who, round: S.st.round.key, item: it.key, grade: g === "U" ? null : g,
+                 unsure: g === "U", flag: S.flag, note: $("note").value.trim(),
+                 seconds: timer.secs() + (it.carry || 0), expect: lab ? lab.updated_at : null };
+  let res;
+  try { res = await api("/api/label", body); }
+  catch (e) {
+    console.error(e);
+    if (e.status !== 409) { $("err").textContent = "Not saved, try again."; return false; }
+    await load();  // another tab changed this answer: show what is stored now
+    $("err").textContent = "That answer was changed in another tab, so the page reloaded.";
+    return false;
+  }
+  S.stats = res;
+  it.carry = 0;
+  timer.start();
+  it.label = { grade: body.grade, unsure: body.unsure, flag: body.flag, note: body.note, updated_at: res.updated_at };
+  localStorage.removeItem(draftKey(it));
+  return true;
+}
+
+function changed() {  // flag/note differ from what is stored for the current item
+  const lab = S.items[S.i].label || {};
+  return S.flag !== !!lab.flag || $("note").value.trim() !== (lab.note || "");
+}
+
+const answer = serial(async (g) => {
+  if (S.screen !== "label" || performance.now() - S.shownAt < DWELL) return;
+  const n = S.i + 1;
+  if (!(await save(g))) return;
+  saidSaved(`Saved ${NAMES[g]} for abstract ${n}. ← to change.`);
+  S.i += 1;
+  showItem();
+  S.shownAt = performance.now();  // only after a rating moves on: going back to fix one is never blocked
+});
+
+const move = serial(async (step) => {  // step -1 back, +1 forward (forward only past answered items)
+  if (S.screen === "done") { if (step < 0) { S.i = S.items.length - 1; showItem(); } return; }
+  if (S.screen !== "label") return;
+  const it = S.items[S.i];
+  if ((step > 0 && !it.label) || (step < 0 && S.i === 0)) return;
+  if (it.label && changed()) { if (!(await save())) return; }
+  else { it.carry = (it.carry || 0) + timer.secs(); if (!it.label) putDraft(it); }
+  S.i += step;
+  showItem();
+});
+
+const toggleFlag = serial(async () => {  // F only flips the flag; N opens the note box
+  if (S.screen !== "label") return;
+  const it = S.items[S.i];
+  S.flag = !S.flag;
+  $("flagBtn").setAttribute("aria-pressed", S.flag);
+  if (S.flag) $("noteRow").hidden = false;
+  if (!it.label) return putDraft(it);
+  if (await save()) saidSaved(S.flag ? "Flag saved." : "Flag removed.");
+});
+
+const saveNote = serial(async () => {
+  if (S.screen !== "label") return;
+  const it = S.items[S.i];
+  if (!it.label) return putDraft(it);
+  if (changed() && await save()) saidSaved("Note saved.");
+});
+
+function openNote() { $("noteRow").hidden = false; $("note").focus(); }
+
+// Mouse
+for (const b of document.querySelectorAll(".rate[data-g]"))
+  b.onclick = () => answer(b.dataset.g === "U" ? "U" : +b.dataset.g);
+for (const [id, fn] of [["flagBtn", toggleFlag], ["prevBtn", () => move(-1)], ["backBtn", () => move(-1)], ["nextBtn", load]])
+  $(id).onclick = (e) => { e.currentTarget.blur(); fn(); };
+$("noteBtn").onclick = openNote;
+$("note").oninput = () => { if (!S.items[S.i]?.label) putDraft(S.items[S.i]); };
+$("note").onchange = () => saveNote();
+$("nameForm").onsubmit = (e) => {
+  e.preventDefault();
+  S.who = $("nameIn").value.trim().toLowerCase();
+  if (S.who) { localStorage.setItem("labeller", S.who); load(); }
+};
+$("who").onclick = () => {
+  if (confirm("Switch labeller?")) { S.who = ""; S.st = S.stats = null; localStorage.removeItem("labeller"); show("name"); renderBar(); }
+};
+
+// Keyboard
+document.addEventListener("keydown", (e) => {
+  if (e.target.id === "note") {
+    if (e.key === "Escape" || e.key === "Enter") { e.preventDefault(); e.target.blur(); }
+    return;
+  }
+  if (e.target.matches("input, textarea") || e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
+  const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+  if (k === "r" || (k === "Escape" && document.body.classList.contains("rubricOpen"))) $("tRubric").click();
+  else if (S.screen === "label") {
+    if (k === "0" || k === "1" || k === "2") answer(+k);
+    else if (k === "u") answer("U");
+    else if (k === "f") toggleFlag();
+    else if (k === "n") openNote();
+    else if (k === "Backspace" || k === "ArrowLeft") move(-1);
+    else if (k === "ArrowRight") move(1);
+    else if (k !== "Enter" && k !== " ") return;  // Enter/Space: never click a focused button here
+  } else if (S.screen === "done") {
+    if (k === "Enter" || k === "ArrowRight") load();
+    else if (k === "Backspace" || k === "ArrowLeft") move(-1);
+    else return;
+  } else return;
+  e.preventDefault();
+});
+
+load();
+</script>
+</body>
+</html>

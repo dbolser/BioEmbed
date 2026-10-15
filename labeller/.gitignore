@@ -1,0 +1,4 @@
+labels.sqlite*
+export/
+.venv/
+__pycache__/
