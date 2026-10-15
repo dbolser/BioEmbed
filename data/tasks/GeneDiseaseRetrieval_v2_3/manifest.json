@@ -1,0 +1,77 @@
+{
+  "name": "GeneDiseaseRetrieval_v2_3",
+  "category": "Retrieval",
+  "instance": {
+    "index": 3,
+    "of": 5,
+    "seed": 45
+  },
+  "sizes": {
+    "corpus": 300,
+    "queries": 75,
+    "qrels": 75
+  },
+  "provenance": {
+    "gold_links": "/outsee5/home/danbolser/Work/IUK-IPF/data/sources/opentargets/26.06/evidence_{orphanet,gene2phenotype,genomics_england,uniprot_literature}",
+    "silver_links": "/outsee5/home/danbolser/Work/IUK-IPF/data/sources/opentargets/26.06/evidence_{europepmc,eva,cancer_gene_census,gene_burden,gwas_credible_sets} (guard only)",
+    "names": "/outsee5/home/danbolser/Work/IUK-IPF/data/sources/opentargets/26.06/target, /outsee5/home/danbolser/Work/IUK-IPF/data/sources/opentargets/26.06/disease",
+    "disease_relations": "/outsee5/home/danbolser/Work/IUK-IPF/data/sources/opentargets/26.06/disease ancestors, descendants, dbXRefs, names",
+    "gene_tags": "/outsee5/home/danbolser/Work/IUK-IPF/data/sources/pubtator3/2026-10-06/gene2pubtator3.gz via /outsee5/home/danbolser/Work/IUK-IPF/data/sources/hgnc/2026-10-14/hgnc_complete_set.txt (Ensembl -> NCBI Gene)",
+    "texts": "/outsee5/home/danbolser/Work/IUK-IPF/data/embeddings-catalogue/records/*.parquet",
+    "excluded_genes": "data/exclusion/registry.parquet",
+    "source_counts_gold": {
+      "orphanet": 46,
+      "genomics_england": 17,
+      "uniprot_literature": 10,
+      "gene2phenotype": 7
+    },
+    "build_script": "scripts/build_tier_c_gene_disease_v2.py"
+  },
+  "protocol": {
+    "query_text": "'{SYMBOL} ({approved gene name}) in {OT disease name}'",
+    "query_id": "'{Ensembl gene}|{disease id}'",
+    "doc_text": "'{title}\\n\\n{abstract}' if title else abstract; text is self-contained -- do NOT re-prepend the title column",
+    "candidate_pairs": "exactly one curated PMID with a local abstract (the gold), PubTator-tagged with the query gene and cited by curators for <10 genes; disease id prefix in ['MONDO_', 'Orphanet_', 'EFO_'] (no HP phenotypes); gene not used by ['GeneDiseaseHaystack', 'GeneDiseaseHaystackDev', 'GeneDiseaseRetrieval']",
+    "docs_per_query": {
+      "gold": 1,
+      "same_gene": 2,
+      "same_disease": 1
+    },
+    "same_gene": "curated PMID for the query gene with a disease not related to d, PubTator-tagged with the query gene; its title/abstract does not contain the name or an OT exact synonym (>= 5 chars) of d or a twin of d",
+    "same_disease": "curated PMID for the query disease with another gene, not PubTator-tagged with the query gene and not linked to it by any OT evidence (any disease)",
+    "related": "related(d, o) if (ontology) o is reachable from d by same-concept links plus ancestor steps only, or plus descendant steps only (same concept = a shared dbXRef with prefix in ['DOID', 'EFO', 'GARD', 'HP', 'MEDDRA', 'MEDGEN', 'MESH', 'MONDO', 'MP', 'MedDRA', 'NANDO', 'NCIT', 'NCIt', 'OMIM', 'OMIMPS', 'Orphanet', 'SCTID', 'SNOMEDCT', 'SNOMEDCT_US', 'UMLS', 'icd11.foundation'], or one's id among the other's dbXRefs); or (category) o is in the OT family, or a twin of it, of a disease sharing a classification code ['ICD-10', 'ICD10', 'ICD10CM', 'ICD10WHO', 'ICD9', 'ICDO'] with d or a twin; or (names) each stemmed name word of one, minus modifiers and numbers, is inside a name word of the other; or o is not in the OT disease index",
+    "guard": "no corpus doc is linked (curated or silver_links) to any query's gene with a disease related to the query disease unless it is that query's gold; asserted for every (query, doc, linked disease)",
+    "selection": "seeded shuffle (seed 45) of 640 candidates; greedily accept pairs with a gene unused by this and earlier instances, an unused disease, and no guard clash with accepted queries; negatives sampled from sorted pools; stop at 75",
+    "qrels": "score=1 for the single gold per query",
+    "metric": "hit@1 = recall@1 over all 300 docs (random ranking: 1/300); the 4 docs sharing the query's gene or disease give within-group chance 0.25"
+  },
+  "exclusion_counts": {
+    "excluded_genes": 734,
+    "earlier_instance_genes": 225,
+    "candidate_funnel": {
+      "curated_pairs_with_local_abstract": 17352,
+      "one_local_gold": 5338,
+      "dropped_excluded_gene": 984,
+      "gold_gene_tagged": 3521,
+      "gold_cited_for_<10_genes": 3454,
+      "enough_same_gene": 938,
+      "candidates": 640,
+      "dropped_phenotype_disease": 486
+    },
+    "greedy_rejections": {
+      "gene_used": 123,
+      "disease_used": 13,
+      "negatives_exhausted": 1
+    },
+    "guard_drops_selected_queries": {
+      "same_gene_v1_rule": 952,
+      "same_gene_removed": 262,
+      "removed_by_ontology": 219,
+      "same_disease_candidates": 3582,
+      "same_disease_removed_linked_to_gene": 8,
+      "removed_by_names": 12,
+      "removed_by_category": 19,
+      "removed_by_mention": 12
+    }
+  }
+}

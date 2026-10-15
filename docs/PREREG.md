@@ -137,3 +137,21 @@ bge-base-gaf − bge-base +0.015 (p = 0.11, 7/12).
   the bug-fix reruns, BM25 setting selection on the practice set with one
   selected BM25 test run, and the memory probe. The claims those touch (C2,
   C4) did not change.
+- 2026-10-15 (after phase 1 builds, before any claim's test run except the
+  BM25 one above):
+  - **C4 memory label.** A model "remembers" a pair if, given no papers, it
+    names a right PMID or a right title (fuzzy match, rapidfuzz
+    token_sort_ratio ≥ 90; a looser rule gave 23% false hits on made-up
+    titles, this one 1%). C4 uses each LLM's own label. If fewer than 15
+    small-task pairs are remembered by the LLM tested, C4 is dropped.
+  - **Small task (v2), as built.** Phenotype-only (HP) diseases are left
+    out. A wrong answer on the same gene may not name the query disease, and
+    may not be linked by any Open Targets source to it or a related disease.
+    Chance is 1 in 300 for a method that ranks everything, 1 in 4 for one
+    that already knows the gene and disease.
+  - **Practice haystack, as built.** 200 pairs, no shared genes with the
+    test haystack, genes with over 20,000 tagged abstracts left out (6% of
+    test pairs are bigger than that).
+  - **Clean answer key** (a check, not a claim): curator papers that PubTator
+    tags with the gene, cited for fewer than 10 genes, and from Genomics
+    England only if rated green.

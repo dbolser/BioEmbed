@@ -88,8 +88,18 @@ class _LocalRetrievalTask(AbsTaskRetrieval):
     def load_data(self, num_proc=None, **kwargs) -> None:
         if self.data_loaded:
             return
-        dd = load_from_disk(str(DATA / self.local_name))
+        # in memory, so mteb's .map() writes no cache-*.arrow into data/tasks
+        dd = load_from_disk(str(DATA / self.local_name), keep_in_memory=True)
         corpus = dd["corpus"].rename_column("_id", "id")
+        # mteb prepends a non-empty title to text; ours already holds
+        # 'title\n\nabstract' (R2MED titles are all empty, so no-op there).
+        if "title" in corpus.column_names:
+            pairs = [(ti, tx) for ti, tx in zip(corpus["title"], corpus["text"]) if ti]
+            dup = sum(tx.startswith(ti) for ti, tx in pairs)
+            if dup != len(pairs):
+                raise ValueError(f"{self.local_name}: only {dup}/{len(pairs)} texts "
+                                 "start with their title")
+            corpus = corpus.remove_columns("title")
         queries = dd["queries"].rename_column("_id", "id")
         qrels: dict[str, dict[str, int]] = {}
         for row in dd["qrels"]:
@@ -124,6 +134,19 @@ class GeneDiseaseRetrieval(_LocalRetrievalTask):
                      "75 queries, 300 docs, 3 same-gene hard negatives per query.")
 
 
+# v2: 5 gene-disjoint instances (seeds 42-46), pooled for testing.
+GENE_DISEASE_V2 = [
+    type(f"GeneDiseaseRetrieval_v2_{i}", (_LocalRetrievalTask,), {
+        "local_name": f"GeneDiseaseRetrieval_v2_{i}",
+        "metadata": _meta(_RET_TMPL, f"GeneDiseaseRetrieval_v2_{i}",
+                          f"GeneDiseaseRetrieval v2, instance {i} of 5 (seed {42 + i}): "
+                          "75 queries, 300 docs; per query 1 curated gold, 2 same-gene "
+                          "and 1 same-disease negatives."),
+    })
+    for i in range(5)
+]
+
+
 LOCAL_TASKS = [
     BioMeSHClassification(),
     PubChemSynonymPC500(),
@@ -131,4 +154,5 @@ LOCAL_TASKS = [
     R2MEDBiologyPooled(),
     GOPubMedRetrieval(),
     GeneDiseaseRetrieval(),
+    *(cls() for cls in GENE_DISEASE_V2),
 ]

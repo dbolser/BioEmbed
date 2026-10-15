@@ -46,9 +46,9 @@ DEFAULT_MODELS = [
 
 
 def get_model(name: str):
-    if name == "ncbi/MedCPT":
+    if name in ("ncbi/MedCPT", "ncbi/MedCPT-cosine"):  # CLS + dot product; -cosine variant
         from medcpt_model import MedCPT
-        return MedCPT()
+        return MedCPT(cosine=name.endswith("-cosine"))
     if name.startswith("bioembed/"):  # our fine-tunes: models/bioembed-<x> -> results/embedding/bioembed__<x>
         from sentence_transformers import SentenceTransformer
         model = SentenceTransformer(str(REPO / "models" / f"bioembed-{name.split('/', 1)[1]}"))
@@ -57,6 +57,10 @@ def get_model(name: str):
     try:
         return mteb.get_model(name)
     except Exception as e:
+        if "FlashAttention2" in str(e):  # no flash-attn (CPU): keep mteb's loader and prompts
+            meta = mteb.get_model_meta(name).model_copy(deep=True)
+            meta.loader_kwargs.setdefault("model_kwargs", {})["attn_implementation"] = "sdpa"
+            return meta.load_model()
         print(f"  mteb.get_model failed ({e!r}); falling back to SentenceTransformer")
         from sentence_transformers import SentenceTransformer
         model = SentenceTransformer(name)
@@ -71,6 +75,8 @@ def main() -> None:
                     help="task names; default = whole suite")
     ap.add_argument("--suite", choices=["tier_a", "local", "all"], default="all")
     ap.add_argument("--batch-size", type=int, default=32)
+    ap.add_argument("--out", type=Path, default=REPO / "results" / "embedding",
+                    help="mteb output folder (default: the tracked results)")
     args = ap.parse_args()
 
     tasks = {"tier_a": TIER_A_TASKS, "local": LOCAL_TASKS,
@@ -78,7 +84,7 @@ def main() -> None:
     if args.tasks:
         tasks = [t for t in tasks if t.metadata.name in args.tasks]
 
-    out = REPO / "results" / "embedding"
+    out = args.out
     failures = []
     for name in args.models:
         print(f"=== {name} ===", flush=True)
