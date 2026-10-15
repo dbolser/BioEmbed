@@ -134,6 +134,84 @@ nothing outside PubMed-style retrieval.
   frontier's range; the last +0.013 (Gemini Pro) costs 100×. On the full
   bio suite the frontier ends at Qwen3-E-4B with no LLM on it.
 
+## Gene–disease evidence retrieval (v1.3, 2026-10-15)
+
+Two new Tier C tasks: "find the abstracts curators cite for this gene–disease
+link". Query: `HFE (homeostatic iron regulator) in hereditary hemochromatosis`.
+Gold: curated PMIDs from Open Targets (Orphanet, Gene2Phenotype, Genomics
+England, UniProt literature). Gold table: `data/gold/ot_curated_gene_disease_pmid.parquet`
+(17.7k pairs, untracked, rebuilt by the builder). Not yet in the 12-task
+BioScore.
+
+**GeneDiseaseRetrieval** (`scripts/build_tier_c_gene_disease.py`): 75 queries,
+300 docs, 1 gold + 3 hard negatives per query (same gene, unrelated disease).
+Silver guard: no doc in the corpus is linked to a query, by curators or Europe
+PMC text-mining, unless it is gold. First designs (2–3 golds, few hard
+negatives) were too easy: BM25 and small embedders hit 80–93% of the recall@1
+ceiling.
+
+| recall@1 | models |
+|---|---|
+| 0.79 | bge-large |
+| 0.77 | Snowflake-L, Qwen3-E-8B |
+| 0.75–0.76 | bge-small/base, MedEmbed-small, Qwen3-E-0.6B/4B, F2LLM-1.7B |
+| 0.70–0.73 | MedEmbed-base/large, PubMedBERT, e5-small, F2LLM-0.6B, MiniLM, MedCPT |
+| 0.65–0.67 | **bge-small-gaf, bge-base-gaf (ours)**, BioLORD |
+
+Size buys nothing here (±0.05 noise at 75 queries). Our GAF fine-tunes drop
+0.07–0.10 below their parents: training GO term → abstract seems to blur
+which disease an abstract is about.
+
+**GeneDiseaseHaystack** (`scripts/build_tier_c_haystack.py`): 500 queries over
+all 28.3M local PubMed abstracts, ~4.9 golds each. Gene-filtered track: each
+query's candidates are the abstracts PubTator 3 tags with the gene (median
+1,088 per query, 1.7M docs in total); models rank them (`eval/haystack.py`, Spot
+L4s via `scripts/gcp_haystack.sh`). That filter's recall, 0.88, is the ceiling.
+Scores are "condensed": Europe PMC-linked abstracts that aren't gold are dropped
+before scoring (`scripts/score_haystack.py`, `results/haystack/scores.csv`).
+
+| system | recall@10 | recall@100 | nDCG@10 |
+|---|---|---|---|
+| MedEmbed-base | **0.48** | 0.75 | **0.43** |
+| MedEmbed-small | 0.48 | 0.75 | 0.43 |
+| bge-base | 0.48 | 0.75 | 0.42 |
+| bge-small | 0.47 | 0.75 | 0.41 |
+| MiniLM | 0.44 | 0.73 | 0.37 |
+| e5-small | 0.43 | 0.72 | 0.37 |
+| BM25 ($0, CPU) | 0.42 | 0.70 | 0.35 |
+| PubMedBERT | 0.42 | 0.72 | 0.36 |
+| bge-base-gaf (ours) | 0.38 | 0.71 | 0.29 |
+| MedCPT | 0.38 | 0.70 | 0.30 |
+| bge-small-gaf (ours) | 0.35 | 0.69 | 0.28 |
+
+PubTator lookups (gene AND disease tagged, no ranking; disease mapped via
+Open Targets MeSH/OMIM xrefs):
+
+| disease match | recall | median docs/query |
+|---|---|---|
+| exact disease ID | 0.21 | 0 |
+| + parent terms | 0.40 | 39 |
+| + all ancestors | 0.60 | 245 |
+
+- **The best embedders beat BM25 by only ~+0.06 recall@10.** The disease name
+  is usually in the abstract, so word matching gets most of the way.
+- **PubTator's gene tags are an excellent filter (0.88 recall at ~1k docs). Its
+  disease tags are a poor one.** Exact-ID lookup finds nothing for most queries:
+  148/500 query diseases (Orphanet, HPO, EFO) have no MeSH/OMIM ID, and when one
+  exists PubTator often tags a broader term. MONDO's own mappings
+  (`/data/public/MONDO`) add one disease, so this isn't a mapping gap we can
+  close. Ranking beats lookup: BM25 reaches 0.70 recall in 100 docs, the
+  ancestor lookup 0.60 in 245.
+- **MedCPT, built for PubMed search, falls to near-last here** despite placing
+  mid-pack on the 300-doc task (nDCG@10 0.83). Not yet investigated.
+- **The GAF fine-tunes lose again**, consistently with the 300-doc task.
+- Qwen3-E-0.6B is still running. Bigger models are best used to rerank the
+  top 100, not on all 1.7M (8B ≈ 900 L4-hours).
+
+Data now in `/data/public` (symlinked into `IUK-IPF/data/sources/`):
+`OpenTargets/26.06`, `PubTator3/2026-10-06` (gene, disease, relation files),
+`HGNC/2026-10-14`, `MONDO/2026-10-14`.
+
 ## Method notes & caveats
 
 - Both paradigms score identical seed-42 data; retrieval scored recall@1

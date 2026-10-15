@@ -62,6 +62,12 @@ TIER_C = {
         "category": "Retrieval",
         "max_queries": 75, "corpus_budget": 300,
     },
+    # query = "SYMBOL (gene name) in disease"; gold = curated Open Targets
+    # literature evidence; 3 hard negatives per query share the gene.
+    "GeneDiseaseRetrieval": {
+        "category": "Retrieval",
+        "max_queries": 75, "corpus_budget": 300,
+    },
     # (GO term text, UniProt function text): annotated-or-not, with
     # hierarchy-aware negatives (GO parents excluded from negatives).
     "GOProteinPairCls": {

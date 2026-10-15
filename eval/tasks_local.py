@@ -116,10 +116,19 @@ class GOPubMedRetrieval(_LocalRetrievalTask):
                      "75 queries, 300 docs, GAF gold.")
 
 
+class GeneDiseaseRetrieval(_LocalRetrievalTask):
+    local_name = "GeneDiseaseRetrieval"
+    metadata = _meta(_RET_TMPL, "GeneDiseaseRetrieval",
+                     "Retrieve PubMed abstracts cited by curators as evidence "
+                     "for a gene-disease link (Open Targets curated sources). "
+                     "75 queries, 300 docs, 3 same-gene hard negatives per query.")
+
+
 LOCAL_TASKS = [
     BioMeSHClassification(),
     PubChemSynonymPC500(),
     GOProteinPairCls(),
     R2MEDBiologyPooled(),
     GOPubMedRetrieval(),
+    GeneDiseaseRetrieval(),
 ]
