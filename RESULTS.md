@@ -172,7 +172,8 @@ before scoring (`scripts/score_haystack.py`, `results/haystack/scores.csv`).
 
 | system | recall@10 | recall@100 | nDCG@10 |
 |---|---|---|---|
-| MedEmbed-base | **0.48** | 0.75 | **0.43** |
+| Qwen3-E-0.6B | **0.51** | **0.77** | **0.44** |
+| MedEmbed-base | 0.48 | 0.75 | 0.43 |
 | MedEmbed-small | 0.48 | 0.75 | 0.43 |
 | bge-base | 0.48 | 0.75 | 0.42 |
 | bge-small | 0.47 | 0.75 | 0.41 |
@@ -193,8 +194,10 @@ Open Targets MeSH/OMIM xrefs):
 | + parent terms | 0.40 | 39 |
 | + all ancestors | 0.60 | 245 |
 
-- **The best embedders beat BM25 by only ~+0.06 recall@10.** The disease name
-  is usually in the abstract, so word matching gets most of the way.
+- **The best embedders beat BM25 by only +0.06–0.09 recall@10.** The disease
+  name is usually in the abstract, so word matching gets most of the way.
+  Qwen3-E-0.6B leads but costs ~10 L4-hours on the 1.7M docs, against ~1.5 h
+  for MedEmbed-base, which is within 0.03 of it.
 - **PubTator's gene tags are an excellent filter (0.88 recall at ~1k docs). Its
   disease tags are a poor one.** Exact-ID lookup finds nothing for most queries:
   148/500 query diseases (Orphanet, HPO, EFO) have no MeSH/OMIM ID, and when one
@@ -205,8 +208,8 @@ Open Targets MeSH/OMIM xrefs):
 - **MedCPT, built for PubMed search, falls to near-last here** despite placing
   mid-pack on the 300-doc task (nDCG@10 0.83). Not yet investigated.
 - **The GAF fine-tunes lose again**, consistently with the 300-doc task.
-- Qwen3-E-0.6B is still running. Bigger models are best used to rerank the
-  top 100, not on all 1.7M (8B ≈ 900 L4-hours).
+- Bigger models are best used to rerank the top 100, not on all 1.7M
+  (8B ≈ 900 L4-hours).
 
 Data now in `/data/public` (symlinked into `IUK-IPF/data/sources/`):
 `OpenTargets/26.06`, `PubTator3/2026-10-06` (gene, disease, relation files),
