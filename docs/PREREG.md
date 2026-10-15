@@ -155,3 +155,16 @@ bge-base-gaf − bge-base +0.015 (p = 0.11, 7/12).
   - **Clean answer key** (a check, not a claim): curator papers that PubTator
     tags with the gene, cited for fewer than 10 genes, and from Genomics
     England only if rated green.
+- 2026-10-15 22:45 (before phase 2 runs):
+  - **Small task practice batch.** Batch 0 (75 pairs) is the practice set
+    for C3/C4: the best embedder and the best LLM are picked on it. C3 and
+    C4 are tested on batches 1–4 (300 pairs).
+  - **Rerank depths, fixed now.** Cross-encoders and fine-tuned rerankers
+    re-sort the top 100 of the first pass; LLM rerankers re-sort the top 20.
+    Not tuned.
+  - **First-pass candidates for C1:** tuned BM25, each dense embedder, and
+    BM25 + dense fused by reciprocal rank (k = 60). The best on the practice
+    haystack by recall@100 (curator-only) is the first pass for C1.
+  - **"Similar size" for C6/C7:** under 150M parameters (bge-base class).
+  - **Haystack selection metric** until graded practice labels exist:
+    curator-only nDCG@10 on the practice haystack.
