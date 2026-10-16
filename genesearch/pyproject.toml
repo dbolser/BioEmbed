@@ -1,0 +1,17 @@
+[project]
+name = "genesearch"
+version = "0.1.0"
+description = "Type a gene, see its literature (PubMed + PubTator3 + Open Targets)"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "duckdb",
+    "pandas",
+    "pyarrow",
+    "bm25s",
+    "PyStemmer",
+]
+
+[tool.uv]
+package = false
