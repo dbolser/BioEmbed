@@ -1,0 +1,14 @@
+# hs-q2: practice then TEST haystack for MedCPT (CLS fix), MedCPT-cosine, BiCA-base, BiCA-small, embeddinggemma.
+# MedCPT-cosine encodes docs exactly as MedCPT (cosine is applied at scoring), so it reuses MedCPT's vector cache.
+uv run python haystack.py --haystack GeneDiseaseHaystackDev --batch-size 512 --models ncbi/MedCPT
+ln -sfn ncbi__MedCPT ../data/haystack/GeneDiseaseHaystackDev/vectors/ncbi__MedCPT-cosine
+uv run python haystack.py --haystack GeneDiseaseHaystackDev --batch-size 512 --models ncbi/MedCPT-cosine
+uv run python haystack.py --haystack GeneDiseaseHaystackDev --batch-size 512 --models bisectgroup/BiCA-base
+uv run python haystack.py --haystack GeneDiseaseHaystackDev --batch-size 512 --models bisectgroup/BiCA-small
+uv run python haystack.py --haystack GeneDiseaseHaystackDev --batch-size 128 --models google/embeddinggemma-300m || uv run python haystack.py --haystack GeneDiseaseHaystackDev --batch-size 32 --models google/embeddinggemma-300m
+uv run python haystack.py --batch-size 512 --models ncbi/MedCPT
+ln -sfn ncbi__MedCPT ../data/haystack/GeneDiseaseHaystack/vectors/ncbi__MedCPT-cosine
+uv run python haystack.py --batch-size 512 --models ncbi/MedCPT-cosine
+uv run python haystack.py --batch-size 512 --models bisectgroup/BiCA-base
+uv run python haystack.py --batch-size 512 --models bisectgroup/BiCA-small
+uv run python haystack.py --batch-size 128 --models google/embeddinggemma-300m || uv run python haystack.py --batch-size 32 --models google/embeddinggemma-300m

@@ -176,3 +176,14 @@ bge-base-gaf − bge-base +0.015 (p = 0.11, 7/12).
     and Holm runs over 10 claims instead of 9. The LLM pick (Gemini 3.1
     Flash-Lite, 59 vs 57 for DeepSeek on batch 0) stands as pre-registered,
     so C4 is dropped: Gemini remembers only 9 test pairs (< 15).
+- 2026-10-16 (before any fine-tuned model's test-haystack result exists):
+  - **Fine-tune recipe**, picked automatically on the practice haystack:
+    Europe PMC silver positives added, 3 hard negatives (practice nDCG@10
+    0.426 vs 0.424 for curated-only; a near tie, kept as the rule says).
+  - **Seeds in C5, C6 and C8.** A fine-tune's score on each test pair is the
+    mean over its seeds (bge-base: 42, 43, 44). The paired test compares
+    that mean with the other model on the same pair. Seed-to-seed spread is
+    reported alongside.
+  - **C5 base model** is bge-base-en-v1.5 (the fine-tune's starting point).
+    **C6 comparison** is the best on the practice haystack among MedCPT,
+    BiCA-base, MedEmbed-base and PubMedBERT (all < 150M parameters).
