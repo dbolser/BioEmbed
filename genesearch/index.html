@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Gene search</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --bg: #ffffff; --fg: #1d1d1f; --muted: #555; --line: #d8d8d8; --panel: #f4f5f7;
+    --gene: #005a8c; --term-bg: #ffe39a; --term-line: #9a4a00; --cur: #00664a; --focus: #0072b2;
+  }
+  body.cream { --bg: #fbf5e6; --panel: #f1e9d4; --line: #d9cfb6; }
+  * { box-sizing: border-box; }
+  html { font-size: 19px; }  /* rem = 19px; nothing on the page is smaller than .9rem (17px) */
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 1rem/1.65 "Atkinson Hyperlegible", Verdana, "DejaVu Sans", system-ui, sans-serif;
+  }
+  .wrap { max-width: 60rem; margin: 0 auto; padding: 0 1.2rem 4rem; }
+  header { background: var(--panel); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 2; }
+  header .wrap { padding-top: .8rem; padding-bottom: .8rem; }
+  form { display: flex; flex-wrap: wrap; gap: .6rem; align-items: end; }
+  label { display: flex; flex-direction: column; font-size: .9rem; color: var(--muted); }
+  input, select, button {
+    font: inherit; font-size: 1rem; padding: .35rem .6rem; border: 1px solid #888; border-radius: 6px;
+    background: #fff; color: var(--fg);
+  }
+  #gene { width: 15rem; } #term { width: 21rem; }
+  button { cursor: pointer; background: #fff; }
+  button.primary { background: var(--focus); color: #fff; border-color: var(--focus); }
+  :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+  .hint { font-size: .9rem; color: var(--muted); }
+  .linkish { border: none; background: none; padding: 0; color: var(--gene); text-decoration: underline; font-size: inherit; }
+  .muted { color: var(--muted); }
+  h1 { font-size: 1.7rem; margin: 1.2rem 0 .2rem; line-height: 1.3; }
+  h1 .nm { font-weight: normal; }
+  h2 { font-size: 1.2rem; margin: 1.6rem 0 .4rem; }
+  a { color: var(--gene); }
+  .card p { margin: .25rem 0; max-width: 70ch; }
+  .links a { margin-right: 1rem; }
+  .choices button { display: block; width: 100%; text-align: left; margin: .35rem 0; padding: .5rem .8rem; }
+  .dlist { list-style: none; padding: 0; margin: 0; }
+  .dlist button {
+    width: 100%; text-align: left; border: 1px solid transparent; background: transparent;
+    padding: .2rem .5rem; border-radius: 6px; display: flex; gap: 1rem; justify-content: space-between;
+  }
+  .dlist button:hover { border-color: var(--line); background: var(--panel); }
+  .dlist button.on { border-color: var(--cur); background: var(--panel); font-weight: bold; }
+  .dlist .n { white-space: nowrap; color: var(--muted); font-size: .9rem; }
+  details.more > summary { cursor: pointer; color: var(--gene); margin-top: .5rem; }
+  .bar { display: flex; flex-wrap: wrap; gap: .8rem 1.2rem; align-items: center; margin: .6rem 0; }
+  .bar input[type=number] { width: 5.5rem; }
+  .status { font-size: 1.05rem; margin-top: 1.4rem; }
+  .note { background: var(--panel); border-left: 4px solid var(--term-line); padding: .4rem .8rem; max-width: 70ch; }
+  .filter { border: 2px solid var(--cur); border-radius: 999px; padding: .1rem .3rem .1rem .8rem; }
+  .filter button { border: none; background: none; padding: 0 .4rem; font-weight: bold; }
+  ol.papers { list-style: none; padding: 0; margin: 0; }
+  ol.papers > li { border-top: 1px solid var(--line); padding: 1rem 0; }
+  .title { font-weight: bold; font-size: 1.15rem; line-height: 1.45; max-width: 70ch; }
+  .meta { color: var(--muted); font-size: .95rem; }
+  .meta a { color: var(--gene); }
+  .badge {
+    display: inline-block; border: 2px solid var(--cur); color: var(--cur); border-radius: 6px;
+    padding: 0 .45rem; font-size: .9rem; font-weight: bold; margin: .25rem .3rem 0 0;
+  }
+  .chip {
+    display: inline-block; border: 1px solid var(--line); background: var(--panel); border-radius: 999px;
+    padding: 0 .55rem; font-size: .9rem; margin: .25rem .25rem 0 0; color: var(--fg);
+  }
+  details.abs > summary { cursor: pointer; color: var(--gene); font-size: .95rem; margin-top: .3rem; }
+  details.tags { display: inline; }
+  details.tags > summary { display: inline; cursor: pointer; color: var(--muted); font-size: .9rem; margin-left: .2rem; }
+  details.tags[open] > summary { display: block; }
+  .abstract { white-space: pre-line; max-width: 70ch; margin: .4rem 0 0; }
+  mark.g { background: none; color: var(--gene); font-weight: bold; text-decoration: underline 2px solid; text-underline-offset: 3px; }
+  mark.t { background: var(--term-bg); color: inherit; text-decoration: underline 2px dashed var(--term-line); text-underline-offset: 3px; }
+  .legend mark { padding: 0 .2rem; }
+  nav.pager { display: flex; gap: .6rem; align-items: center; margin-top: 1rem; }
+  .toprow { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <form id="f" autocomplete="off">
+      <label>Gene
+        <input id="gene" placeholder="symbol, alias or name" aria-label="Gene">
+      </label>
+      <label>and&hellip; (optional)
+        <input id="term" placeholder="disease or any words" aria-label="And words">
+      </label>
+      <button class="primary" type="submit">Search</button>
+      <button type="button" id="creamBtn" title="Toggle cream background">Cream</button>
+    </form>
+    <div class="hint">Press <kbd>/</kbd> to jump to the gene box. Examples:
+      <a href="?gene=ZCCHC8&amp;q=pulmonary+fibrosis">ZCCHC8 + pulmonary fibrosis</a>,
+      <a href="?gene=CFTR">CFTR</a>, <a href="?gene=p53">p53</a>, <a href="?gene=BRCA">BRCA</a></div>
+  </div>
+</header>
+
+<div class="wrap">
+  <div id="msg"></div>
+  <div id="choices" class="choices"></div>
+  <section id="card" class="card"></section>
+  <section id="dis"></section>
+  <section id="list"></section>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const fmt = (n) => (n ?? 0).toLocaleString("en-GB");
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
+  ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
+const reEsc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+// ---- state <-> URL
+let S = {};      // gene, q, src, disease, dname, ymin, ymax, sort, match ("" = all words, "any"), page
+let G = null;    // current gene record from /api/gene
+let reqNo = 0;
+
+function readURL() {
+  const p = new URLSearchParams(location.search);
+  S = {gene: p.get("gene") || "", q: p.get("q") || "", src: p.get("src") || "", disease: p.get("disease") || "",
+       dname: p.get("dname") || "", ymin: p.get("ymin") || "", ymax: p.get("ymax") || "",
+       sort: p.get("sort") || "", match: p.get("match") || "", page: +(p.get("page") || 1)};
+}
+function writeURL(push = true) {
+  const p = new URLSearchParams();
+  for (const [k, v] of Object.entries(S)) if (v && !(k === "page" && v === 1)) p.set(k, v);
+  const url = "?" + p.toString();
+  if (url !== location.search) (push ? history.pushState : history.replaceState).call(history, null, "", url);
+}
+const apiParams = () => new URLSearchParams({gene: G.hgnc_id, term: S.q, src: S.src, disease: S.disease,
+  ymin: S.ymin || 0, ymax: S.ymax || 0, sort: S.sort, match: S.match || "all", page: S.page});
+
+async function getJSON(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
+  return r.json();
+}
+
+// ---- highlighting: gene mentions (blue, solid underline) and search words (yellow, dashed underline)
+// Gene symbol and short or all-caps mentions match case-sensitively (WAS must not mark "was",
+// IMPACT not "impact"); longer mixed-case mentions ("tumor protein p53") and search words ignore case.
+const anyCase = (w) => [...w].map((c) => {
+  const l = c.toLowerCase(), u = c.toUpperCase();
+  return l === u || l.length > 1 || u.length > 1 ? reEsc(c) : `[${l}${u}]`;
+}).join("");
+const geneCase = (w) => (w.length > 5 && w !== w.toUpperCase() ? anyCase(w) : reEsc(w));
+function highlighter(geneWords, termWords) {
+  const alt = (ws, f) => [...new Set(ws.filter((w) => w && w.length > 1))].sort((a, b) => b.length - a.length).map(f).join("|") || "(?!)";
+  const re = new RegExp(`(?<![\\p{L}\\p{N}])(?:(${alt(geneWords, geneCase)})|(${alt(termWords, anyCase)}))(?![\\p{L}\\p{N}])`, "gu");
+  return (text) => {
+    if (!text) return "";
+    let out = "", last = 0;
+    for (const m of text.matchAll(re)) {
+      out += esc(text.slice(last, m.index)) + `<mark class="${m[1] !== undefined ? "g" : "t"}">${esc(m[0])}</mark>`;
+      last = m.index + m[0].length;
+    }
+    return out + esc(text.slice(last));
+  };
+}
+
+// ---- gene search
+async function searchGene(push = true) {
+  const q = S.gene.trim();
+  $("choices").innerHTML = ""; $("msg").innerHTML = "";
+  if (!q) return;
+  const res = await getJSON("/api/resolve?q=" + encodeURIComponent(q));
+  if (!res.matches.length) {
+    clearGene(); $("msg").innerHTML = `<p>No gene found for <b>${esc(q)}</b>. Try a symbol (e.g. CFTR), an alias or part of the name.</p>`;
+    return;
+  }
+  if (res.matches.length === 1 && !res.partial) return loadGene(res.matches[0], res.also || [], push);
+  clearGene();
+  $("choices").innerHTML = (res.partial
+      ? `<h2>No exact match for “${esc(q)}”. Did you mean:</h2>
+         <p class="hint">Only human (HGNC) genes are listed. For a mouse or rat gene, type the human symbol (e.g. TP53 for Trp53).</p>`
+      : `<h2>${fmt(res.matches.length)} genes match “${esc(q)}”. Pick one:</h2>`) +
+    res.matches.map((g, i) => `<button data-i="${i}"><b>${esc(g.symbol)}</b> &nbsp;${esc(g.name)}
+       <span class="muted">· ${esc(g.why)} · ${fmt(g.n_papers)} papers</span></button>`).join("") +
+    (res.n_more ? `<p class="muted">…and ${fmt(res.n_more)} more. Type more letters to narrow it down.</p>` : "");
+  $("choices").querySelectorAll("button").forEach((b) => b.onclick = () => {
+    $("choices").innerHTML = "";
+    loadGene(res.matches[+b.dataset.i], [], true, true);
+  });
+}
+
+function clearGene() { G = null; $("card").innerHTML = ""; $("dis").innerHTML = ""; $("list").innerHTML = ""; }
+
+async function loadGene(g, also, push, picked = false) {
+  if (picked) { S.gene = g.symbol; $("gene").value = g.symbol; }
+  G = await getJSON("/api/gene/" + encodeURIComponent(g.hgnc_id));
+  const otherNames = [G.aliases.length ? `Also known as: ${esc(G.aliases.join(", "))}` : "",
+                      G.prev.length ? `Previous symbols: ${esc(G.prev.join(", "))}` : ""].filter(Boolean).join(" · ");
+  $("card").innerHTML = `
+    <h1>${esc(G.symbol)} <span class="nm">${esc(G.name)}</span></h1>
+    ${otherNames ? `<p>${otherNames}</p>` : ""}
+    <p class="muted">${esc(G.location || "")} · ${esc(G.locus_group || "")} · ${esc(G.hgnc_id)}</p>
+    <p><b>${fmt(G.n_tagged)}</b> papers tagged with this gene by PubTator3
+       · <b>${fmt(G.n_curated_papers)}</b> curated papers (Open Targets)</p>
+    <p class="links">
+      <a href="https://www.genenames.org/data/gene-symbol-report/#!/hgnc_id/${esc(G.hgnc_id)}" target="_blank" rel="noopener">HGNC</a>
+      ${G.entrez ? `<a href="https://www.ncbi.nlm.nih.gov/gene/${G.entrez}" target="_blank" rel="noopener">NCBI Gene</a>` : ""}
+      ${G.ensembl ? `<a href="https://platform.opentargets.org/target/${esc(G.ensembl)}" target="_blank" rel="noopener">Open Targets</a>` : ""}
+    </p>
+    ${also.length ? `<p class="muted">“${esc(S.gene)}” is also an alias or old symbol of:
+       ${also.map((a) => `<a href="?gene=${encodeURIComponent(a.symbol)}">${esc(a.symbol)}</a>`).join(", ")}</p>` : ""}`;
+  renderDiseases();
+  await loadPapers(push);
+}
+
+function diseaseRows(list, src) {
+  return list.map((d) => `<li><button data-src="${src}" data-id="${esc(d.disease_id)}" data-name="${esc(d.disease)}"
+      class="${S.src === src && S.disease === d.disease_id ? "on" : ""}">
+      <span>${esc(d.disease)}${d.sources ? ` <span class="n">(${esc(d.sources.join(", "))})</span>` : ""}</span>
+      <span class="n">${fmt(d.n_papers)} paper${d.n_papers === 1 ? "" : "s"}</span></button></li>`).join("");
+}
+
+function renderDiseases() {
+  if (!G) return;
+  const cur = G.curated, ep = G.epmc;
+  const top = cur.slice(0, 12), rest = cur.slice(12);
+  $("dis").innerHTML = `
+    <h2>Curated diseases <span class="muted" style="font-weight:normal">(Open Targets: Orphanet, Gene2Phenotype, Genomics England, UniProt)</span></h2>
+    ${cur.length ? `<ul class="dlist">${diseaseRows(top, "curated")}</ul>
+      ${rest.length ? `<details class="more"><summary>${rest.length} more curated diseases</summary>
+        <ul class="dlist">${diseaseRows(rest, "curated")}</ul></details>` : ""}`
+      : `<p class="muted">No curated gene–disease papers for ${esc(G.symbol)}.</p>`}
+    ${ep.length ? `<details class="more" ${S.src === "epmc" ? "open" : ""}><summary>Text-mined diseases (Europe PMC, top ${ep.length})</summary>
+      <ul class="dlist">${diseaseRows(ep, "epmc")}</ul></details>` : ""}
+    <p class="hint">Click a disease to list only the papers linking it to ${esc(G.symbol)}.</p>`;
+  $("dis").querySelectorAll(".dlist button").forEach((b) => b.onclick = () => {
+    const same = S.src === b.dataset.src && S.disease === b.dataset.id;
+    Object.assign(S, same ? {src: "", disease: "", dname: ""} : {src: b.dataset.src, disease: b.dataset.id, dname: b.dataset.name});
+    S.page = 1; renderDiseases(); loadPapers(true);
+  });
+}
+
+// ---- paper list
+async function loadPapers(push = true) {
+  writeURL(push);
+  const my = ++reqNo, t0 = performance.now();
+  const st = document.querySelector("#list .status");
+  if (st) st.innerHTML = `<b>Searching…</b>`;
+  else $("list").innerHTML = `<p class="status"><b>Searching…</b></p>`;
+  let r;
+  try { r = await getJSON("/api/papers?" + apiParams()); }
+  catch (e) { $("list").innerHTML = `<p class="note">Error: ${esc(e.message)}</p>`; return; }
+  if (my !== reqNo) return;  // a newer request superseded this one
+  const secs = ((performance.now() - t0) / 1000).toFixed(2);
+  const term = S.q.trim();
+  const scope = S.disease
+    ? `papers ${S.src === "curated" ? "curated" : "text-mined (Europe PMC)"} for ${esc(G.symbol)} + ${esc(S.dname || S.disease)}`
+    : `papers for ${esc(G.symbol)}`;
+  // Several words: count papers with ALL of them (any-word counts are inflated: "19" in "COVID-19").
+  const toggle = (to, label) => ` · <button type="button" class="linkish" data-match="${to}">${label}</button>`;
+  const what = !term ? `<b>${fmt(r.n_matched)}</b> ${scope}`
+    : r.n_words <= 1 ? `<b>${fmt(r.n_matched)}</b> of ${fmt(r.n_set)} ${scope} match “${esc(term)}”`
+    : r.match === "all" ? `<b>${fmt(r.n_matched)}</b> of ${fmt(r.n_set)} ${scope} contain all the words “${esc(term)}”` +
+        (r.n_any > r.n_all ? toggle("any", `show the ${fmt(r.n_any)} with any word`) : "")
+    : r.n_all ? `<b>${fmt(r.n_matched)}</b> of ${fmt(r.n_set)} ${scope} contain any of the words “${esc(term)}”` +
+        toggle("", `show only the ${fmt(r.n_all)} with all words`)
+    : `No paper has all the words “${esc(term)}”. Showing the <b>${fmt(r.n_matched)}</b> of ${fmt(r.n_set)} ${scope} with any of them`;
+  const noText = r.n_no_text ? ` · ${fmt(r.n_no_text)} have no abstract here (listed last)` : "";
+  const sortName = {relevance: "best match first", newest: "newest first", oldest: "oldest first"}[r.sort];
+  // PubTator sometimes tags plain words as the gene ("was" for WAS, "clock" for CLOCK): skip
+  // lower-case, digit-free spellings of the symbol ("tp53", zebrafish, is kept).
+  const realMention = (m) => !(m === m.toLowerCase() && !/\d/.test(m) && m.toUpperCase() === G.symbol);
+  const hl = (p) => highlighter([...p.gene_mentions.filter(realMention), G.symbol], p.term_words);
+  const csv = "/api/papers.csv?" + apiParams();
+  $("list").innerHTML = `
+    <p class="status">${what}${noText} · ${sortName} · ${secs} s</p>
+    <div class="bar">
+      ${S.disease ? `<span class="filter">${esc(S.dname || S.disease)}<button id="clearDis" title="Remove disease filter" aria-label="Remove disease filter">✕</button></span>` : ""}
+      <label>From year <input type="number" id="ymin" value="${esc(S.ymin)}" placeholder="${G.year_min ?? ""}"></label>
+      <label>To year <input type="number" id="ymax" value="${esc(S.ymax)}" placeholder="${G.year_max ?? ""}"></label>
+      <label>Sort <select id="sort">
+        ${term ? `<option value="relevance">Best match</option>` : ""}
+        <option value="newest">Newest first</option><option value="oldest">Oldest first</option></select></label>
+      <a href="${csv}" download>Download CSV (all ${fmt(r.n_matched)}${r.n_matched > 50000 ? `, about ${fmt(Math.round(r.n_matched / 2000))} MB` : ""})</a>
+    </div>
+    <p class="legend hint">Highlights: <mark class="g">gene mention</mark> ${term ? `· <mark class="t">your words</mark>` : ""}
+       · <span class="badge">Curated</span> = Open Targets curated paper for this gene</p>
+    <ol class="papers">${r.papers.map((p) => paperHTML(p, hl(p))).join("")}</ol>
+    ${pager(r)}`;
+  $("sort").value = r.sort;
+  $("sort").onchange = (e) => { S.sort = e.target.value; S.page = 1; loadPapers(); };
+  document.querySelectorAll("#list [data-match]").forEach((b) => b.onclick = () => { S.match = b.dataset.match; S.page = 1; loadPapers(); });
+  for (const k of ["ymin", "ymax"]) $(k).onchange = (e) => { S[k] = e.target.value; S.page = 1; loadPapers(); };
+  if ($("clearDis")) $("clearDis").onclick = () => { S.src = S.disease = S.dname = ""; S.page = 1; renderDiseases(); loadPapers(); };
+  document.querySelectorAll("nav.pager button").forEach((b) => b.onclick = () => {
+    S.page = +b.dataset.p; loadPapers().then(() => $("list").scrollIntoView({behavior: "smooth"}));
+  });
+}
+
+function paperHTML(p, h) {
+  const url = `https://pubmed.ncbi.nlm.nih.gov/${p.pmid}/`;
+  const title = p.title ? h(p.title)
+    : `<span class="muted">PMID ${p.pmid}: no abstract in the local PubMed copy (often an older letter or editorial, or a very new paper). Open it in PubMed.</span>`;
+  const abs = p.abstract ? h(p.abstract) : "";
+  const named = (title + abs).includes('<mark class="g">');
+  const meta = [p.journal && esc(p.journal), p.year, `<a href="${url}" target="_blank" rel="noopener">PMID ${p.pmid}</a>`,
+                p.score != null ? `score ${p.score}` : ""].filter(Boolean).join(" · ");
+  const badges = p.curated.map((c) => `<span class="badge" title="${esc(c.sources.join(", "))}">Curated: ${esc(c.disease)}</span>`).join("");
+  const chip = (d) => `<span class="chip" title="PubTator: ${esc(d.id)} ${esc(d.canonical)}">${esc(d.name)}</span>`;
+  const inAbs = p.diseases.filter((d) => d.in_abstract), other = p.diseases.filter((d) => !d.in_abstract);
+  const chips = inAbs.map(chip).join("") + (other.length
+    ? `<details class="tags"><summary>${inAbs.length ? "+" : ""}${other.length} disease tag${other.length === 1 ? "" : "s"} from full text / MeSH</summary>${other.map(chip).join("")}</details>`
+    : "");
+  return `<li>
+    <div class="title">${title}</div>
+    <div class="meta">${meta}</div>
+    ${badges ? `<div>${badges}</div>` : ""}
+    ${chips ? `<div>${chips}</div>` : ""}
+    ${p.title && !named ? `<div class="hint">${esc(G.symbol)} is not named in the title or abstract (tagged in the full text, or linked by curation).</div>` : ""}
+    ${abs ? `<details class="abs"><summary>Abstract</summary><p class="abstract">${abs}</p></details>` : ""}
+  </li>`;
+}
+
+function pager(r) {
+  if (r.n_pages <= 1) return "";
+  const b = (p, label, dis) => `<button data-p="${p}" ${dis ? "disabled" : ""}>${label}</button>`;
+  return `<nav class="pager">${b(1, "« First", r.page === 1)}${b(r.page - 1, "‹ Previous", r.page === 1)}
+    <span>Page ${fmt(r.page)} of ${fmt(r.n_pages)}</span>
+    ${b(r.page + 1, "Next ›", r.page === r.n_pages)}${b(r.n_pages, "Last »", r.page === r.n_pages)}</nav>`;
+}
+
+// ---- wiring
+$("f").onsubmit = (e) => {
+  e.preventDefault();
+  const gene = $("gene").value.trim(), q = $("term").value.trim();
+  const sameGene = G && gene.toUpperCase() === S.gene.toUpperCase();
+  S = {...S, gene, q, page: 1, sort: "", match: ""};
+  if (sameGene) { renderDiseases(); loadPapers(); }
+  else { Object.assign(S, {src: "", disease: "", dname: "", ymin: "", ymax: ""}); searchGene(); }
+};
+document.addEventListener("keydown", (e) => {
+  if (e.key === "/" && !["INPUT", "SELECT", "TEXTAREA"].includes(document.activeElement.tagName)) {
+    e.preventDefault(); $("gene").focus(); $("gene").select();
+  }
+});
+$("creamBtn").onclick = () => {
+  document.body.classList.toggle("cream");
+  localStorage.setItem("cream", document.body.classList.contains("cream") ? "1" : "");
+};
+if (localStorage.getItem("cream")) document.body.classList.add("cream");
+
+async function fromURL() {
+  readURL();
+  $("gene").value = S.gene; $("term").value = S.q;
+  if (S.gene) await searchGene(false); else { clearGene(); $("gene").focus(); }
+}
+window.addEventListener("popstate", fromURL);
+fromURL();
+</script>
+</body>
+</html>
