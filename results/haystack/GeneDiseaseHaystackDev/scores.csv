@@ -35,6 +35,10 @@ bm25-symbol_disease_syn-k1.5-b0.4,gene,raw,0.4431,0.7463,0.864,0.3505,,
 bm25-symbol_disease_syn-k1.5-b0.4,gene,condensed,0.4759,0.7605,0.864,0.4009,,
 bm25-symbol_disease_syn-k1.5-b0.75,gene,raw,0.4321,0.7512,0.8641,0.3433,,
 bm25-symbol_disease_syn-k1.5-b0.75,gene,condensed,0.4754,0.766,0.8641,0.3935,,
+llm-deepseek-v4-flash-top20-of-bm25-symbol_disease-k0.9-b0.75,gene,raw,0.51,0.7498,0.8638,0.4909,,
+llm-deepseek-v4-flash-top20-of-bm25-symbol_disease-k0.9-b0.75,gene,condensed,0.5282,0.7579,0.8638,0.5266,,
+llm-gemini-3.1-flash-lite-top20-of-bm25-symbol_disease-k0.9-b0.75,gene,raw,0.5233,0.7498,0.8638,0.5053,,
+llm-gemini-3.1-flash-lite-top20-of-bm25-symbol_disease-k0.9-b0.75,gene,condensed,0.5341,0.7579,0.8638,0.5354,,
 pubtator_gene,lookup,set,,,,,0.8802,816.0
 pubtator_gene+disease<=exact,lookup,set,,,,,0.2338,0.0
 pubtator_gene+disease<=descendants,lookup,set,,,,,0.2666,6.0
