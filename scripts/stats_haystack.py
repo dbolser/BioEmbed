@@ -5,8 +5,17 @@ Runs in data/haystack/<NAME>/runs/*.parquet (filtered by --runs) are scored
 per query with score_haystack.ranked_metrics (one query at a time), raw and
 condensed exactly as score_haystack.py does: recall@10, recall@100, nDCG@10
 over the curated gold. With --judgments (qid, pmid, grade 0/1/2; parquet or
-csv) the raw runs also get graded nDCG@10 (variant 'pooled', gains = grade,
-unjudged docs = 0, queries with no positive grade dropped).
+csv, e.g. llm/judge_pool.py's judgments_merged.parquet) the raw runs also get,
+as variant 'pooled' (stats_haystack.graded_metrics):
+  graded_ndcg@10   gains = grade, ideal DCG from all graded docs of the query
+                   (queries with no positive grade dropped)
+  p@10_ge<t>       share of the top 10 with grade >= t
+  bpref_ge<t>      bpref as trec_eval computes it (denominator min(R, N),
+                   not the R of Buckley & Voorhees 2004), grade >= t
+                   relevant (queries with no doc at grade >= t dropped)
+for t = --threshold (default 1) and t = 2. Unjudged docs are never relevant
+(gain 0); each pooled row reports judged@10, the share of the run's top-10
+docs that are judged, and unjudged@10, their count, over the queries kept.
 
 Per (variant, metric), over queries:
   ci_*        percentile bootstrap 95% CI, 10k query resamples
@@ -30,7 +39,7 @@ runs are added: fix it with --runs for any table. These are exploratory; the
 confirmatory family is PREREG C1-C9.
 
 Run:  uv run python scripts/stats_haystack.py [--haystack NAME] [--runs GLOB ...]
-          [--n-perm N] [--judgments PATH [--merge-gold]] [--out DIR]
+          [--n-perm N] [--judgments PATH [--merge-gold] [--threshold 1|2]] [--out DIR]
 Output: results/haystack/stats.csv, stats_pairs.csv for the test haystack,
         results/haystack/<NAME>/ for any other
 """
@@ -90,19 +99,48 @@ def load_judgments(path: Path, gold: dict[str, set[str]], merge_gold: bool) -> d
     return {q: dict(zip(g.pmid, g.grade)) for q, g in j.groupby("qid")}
 
 
-def graded_ndcg(run: pd.DataFrame, grades: dict[str, dict[str, int]], k: int = 10) -> tuple[pd.Series, float]:
-    """Per-query graded nDCG@k, and the share of top-k docs that are judged."""
-    ranked = {q: g.sort_values("rank").pmid.tolist()[:k] for q, g in run.groupby("qid")}
-    out, judged, seen = {}, 0, 0
-    for q, g in grades.items():
-        idcg = sum(x / math.log2(i + 2) for i, x in enumerate(sorted(g.values(), reverse=True)[:k]))
-        if idcg == 0:
+def bpref(ranked: list[str], grades: dict[str, int], threshold: int) -> float:
+    """bpref as trec_eval computes it (so pytrec_eval and ir_measures agree), grade >= threshold
+    relevant: 1/R times the sum, over retrieved relevant docs r, of 1 - min(n_r, M) / M, where
+    n_r = judged non-relevant docs ranked above r, M = min(R, N), R and N = judged relevant and
+    non-relevant docs; unjudged docs are skipped. NaN if R = 0. Buckley & Voorhees (2004) use R
+    for M; the two agree whenever N >= R."""
+    R = sum(x >= threshold for x in grades.values())
+    if not R:
+        return math.nan
+    M = min(R, len(grades) - R)
+    above, total = 0, 0.0
+    for p in ranked:
+        if p not in grades:
             continue
-        top = ranked.get(q, [])
-        out[q] = sum(g.get(p, 0) / math.log2(i + 2) for i, p in enumerate(top)) / idcg
-        judged += sum(p in g for p in top)
-        seen += len(top)
-    return pd.Series(out, dtype=float), judged / max(seen, 1)
+        if grades[p] >= threshold:
+            total += 1 - min(above, M) / M if above else 1.0
+        else:
+            above += 1
+    return total / R
+
+
+def graded_metrics(run: pd.DataFrame, grades: dict[str, dict[str, int]], k: int = 10,
+                   thresholds: tuple[int, ...] = (1, 2)) -> pd.DataFrame:
+    """Per judged query: graded_ndcg@k (gain = grade, ideal DCG from all the query's graded docs;
+    NaN if none is above 0), and per threshold t, p@k_ge<t> (top-k docs with grade >= t, over k)
+    and bpref_ge<t> (whole run; both NaN if no doc has grade >= t). Unjudged docs are never
+    relevant (gain 0); judged@k and n@k count the judged and all docs of the run's top k."""
+    ranked = {q: g.sort_values("rank").pmid.tolist() for q, g in run.groupby("qid")}
+    rows = {}
+    for q, g in grades.items():
+        full = ranked.get(q, [])
+        top = full[:k]
+        idcg = sum(x / math.log2(i + 2) for i, x in enumerate(sorted(g.values(), reverse=True)[:k]))
+        dcg = sum(g.get(p, 0) / math.log2(i + 2) for i, p in enumerate(top))
+        row = {f"graded_ndcg@{k}": dcg / idcg if idcg else math.nan,
+               f"judged@{k}": sum(p in g for p in top), f"n@{k}": len(top)}
+        for t in thresholds:
+            has_rel = any(x >= t for x in g.values())
+            row[f"p@{k}_ge{t}"] = sum(g.get(p, 0) >= t for p in top) / k if has_rel else math.nan
+            row[f"bpref_ge{t}"] = bpref(full, g, t)
+        rows[q] = row
+    return pd.DataFrame.from_dict(rows, orient="index")
 
 
 def holm(p: np.ndarray) -> np.ndarray:
@@ -186,6 +224,8 @@ def main() -> None:
     ap.add_argument("--n-perm", type=int, default=N_PERM)
     ap.add_argument("--judgments", type=Path, help="qid, pmid, grade (0/1/2) for graded nDCG@10")
     ap.add_argument("--merge-gold", action="store_true", help="count gold PMIDs missing from --judgments as grade 2")
+    ap.add_argument("--threshold", type=int, default=1, choices=[1, 2],
+                    help="grade >= this is relevant for p@10 and bpref (2 is reported as well)")
     ap.add_argument("--out", type=Path, help="output directory (default results/haystack[/<NAME>])")
     args = ap.parse_args()
 
@@ -202,8 +242,10 @@ def main() -> None:
 
     files = [f for f in sorted((hay / "runs").glob("*.parquet"))
              if any(fnmatch.fnmatchcase(f.stem, g) for g in args.runs)]
+    thresholds = tuple(sorted({args.threshold, 2}))
+    graded = ["graded_ndcg@10"] + [f"{m}_ge{t}" for t in thresholds for m in ("p@10", "bpref")]
     per: dict[tuple[str, str], dict[str, pd.Series]] = {}
-    judged: dict[str, float] = {}
+    judged: dict[tuple[str, str], tuple[float, int]] = {}  # (metric, run) -> judged@10, unjudged@10
     for f in files:
         try:
             run = pd.read_parquet(f)
@@ -218,8 +260,11 @@ def main() -> None:
             for m in METRICS:
                 per.setdefault((variant, m), {})[f.stem] = pq[m]
         if grades is not None:
-            s, judged[f.stem] = graded_ndcg(run, grades)
-            per.setdefault(("pooled", "graded_ndcg@10"), {})[f.stem] = s.reindex(qids)
+            gm = graded_metrics(run, grades, thresholds=thresholds)
+            for m in graded:
+                j, n = gm.loc[gm[m].notna(), ["judged@10", "n@10"]].sum()
+                judged[m, f.stem] = (j / max(n, 1), int(n - j))
+                per.setdefault(("pooled", m), {})[f.stem] = gm[m].reindex(qids)
     n_runs = len(per[("raw", METRICS[0])])
     print(f"{n_runs} runs in the family: {', '.join(per[('raw', METRICS[0])])}")
     if math.comb(n_runs, 2) / (args.n_perm + 1) >= ALPHA:
@@ -238,7 +283,7 @@ def main() -> None:
     for (variant, metric), cols in per.items():
         run_df, pair_df = summarise(pd.DataFrame(cols), Wq, Wg, signs)
         if variant == "pooled":
-            run_df["judged@10"] = run_df.run.map(judged)
+            run_df["judged@10"], run_df["unjudged@10"] = zip(*(judged[metric, r] for r in run_df.run))
         stats.append(run_df.assign(variant=variant, metric=metric))
         pairs.append(pair_df.assign(variant=variant, metric=metric))
 
@@ -251,6 +296,8 @@ def main() -> None:
                                                                                     n_perm=args.n_perm)
     lead = ["haystack", "variant", "metric"]
     stats_df = stats_df[lead + ["system", "track"] + [c for c in stats_df if c not in lead + ["system", "track"]]]
+    if grades is not None:  # last, so the existing columns keep their places
+        stats_df["unjudged@10"] = stats_df.pop("unjudged@10")
     pairs_df = pairs_df[lead + ["system_a", "track_a", "system_b", "track_b"]
                         + [c for c in pairs_df if c not in lead + ["system_a", "track_a", "system_b", "track_b"]]]
 
