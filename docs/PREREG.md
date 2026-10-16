@@ -168,3 +168,11 @@ bge-base-gaf − bge-base +0.015 (p = 0.11, 7/12).
   - **"Similar size" for C6/C7:** under 150M parameters (bge-base class).
   - **Haystack selection metric** until graded practice labels exist:
     curator-only nDCG@10 on the practice haystack.
+- 2026-10-16 (after small-task embedder runs on all batches; disclosed):
+  - **Tie for best embedder on the small-task practice batch.**
+    embeddinggemma-300m and BMRetriever-410M tie at 63/75 hit@1. The test
+    batches had already been scored when the tie was found, so no tie-break
+    can be blind. C3 is therefore tested against **both**, as C3a and C3b,
+    and Holm runs over 10 claims instead of 9. The LLM pick (Gemini 3.1
+    Flash-Lite, 59 vs 57 for DeepSeek on batch 0) stands as pre-registered,
+    so C4 is dropped: Gemini remembers only 9 test pairs (< 15).
