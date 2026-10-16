@@ -187,3 +187,18 @@ bge-base-gaf − bge-base +0.015 (p = 0.11, 7/12).
   - **C5 base model** is bge-base-en-v1.5 (the fine-tune's starting point).
     **C6 comparison** is the best on the practice haystack among MedCPT,
     BiCA-base, MedEmbed-base and PubMedBERT (all < 150M parameters).
+- 2026-10-16 21:30 (before any test-haystack grading):
+  - **Graded answer key, as built.** Pool per pair: the top 10 of every run
+    (the pre-fix MedCPT run excluded), all curator-cited papers, and up to 5
+    random PubTator lookup hits per tier, weighted back to all hits. Judges:
+    DeepSeek-V4-Flash and Gemini 3.1 Flash-Lite, temperature 0, reasoning
+    off, up to 10 abstracts per request labelled A, B, C in a shuffled
+    order; never shown rank, system, or whether a paper is curator-cited.
+  - **One grade per pair: the mean of the judges' grades, rounded down**
+    (so 1+2 → 1, 0+2 → 1, 0+1 → 0, a cautious rule).
+  - **No self-grading.** A run reranked by an LLM is never graded by a judge
+    from the same model family. A comparison involving such a run uses only
+    the other judge's grades for both sides; if no judge is left, it uses
+    curator-only scores.
+  - New runs added later are graded in the same way, mixed into requests
+    with already-graded papers so they are never judged on their own.
