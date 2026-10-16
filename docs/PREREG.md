@@ -187,7 +187,7 @@ bge-base-gaf − bge-base +0.015 (p = 0.11, 7/12).
   - **C5 base model** is bge-base-en-v1.5 (the fine-tune's starting point).
     **C6 comparison** is the best on the practice haystack among MedCPT,
     BiCA-base, MedEmbed-base and PubMedBERT (all < 150M parameters).
-- 2026-10-16 21:30 (before any test-haystack grading):
+- 2026-10-16 20:58 (before any test-haystack grading; time corrected to the commit's):
   - **Graded answer key, as built.** Pool per pair: the top 10 of every run
     (the pre-fix MedCPT run excluded), all curator-cited papers, and up to 5
     random PubTator lookup hits per tier, weighted back to all hits. Judges:
@@ -202,3 +202,15 @@ bge-base-gaf − bge-base +0.015 (p = 0.11, 7/12).
     curator-only scores.
   - New runs added later are graded in the same way, mixed into requests
     with already-graded papers so they are never judged on their own.
+- 2026-10-16 22:00 (graded practice labels now exist; before any practice
+  dense, reranker or fine-tuned-model haystack run has been looked at):
+  - **Which score picks "best" from now on.** Best embedder (for C1, C2,
+    C6, C7) and best off-the-shelf reranker (C8): **graded nDCG@10 on the
+    practice haystack**, after each new run's top 10 has been graded. The C1
+    first pass stays as registered: **curator-only recall@100, raw** (graded
+    recall@100 is not possible, because ranks 11-100 are not graded). The
+    fine-tune recipe pick (curator-only raw nDCG@10) stands as made.
+  - **Disclosed:** curator-only *test* scores for 10 embedders, v1.3 BM25 and
+    the mean-pooled MedCPT were in RESULTS.md (2026-10-15) before draft 1 of
+    this file; RRF fusions and the two BM25 LLM reranks were scored on test
+    before the practice picks they depend on. No pick above uses test data.
