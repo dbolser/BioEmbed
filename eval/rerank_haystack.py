@@ -4,8 +4,14 @@ PREREG (change log 22:45): cross-encoders re-sort the top 100 of the first
 pass; not tuned. Each model is loaded and scored as its model card does it:
 
   ncbi/MedCPT-Cross-Encoder   [query, article] pairs, max_length 512, the logit
-  BAAI/bge-reranker-v2-m3     [query, passage] pairs, max_length 512, the raw
-                              logit (FlagReranker.compute_score, normalize=False)
+  BAAI/bge-reranker-v2-m3,    [query, passage] pairs, max_length 512, the raw
+  BAAI/bge-reranker-base      logit (FlagReranker.compute_score, normalize=False)
+  bioembed/medcpt-ce-gd-s42,  our fine-tunes of MedCPT-CE and bge-reranker-base
+  bioembed/bge-reranker-      (finetune_ce.py; local models/bioembed-<x>, as
+    base-gd-s42               run_embedders), scored exactly as their bases: the
+                              tokenizer saved with them, [query, doc] pairs,
+                              max_length 512 (as trained), the raw logit (as
+                              dev_eval.py; their saved Sigmoid is not applied)
   Qwen/Qwen3-Reranker-0.6B,   the card's yes/no prompt template and instruction,
   Qwen/Qwen3-Reranker-4B      max_length 8192, last-token logits; score =
                               logit(yes) - logit(no), the card's P(yes) in logit
@@ -45,7 +51,9 @@ REPO = Path(__file__).resolve().parent.parent
 HAYSTACKS = REPO / "data" / "haystack"
 DEPTH = 100
 CHUNK_QUERIES = 10  # cache part size
-PAIR_MODELS = ["ncbi/MedCPT-Cross-Encoder", "BAAI/bge-reranker-v2-m3"]
+PAIR_MODELS = ["ncbi/MedCPT-Cross-Encoder", "BAAI/bge-reranker-v2-m3", "BAAI/bge-reranker-base"]
+FINETUNED = {"bioembed/medcpt-ce-gd-s42": "ncbi/MedCPT-Cross-Encoder",  # fine-tune -> base
+             "bioembed/bge-reranker-base-gd-s42": "BAAI/bge-reranker-base"}
 QWEN_MODELS = ["Qwen/Qwen3-Reranker-0.6B", "Qwen/Qwen3-Reranker-4B"]
 QWEN_INSTRUCTION = "Given a web search query, retrieve relevant passages that answer the query"
 QWEN_PREFIX = ("<|im_start|>system\nJudge whether the Document meets the requirements based on "
@@ -59,8 +67,15 @@ def slug(name: str) -> str:
     return name.replace("/", "__")
 
 
+def model_path(name: str) -> str:
+    """Hub name, or our fine-tune's dir: bioembed/<x> -> models/bioembed-<x> (as run_embedders)."""
+    if name.startswith("bioembed/"):
+        return str(REPO / "models" / f"bioembed-{name.split('/', 1)[1]}")
+    return name
+
+
 class PairReranker:
-    """1-logit sequence classifier over [query, doc] pairs (MedCPT-CE, bge-reranker-v2-m3)."""
+    """1-logit sequence classifier over [query, doc] pairs (MedCPT-CE, bge-rerankers, our fine-tunes)."""
 
     max_length = 512
 
@@ -112,7 +127,7 @@ class QwenReranker:
 def load_reranker(name: str, device: torch.device, dtype: torch.dtype, instruction: str):
     if name in QWEN_MODELS:
         return QwenReranker(name, device, dtype, instruction)
-    return PairReranker(name, device, dtype)
+    return PairReranker(model_path(name), device, dtype)
 
 
 def score_pairs(scorer, queries: list[str], docs: list[str], batch_size: int) -> np.ndarray:
@@ -172,7 +187,7 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--haystack", default="GeneDiseaseHaystack")
     ap.add_argument("--first", required=True, help="first-stage run file in <haystack>/runs/")
-    ap.add_argument("--model", choices=PAIR_MODELS + QWEN_MODELS, required=True)
+    ap.add_argument("--model", choices=PAIR_MODELS + QWEN_MODELS + list(FINETUNED), required=True)
     ap.add_argument("--batch-size", type=int, default=32)
     ap.add_argument("--instruction", default=QWEN_INSTRUCTION, help="Qwen3-Reranker only")
     ap.add_argument("--max-queries", type=int, default=None, help="smoke test on the first N queries")
