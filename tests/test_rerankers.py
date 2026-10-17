@@ -21,8 +21,8 @@ sys.path.insert(0, str(ROOT / "eval"))
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from rerank_haystack import (  # noqa: E402
-    QWEN_INSTRUCTION, PairReranker, QwenReranker, fill_cache, load_cache, pending, rerank,
-    score_pairs,
+    FINETUNED, QWEN_INSTRUCTION, PairReranker, QwenReranker, fill_cache, load_cache, load_reranker,
+    model_path, pending, rerank, score_pairs,
 )
 
 CPU = torch.device("cpu")
@@ -135,6 +135,43 @@ def test_bge_reranker_matches_card():
     m = PairReranker("BAAI/bge-reranker-v2-m3", CPU, torch.float32)
     s = m(*map(list, zip(*BGE_PAIRS)))
     np.testing.assert_allclose(s, BGE_SCORES, atol=0.01)  # card is fp16
+
+
+def needs_finetune(name: str, base: str):
+    """Skip unless the fine-tune's dir (models/bioembed-<x>) and its base's tokenizer are local."""
+    here = Path(model_path(name), "model.safetensors").exists()
+    tok = isinstance(try_to_load_from_cache(base, "tokenizer_config.json"), str)
+    return pytest.mark.skipif(not (here and tok), reason=f"{name} dir or {base} tokenizer not local")
+
+
+@pytest.mark.parametrize("name,base", [pytest.param(n, b, marks=needs_finetune(n, b))
+                                       for n, b in FINETUNED.items()])
+def test_finetuned_scored_as_base(name, base):
+    """Our fine-tunes go through their base's pipeline: the base's tokens for each pair
+    (truncated at 512), the base's architecture with the fp32 head, and the raw logit that
+    dev_eval.py ranked them by (sentence-transformers CrossEncoder, no saved Sigmoid)."""
+    from sentence_transformers.cross_encoder import CrossEncoder
+    from transformers import AutoConfig, AutoTokenizer
+
+    queries = ["MECP2 (methyl-CpG binding protein 2) in Rett syndrome"] * 3
+    docs = MEDCPT_ARTICLES[:2] + [" ".join(MEDCPT_ARTICLES * 10)]  # the last runs past 512 tokens
+    m = load_reranker(name, CPU, torch.bfloat16, QWEN_INSTRUCTION)
+    assert isinstance(m, PairReranker)
+    enc = m.tok(queries, docs, truncation=True, padding=True, max_length=m.max_length)
+    assert enc == AutoTokenizer.from_pretrained(base)(queries, docs, truncation=True, padding=True,
+                                                      max_length=512)
+    assert len(enc["input_ids"][2]) == 512
+    assert type(m.model).__name__ == AutoConfig.from_pretrained(base).architectures[0]
+    assert m.model.base_model.dtype == torch.bfloat16
+    assert all(p.dtype == torch.float32 for p in m.model.classifier.parameters())
+    bf16 = m(queries, docs)
+
+    s = PairReranker(model_path(name), CPU, torch.float32)(queries, docs)
+    dev = CrossEncoder(model_path(name), max_length=512).predict(
+        list(zip(queries, docs)), activation_fn=torch.nn.Identity())
+    np.testing.assert_allclose(s, dev, atol=1e-4)
+    np.testing.assert_allclose(bf16, s, atol=0.3)
+    assert len(set(bf16)) == 3
 
 
 @pytest.mark.parametrize("name", [pytest.param(n, marks=needs(n)) for n in QWEN_CARD])
