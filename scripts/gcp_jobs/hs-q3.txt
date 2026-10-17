@@ -1,0 +1,5 @@
+# hs-q3: practice then TEST haystack for BMRetriever-410M and BioLORD (PubMedBERT's test run exists already).
+uv run python haystack.py --haystack GeneDiseaseHaystackDev --batch-size 256 --models BMRetriever/BMRetriever-410M || uv run python haystack.py --haystack GeneDiseaseHaystackDev --batch-size 64 --models BMRetriever/BMRetriever-410M
+uv run python haystack.py --haystack GeneDiseaseHaystackDev --batch-size 512 --models FremyCompany/BioLORD-2023
+uv run python haystack.py --batch-size 256 --models BMRetriever/BMRetriever-410M || uv run python haystack.py --batch-size 64 --models BMRetriever/BMRetriever-410M
+uv run python haystack.py --batch-size 512 --models FremyCompany/BioLORD-2023

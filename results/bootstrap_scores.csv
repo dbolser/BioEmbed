@@ -1,6 +1,12 @@
 model,suite,n_tasks,bio_score,ci_low,ci_high
+google__gemini-3.1-pro-preview,full,12,0.6885,0.5628,0.8053
+Qwen__Qwen3-Embedding-8B,full,12,0.6616,0.5381,0.7748
+codefuse-ai__F2LLM-v2-1.7B,full,12,0.656,0.5388,0.7627
 Qwen__Qwen3-Embedding-4B,full,12,0.6452,0.5182,0.763
+codefuse-ai__F2LLM-v2-0.6B,full,12,0.6311,0.5097,0.741
 Qwen__Qwen3-Embedding-0.6B,full,12,0.6157,0.4908,0.7327
+bioembed__bge-base-gaf,full,12,0.6036,0.4848,0.7201
+bioembed__bge-small-gaf,full,12,0.5984,0.4842,0.709
 abhinand__MedEmbed-base-v0.1,full,12,0.5924,0.4726,0.705
 BAAI__bge-large-en-v1.5,full,12,0.5902,0.4743,0.7005
 abhinand__MedEmbed-large-v0.1,full,12,0.59,0.472,0.7025
@@ -44,6 +50,8 @@ abhinand__MedEmbed-base-v0.1,lifted,7,0.6511,0.5344,0.7689
 abhinand__MedEmbed-large-v0.1,lifted,7,0.6495,0.5353,0.7685
 BAAI__bge-large-en-v1.5,lifted,7,0.6468,0.5326,0.767
 BAAI__bge-base-en-v1.5,lifted,7,0.6438,0.5284,0.7675
+bioembed__bge-base-gaf,lifted,7,0.6431,0.5232,0.7692
+bioembed__bge-small-gaf,lifted,7,0.6415,0.5344,0.7549
 Snowflake__snowflake-arctic-embed-l-v2.0,lifted,7,0.632,0.5158,0.7498
 BAAI__bge-m3,lifted,7,0.631,0.5007,0.7576
 intfloat__multilingual-e5-large,lifted,7,0.6304,0.5094,0.7551

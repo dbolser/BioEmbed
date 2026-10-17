@@ -1,0 +1,2 @@
+# hs-pm: whole-PubMed MedEmbed-small index for genesearch (28.3M abstracts, 1M-row float16 shards, resumable)
+uv run python embed_corpus.py --batch-size 1024

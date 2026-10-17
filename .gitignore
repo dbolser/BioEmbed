@@ -25,3 +25,6 @@ llm/llm_results/
 llm/dryrun_results/
 llm/.env.or-*
 models/
+
+# datasets map/filter caches
+data/tasks/**/cache-*.arrow

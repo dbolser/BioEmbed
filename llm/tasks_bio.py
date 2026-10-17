@@ -112,6 +112,43 @@ class GOPubMedRetrieval(AbsTaskLocalLLMRetrieval):
     )
 
 
+class GeneDiseaseRetrieval(AbsTaskLocalLLMRetrieval):
+    """Gene-disease pair -> PubMed abstracts curators cite for the link.
+    Corpus: 300 docs incl. 3 same-gene negatives per query. 75 queries, ~1 gold doc each."""
+
+    metadata = _make_local_metadata(
+        name="GeneDiseaseRetrieval",
+        description=(
+            "Retrieve the PubMed title+abstracts that curators cite as evidence "
+            "that a gene is involved in a disease."
+        ),
+        task_type="Retrieval",
+        main_score="recall@1",
+        domains=["Medical", "Academic", "Written"],
+        task_subtypes=["Article retrieval"],
+    )
+
+
+# v2: 5 gene-disjoint instances (seeds 42-46), pooled for testing. Per query:
+# 1 gold, 2 same-gene and 1 same-disease negatives; 75 queries, 300 docs each.
+GENE_DISEASE_V2 = [
+    type(f"GeneDiseaseRetrieval_v2_{i}", (AbsTaskLocalLLMRetrieval,), {
+        "metadata": _make_local_metadata(
+            name=f"GeneDiseaseRetrieval_v2_{i}",
+            description=(
+                "Retrieve the PubMed title+abstract that curators cite as evidence "
+                f"that a gene is involved in a disease (v2, instance {i} of 5)."
+            ),
+            task_type="Retrieval",
+            main_score="recall@1",
+            domains=["Medical", "Academic", "Written"],
+            task_subtypes=["Article retrieval"],
+        ),
+    })
+    for i in range(5)
+]
+
+
 class R2MEDBiologyPooled(AbsTaskLocalLLMRetrieval):
     """R2MED Biology retrieval pooled to a small corpus. Corpus: 363 docs
     (all gold — the gold docs of the 100 selected queries exceeded the pool cap)."""
@@ -259,6 +296,8 @@ class GOProteinPairCls(AbsTaskLocalLLMPairClassification):
 
 BIO_TASKS = [
     GOPubMedRetrieval,
+    GeneDiseaseRetrieval,
+    *GENE_DISEASE_V2,
     R2MEDBiologyPooled,
     BioMeSHClassification,
     PubChemSynonymPC500,
