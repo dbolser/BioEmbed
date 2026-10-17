@@ -214,3 +214,19 @@ bge-base-gaf − bge-base +0.015 (p = 0.11, 7/12).
     the mean-pooled MedCPT were in RESULTS.md (2026-10-15) before draft 1 of
     this file; RRF fusions and the two BM25 LLM reranks were scored on test
     before the practice picks they depend on. No pick above uses test data.
+- 2026-10-17 05:40 (all practice embedder runs graded; no practice score
+  computed yet):
+  - **Groups for C6/C7 (< 150M parameters).** General: MiniLM-L6,
+    multilingual-e5-small, bge-small, bge-base. PubMed-trained: MedCPT (dot),
+    BiCA-small, BiCA-base, MedEmbed-small, MedEmbed-base, PubMedBERT
+    embeddings. BioLORD (trained on concept definitions) is in neither
+    group. MedCPT-cosine is a reporting variant, not a candidate.
+  - **"Best embedder" (C1, C2)** is chosen from all 14 practice dense runs
+    except MedCPT-cosine, by graded practice nDCG@10.
+  - **C1 reranker candidates:** off-the-shelf cross-encoders (MedCPT-CE,
+    bge-reranker-v2-m3, Qwen3-Reranker-0.6B, Qwen3-Reranker-4B) at depth 100
+    and the two LLM rerankers at depth 20, all on the chosen first pass. The
+    best by graded practice nDCG@10 is the C1 reranker. Our fine-tuned
+    rerankers are excluded from C1 (they are C8's).
+  - **Ties** in any pick (equal to 3 decimals) go to the cheaper system by
+    measured cost.
