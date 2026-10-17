@@ -2,3 +2,4 @@ labels.sqlite*
 export/
 .venv/
 __pycache__/
+labels_*.sqlite*
