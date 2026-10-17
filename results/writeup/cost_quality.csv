@@ -1,0 +1,32 @@
+system,group,reranked,graded_ndcg10,graded_ci_low,graded_ci_high,seed_min,seed_max,graded_ndcg10_other_judge,other_judge_grades,curator_ndcg10,run_cost_usd,first_pass_cost_usd,step_cost_usd,l4_hours,train_cost_usd,cost_basis,requested,run_ids
+"BM25, tuned (keyword search)",base,False,0.7589,0.7382,0.779,,,,,0.3724,0.0,0.0,0.0,0.0,,"CPU, not priced ($0)",True,bm25-symbol_disease-k0.9-b0.75
+embeddinggemma-300m,single,False,0.7172,0.696,0.7379,,,,,0.4299,6.55,0.0,6.55,6.97,,logged test run,True,google__embeddinggemma-300m
+Qwen3-Embedding-0.6B,single,False,0.6968,0.6763,0.7176,,,,,0.3986,10.642,0.0,10.642,11.32,,no log; practice encode time x 5.38,True,Qwen__Qwen3-Embedding-0.6B
+BiCA-base,single,False,0.6988,0.6775,0.7201,,,,,0.3821,1.648,0.0,1.648,1.75,,logged test run,True,bisectgroup__BiCA-base
+MedCPT,single,False,0.6898,0.6692,0.7104,,,,,0.345,1.527,0.0,1.527,1.62,,logged test run,True,ncbi__MedCPT
+BiCA-small,single,False,0.6871,0.6658,0.7082,,,,,0.3769,0.905,0.0,0.905,0.96,,logged test run,True,bisectgroup__BiCA-small
+MedEmbed-small,single,False,0.6759,0.6545,0.6966,,,,,0.3921,0.903,0.0,0.903,0.96,,no log; = logged test runs of bge-small-gd (same architecture),True,abhinand__MedEmbed-small-v0.1
+bge-base,single,False,0.6746,0.6527,0.696,,,,,0.3809,1.665,0.0,1.665,1.77,,no log; = logged test runs of bge-base-gd (same architecture),True,BAAI__bge-base-en-v1.5
+MedEmbed-base,single,False,0.6705,0.6485,0.6921,,,,,0.392,1.665,0.0,1.665,1.77,,no log; = logged test runs of bge-base-gd (same architecture),True,abhinand__MedEmbed-base-v0.1
+bge-small,single,False,0.6583,0.6367,0.6796,,,,,0.3711,0.903,0.0,0.903,0.96,,no log; = logged test runs of bge-small-gd (same architecture),True,BAAI__bge-small-en-v1.5
+MiniLM-L6,single,False,0.6313,0.6089,0.6537,,,,,0.3265,0.568,0.0,0.568,0.6,,no log; practice encode time x 5.38,True,sentence-transformers__all-MiniLM-L6-v2
+BMRetriever-410M,single,False,0.6223,0.5991,0.6451,,,,,0.3343,3.576,0.0,3.576,3.8,,logged test run,True,BMRetriever__BMRetriever-410M
+BioLORD-2023,single,False,0.6217,0.5997,0.6442,,,,,0.3649,0.594,0.0,0.594,0.63,,logged test run,True,FremyCompany__BioLORD-2023
+e5-small (multilingual),single,False,0.6093,0.5861,0.6332,,,,,0.3381,0.875,0.0,0.875,0.93,,no log; practice encode time x 5.38,True,intfloat__multilingual-e5-small
+PubMedBERT-embeddings,single,False,0.5419,0.5171,0.5664,,,,,0.3355,1.571,0.0,1.571,1.67,,no log; practice encode time x 5.38,True,NeuML__pubmedbert-base-embeddings
+"bge-base, fine-tuned gene-disease (ours, 3 seeds)",ours,False,0.7641,,,0.7606,0.7667,,,0.4002,1.665,0.0,1.665,1.77,0.306,"logged test runs, mean of 3 seeds",True,bioembed__bge-base-gd-s42;bioembed__bge-base-gd-s43;bioembed__bge-base-gd-s44
+"bge-small, fine-tuned gene-disease (ours, 3 seeds)",ours,False,0.7377,,,0.7331,0.743,,,0.3799,0.903,0.0,0.903,0.96,0.144,"logged test runs, mean of 3 seeds",True,bioembed__bge-small-gd-s42;bioembed__bge-small-gd-s43;bioembed__bge-small-gd-s44
+"bge-base-GO (ours, GO fine-tune)",ours,False,0.5542,0.5318,0.5767,,,,,0.2684,1.665,0.0,1.665,1.77,,no log; = logged test runs of bge-base-gd (same architecture),True,bioembed__bge-base-gaf
+"bge-small-GO (ours, GO fine-tune)",ours,False,0.5401,0.5177,0.5631,,,,,0.2519,0.903,0.0,0.903,0.96,,no log; = logged test runs of bge-small-gd (same architecture),True,bioembed__bge-small-gaf
+First pass: BM25 + bge-base fusion,rerank,False,0.7499,0.7295,0.77,,,,,0.416,1.665,1.665,0.0,1.77,,"bge-base run (no log; = logged test runs of bge-base-gd (same architecture)); BM25 and fusion on CPU, $0",True,rrf-bm25-symbol_disease-k0.9-b0.75+BAAI__bge-base-en-v1.5
+Qwen3-Reranker-4B,rerank,True,0.8274,0.8106,0.8432,,,,,0.4891,3.188,1.665,1.522,3.39,,first pass + logged rerank of top 100,True,ce-Qwen__Qwen3-Reranker-4B-top100-of-rrf-bm25-symbol_disease-k0.9-b0.75+BAAI__bge-base-en-v1.5
+Qwen3-Reranker-0.6B,rerank,True,0.7488,0.7281,0.7692,,,,,0.4043,2.103,1.665,0.437,2.24,,first pass + logged rerank of top 100,True,ce-Qwen__Qwen3-Reranker-0.6B-top100-of-rrf-bm25-symbol_disease-k0.9-b0.75+BAAI__bge-base-en-v1.5
+MedCPT cross-encoder,rerank,True,0.7501,0.7329,0.7677,,,,,0.3928,1.708,1.665,0.043,1.82,,first pass + logged rerank of top 100,True,ce-ncbi__MedCPT-Cross-Encoder-top100-of-rrf-bm25-symbol_disease-k0.9-b0.75+BAAI__bge-base-en-v1.5
+bge-reranker-v2-m3,rerank,True,0.7034,0.6821,0.7244,,,,,0.3337,1.793,1.665,0.127,1.91,,first pass + logged rerank of top 100,True,ce-BAAI__bge-reranker-v2-m3-top100-of-rrf-bm25-symbol_disease-k0.9-b0.75+BAAI__bge-base-en-v1.5
+bge-reranker-base,rerank,True,0.6082,0.5841,0.6319,,,,,0.2838,1.714,1.665,0.049,1.82,,first pass + logged rerank of top 100,True,ce-BAAI__bge-reranker-base-top100-of-rrf-bm25-symbol_disease-k0.9-b0.75+BAAI__bge-base-en-v1.5
+"MedCPT cross-encoder, fine-tuned (ours)",ours,True,0.861,0.8473,0.8742,,,,,0.4768,1.709,1.665,0.043,1.82,0.403,first pass + logged rerank of top 100,True,ce-bioembed__medcpt-ce-gd-s42-top100-of-rrf-bm25-symbol_disease-k0.9-b0.75+BAAI__bge-base-en-v1.5
+"bge-reranker-base, fine-tuned (ours)",ours,True,0.8379,0.8221,0.8531,,,,,0.4388,1.714,1.665,0.049,1.82,0.455,first pass + logged rerank of top 100,True,ce-bioembed__bge-reranker-base-gd-s42-top100-of-rrf-bm25-symbol_disease-k0.9-b0.75+BAAI__bge-base-en-v1.5
+Gemini 3.1 Flash-Lite rerank,rerank,True,0.8532,0.8372,0.8686,,,0.8341,judgments_merged_no-gemini,0.4968,2.542,1.665,0.877,1.77,,"first pass + API spend (top 20, charged)",True,llm-gemini-3.1-flash-lite-top20-of-rrf-bm25-symbol_disease-k0.9-b0.75+BAAI__bge-base-en-v1.5
+DeepSeek-V4-Flash rerank,rerank,True,0.8411,0.8248,0.857,,,0.8433,judgments_merged_no-deepseek,0.4792,1.74,1.665,0.074,1.77,,"first pass + API spend (top 20, charged)",True,llm-deepseek-v4-flash-top20-of-rrf-bm25-symbol_disease-k0.9-b0.75+BAAI__bge-base-en-v1.5
+BM25 + Gemini 3.1 Flash-Lite rerank,bm25llm,True,0.8437,0.8265,0.8602,,,0.8249,judgments_merged_no-gemini,0.4546,0.884,0.0,0.884,0.0,,"BM25 (CPU, $0) + API spend (top 20, charged)",False,llm-gemini-3.1-flash-lite-top20-of-bm25-symbol_disease-k0.9-b0.75
+BM25 + DeepSeek-V4-Flash rerank,bm25llm,True,0.8319,0.8137,0.8494,,,0.8395,judgments_merged_no-deepseek,0.4364,0.126,0.0,0.126,0.0,,"BM25 (CPU, $0) + API spend (top 20, charged)",False,llm-deepseek-v4-flash-top20-of-bm25-symbol_disease-k0.9-b0.75
