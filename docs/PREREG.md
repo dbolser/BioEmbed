@@ -214,7 +214,7 @@ bge-base-gaf − bge-base +0.015 (p = 0.11, 7/12).
     the mean-pooled MedCPT were in RESULTS.md (2026-10-15) before draft 1 of
     this file; RRF fusions and the two BM25 LLM reranks were scored on test
     before the practice picks they depend on. No pick above uses test data.
-- 2026-10-17 05:40 (all practice embedder runs graded; no practice score
+- 2026-10-17 05:16 (all practice embedder runs graded; no practice score
   computed yet):
   - **Groups for C6/C7 (< 150M parameters).** General: MiniLM-L6,
     multilingual-e5-small, bge-small, bge-base. PubMed-trained: MedCPT (dot),
@@ -230,3 +230,7 @@ bge-base-gaf − bge-base +0.015 (p = 0.11, 7/12).
     rerankers are excluded from C1 (they are C8's).
   - **Ties** in any pick (equal to 3 decimals) go to the cheaper system by
     measured cost.
+  - **C8 arms.** Fine-tuned arm: the better of our two fine-tuned
+    cross-encoders (from MedCPT-CE and bge-reranker-base) by graded practice
+    nDCG@10. Comparator: the best off-the-shelf reranker from the C1
+    candidates by the same score. Both re-sort the C1 first pass.
