@@ -39,6 +39,7 @@
   .seg { flex: 1; height: .6rem; background: var(--panel); border: 1px solid var(--line); border-radius: 99px; }
   .seg.on { background: var(--accent); border-color: var(--accent); }
   .seg.cur { height: .9rem; border: 2px solid var(--fg); }  /* the abstract on screen */
+  #pubmed { color: var(--accent); text-underline-offset: .2em; }  /* up here, not in the footer: no button jump */
 
   /* layout */
   main { padding: 1rem 1.5rem calc(var(--foot-h) + 2rem); }
@@ -97,7 +98,6 @@
   .rate[aria-pressed="true"] { border-color: var(--accent); background: var(--accent); color: #fff; }
   .rate.small { font-size: .85em; }
   .gap { width: 1rem; }
-  #pubmed { margin-left: auto; font-size: .85em; color: var(--accent); text-underline-offset: .2em; }
   #saved { position: fixed; right: 1.5rem; bottom: calc(var(--foot-h) + .5rem); font-size: .85em; padding: .15rem .7rem;
            background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }  /* floats: no layout jump */
   #saved:empty { display: none; }
@@ -129,6 +129,7 @@
   <div class="stats">
     <b id="roundNo"></b><span id="level"></span><span id="rated"></span>
     <span class="track" id="track" role="img" hidden></span><span id="pcount"></span>
+    <a id="pubmed" target="_blank" rel="noopener" hidden></a>
   </div>
 </header>
 
@@ -186,7 +187,6 @@
     <button class="rate small" id="noteBtn"><kbd>N</kbd>Note</button>
     <button class="rate small" id="prevBtn"><kbd>&larr;</kbd>Back</button>
     <button class="rate small" id="contBtn" hidden><kbd>C</kbd>Continue</button>
-    <a id="pubmed" target="_blank" rel="noopener" hidden></a>
     <span id="saved" aria-live="polite"></span><span id="err" aria-live="assertive"></span>
   </div>
   <div class="row" id="noteRow" hidden>
@@ -248,9 +248,11 @@ async function api(path, body) {
 function show(screen) {
   S.screen = screen;
   if (document.activeElement !== $("note")) document.activeElement?.blur();  // no stray Enter/Space clicks
+  $("synSrc").hidePopover();
   for (const [s, id] of [["name", "sName"], ["label", "sLabel"], ["done", "sDone"], ["wait", "sWait"], ["end", "sEnd"]])
     $(id).hidden = s !== screen;
   $("controls").hidden = screen !== "label";
+  if (screen !== "label") $("pubmed").hidden = true;
   $("track").hidden = $("pcount").hidden = $("pairMini").hidden = !(screen === "label" || screen === "done");
 }
 
@@ -464,7 +466,7 @@ for (const [id, fn] of [["flagBtn", toggleFlag], ["prevBtn", () => move(-1)], ["
                         ["nextBtn", load]])
   $(id).onclick = (e) => { e.currentTarget.blur(); fn(); };
 $("noteBtn").onclick = openNote;
-$("pubmed").onclick = (e) => e.currentTarget.blur();  // opens in a new tab; keep the rating keys here
+$("pubmed").onclick = $("pubmed").onauxclick = (e) => e.currentTarget.blur();  // opens in a new tab; keep the rating keys here
 $("note").oninput = () => { if (!S.items[S.i]?.label) putDraft(S.items[S.i]); };
 $("note").onchange = () => saveNote();
 $("nameForm").onsubmit = (e) => {
