@@ -2,21 +2,27 @@
 
 Type a gene, see its literature: PubMed abstracts tagged by PubTator3, Open Targets curated diseases, and an
 "and..." box that ranks the gene's papers by keywords, by meaning (AI embeddings), or both. A Map tab groups
-the current list into topics.
+the current list into topics; Map Explorer puts the papers on axes you choose.
 
 1. Build the index once (~10-15 min, 61 GB in `index/`): `uv run python build_index.py`
 2. Run: `cd genesearch && uv run python app.py --port 8766 --host 0.0.0.0`, then open http://localhost:8766
 3. Type a symbol, alias, old symbol or name (`/` jumps to the box); pick from the list if several genes match.
 4. Optional "and..." words rank the gene's papers (e.g. ZCCHC8 + pulmonary fibrosis); empty = newest first.
    **Rank by**: Keywords (BM25, only papers with the words), Meaning (every paper, closest first), or Both (hybrid).
-5. Click a curated or text-mined disease to filter (this clears the "and..." words). Click the green **Curated**
-   badge to show only Open Targets curated papers. Active filters are listed above the results, each with a ✕.
-6. **Map** tab: the current list as a topic map. "Download CSV" saves the whole list. URLs are shareable
-   (`?gene=CFTR&q=sweat+chloride&rank=hybrid`, `&view=map`).
+5. Disease boxes on the left: **OT** (Open Targets curated) and **ePMC** (Europe PMC text-mined). Click a disease to
+   filter (this clears the "and..." words), or "Any disease" for all of that box's papers; one in each box = papers
+   in both, and each box's counts then follow the other box's pick. Papers carry OT and ePMC chips that do the same.
+   Active filters are listed above the results, each with a ✕. "How this search works" is under the (i).
+6. **Map** tab: the current list as a topic map. Play years steps through time; Shift over a dot picks out its
+   topic, Esc clears; "Drill in" re-maps one topic's papers. **Map Explorer**: each axis is closeness in meaning to
+   your words or to a topic's centre (cosine of the MedEmbed vectors). "Download CSV" saves the whole list. URLs are
+   shareable (`?gene=CFTR&q=sweat+chloride&rank=hybrid`, `&ot=any`, `&ep=<disease id>`, `&view=map&topic=3`,
+   `&view=explore&ax=cancer&ay=topic:2`).
 
 How it works
 
-- Papers: PubTator3 gene tags (NCBI text mining, precomputed) plus Open Targets curated links.
+- Papers: PubTator3 gene tags (NCBI text mining, precomputed) plus Open Targets curated links; the ePMC box
+  uses Open Targets' Europe PMC evidence, which can add papers PubTator did not tag.
 - Keywords: BM25 computed live over the gene's papers (`app.py`). With several words, the count is papers
   containing *all* of them (a link shows any-word matches). No AI.
 - Meaning: `abhinand/MedEmbed-small-v0.1` (loaded as `eval/run_embedders.py` does: CLS pooling, normalised,

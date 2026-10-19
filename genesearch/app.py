@@ -11,8 +11,10 @@ import os
 import re
 import threading
 import time
+import unicodedata
+import urllib.parse
 from concurrent.futures import ThreadPoolExecutor
-from functools import lru_cache
+from functools import lru_cache, reduce
 from pathlib import Path
 
 import bm25s
@@ -40,6 +42,7 @@ RRF_K = 60  # reciprocal-rank fusion constant for hybrid ranking
 SEM_CAP = 30_000  # most papers given meaning ranking while vectors are computed here on CPU
 MAP_CAP = 20_000  # most papers on a map (a fixed sample beyond that)
 MAP_VERSION = 7  # bump to recompute cached maps
+EPMC_TOP = 50  # text-mined diseases listed per gene
 
 STEMMER = Stemmer.Stemmer("english")
 WORD = re.compile(r"(?u)\b\w\w+\b")  # bm25s's default token pattern
@@ -111,8 +114,12 @@ def gene_info(row: int) -> dict:
         "aliases": _split(g["alias_symbol"]), "prev": _split(g["prev_symbol"]),
         "entrez": None if pd.isna(g["entrez_id"]) else int(g["entrez_id"]),
         "ensembl": g["ensembl_gene_id"] if isinstance(g["ensembl_gene_id"], str) else None,
-        "location": g["location"], "locus_group": g["locus_group"], "n_papers": int(g["n_papers"]),
+        "location": _str(g["location"]), "locus_group": _str(g["locus_group"]), "n_papers": int(g["n_papers"]),
     }
+
+
+def _str(v) -> str | None:
+    return v if isinstance(v, str) else None
 
 
 def gene_row(hgnc_id: str) -> int:
@@ -176,15 +183,33 @@ def gene_tags(hgnc_id: str) -> tuple[dict[int, str], pd.DataFrame]:
 
 
 @lru_cache(maxsize=128)
-def paper_set(hgnc_id: str, src: str = "", disease: str = "") -> pd.DataFrame:
-    """The gene's papers: PubTator-tagged plus OT-curated, or only those linked to one disease."""
+def gene_epmc(hgnc_id: str) -> pd.DataFrame:
+    """Europe PMC text-mined gene-disease links for a gene (Open Targets evidence): pmid, disease_id."""
+    ensembl = gene_info(gene_row(hgnc_id))["ensembl"]
+    return db().execute(f"SELECT pmid, disease_id FROM '{IDX}/epmc.parquet' WHERE ensembl = ?", [ensembl or ""]).df()
+
+
+@lru_cache(maxsize=128)
+def epmc_counts(hgnc_id: str) -> pd.Series:
+    """Papers per text-mined disease for a gene, most first (ties by id)."""
+    n = gene_epmc(hgnc_id).groupby("disease_id").size()
+    return n.iloc[np.lexsort((n.index.to_numpy(), -n.to_numpy()))]
+
+
+@lru_cache(maxsize=128)
+def paper_set(hgnc_id: str, ot: str = "", ep: str = "") -> pd.DataFrame:
+    """The gene's papers: PubTator-tagged plus OT-curated. With a disease facet, only the papers that
+    Open Targets curators (ot) and Europe PMC text mining (ep) link to the gene and that disease
+    ('any' = any disease); with both, the papers in both."""
     tagged, cur = gene_tags(hgnc_id)
-    if src == "curated":
-        pmids = cur.loc[cur.disease_id == disease, "pmid"].unique()
-    elif src == "epmc":
-        ensembl = gene_info(gene_row(hgnc_id))["ensembl"]
-        pmids = db().execute(f"SELECT pmid FROM '{IDX}/epmc.parquet' WHERE ensembl = ? AND disease_id = ?",
-                             [ensembl, disease]).df().pmid.to_numpy()
+    sets = []
+    if ot:
+        sets.append(cur.pmid.to_numpy() if ot == "any" else cur.loc[cur.disease_id == ot, "pmid"].to_numpy())
+    if ep:
+        e = gene_epmc(hgnc_id)
+        sets.append(e.pmid.to_numpy() if ep == "any" else e.loc[e.disease_id == ep, "pmid"].to_numpy())
+    if sets:
+        pmids = reduce(np.intersect1d, sets)
     else:
         pmids = np.union1d(np.fromiter(tagged, np.int64, len(tagged)), cur.pmid.to_numpy())
     df = pd.DataFrame({"pmid": np.unique(np.asarray(pmids, dtype=np.int64))})
@@ -206,13 +231,13 @@ def pmap(fn, text: pa.ChunkedArray) -> list:
 
 def count(text: pa.ChunkedArray, pattern: str) -> np.ndarray:
     """Regex matches per paper (RE2: ASCII \\w and \\b), over 32 threads."""
-    return np.concatenate([c.to_numpy() for c in pmap(lambda a: pc.count_substring_regex(a, pattern), text)])
+    return np.concatenate([np.zeros(0, np.int64), *[c.to_numpy() for c in pmap(lambda a: pc.count_substring_regex(a, pattern), text)]])
 
 
 @lru_cache(maxsize=8)
-def corpus(hgnc_id: str, src: str, disease: str) -> tuple[pa.ChunkedArray, np.ndarray]:
+def corpus(hgnc_id: str, ot: str, ep: str) -> tuple[pa.ChunkedArray, np.ndarray]:
     """Lower-cased title + abstract of the papers in paper_set that have text, and their positions."""
-    df = paper_set(hgnc_id, src, disease)
+    df = paper_set(hgnc_id, ot, ep)
     have = np.flatnonzero(df.row.to_numpy() >= 0)
     t = take(df.row.to_numpy()[have], ["title", "abstract"])
     step = max(1, -(-len(t) // 32))
@@ -226,7 +251,7 @@ def corpus(hgnc_id: str, src: str, disease: str) -> tuple[pa.ChunkedArray, np.nd
 
 
 @lru_cache(maxsize=64)
-def bm25(hgnc_id: str, src: str, disease: str, term: str) -> tuple[np.ndarray, np.ndarray]:
+def bm25(hgnc_id: str, ot: str, ep: str, term: str) -> tuple[np.ndarray, np.ndarray]:
     """BM25 (Lucene IDF, k1=1.5, b=0.75 as bm25s) over the gene's papers, built on the fly,
     plus how many of the query's stems each paper contains.
 
@@ -234,14 +259,14 @@ def bm25(hgnc_id: str, src: str, disease: str, term: str) -> tuple[np.ndarray, n
     that stem, then count those forms per paper with one regex. Exact term frequencies; doc
     length is measured in characters. ~20x faster than tokenising with bm25s (8.5 s for CFTR).
     """
-    df = paper_set(hgnc_id, src, disease)
-    text, have = corpus(hgnc_id, src, disease)
+    df = paper_set(hgnc_id, ot, ep)
+    text, have = corpus(hgnc_id, ot, ep)
     scores, hits = np.zeros(len(df)), np.zeros(len(df), np.int64)
     if not len(have):
         return scores, hits
     dl = pc.utf8_length(text).to_numpy()
     norm = K1 * (1 - B + B * dl / dl.mean())
-    for stem, forms in stem_forms(hgnc_id, src, disease, term).items():
+    for stem, forms in stem_forms(hgnc_id, ot, ep, term).items():
         if not forms:
             continue
         tf = count(text, words_re(forms))
@@ -253,9 +278,9 @@ def bm25(hgnc_id: str, src: str, disease: str, term: str) -> tuple[np.ndarray, n
 
 
 @lru_cache(maxsize=64)
-def stem_forms(hgnc_id: str, src: str, disease: str, term: str) -> dict[str, set[str]]:
+def stem_forms(hgnc_id: str, ot: str, ep: str, term: str) -> dict[str, set[str]]:
     """Query stem -> word forms in these papers with that stem (e.g. fibrosi -> fibrosis, fibroses)."""
-    text, _ = corpus(hgnc_id, src, disease)
+    text, _ = corpus(hgnc_id, ot, ep)
     out: dict[str, set[str]] = {}
     for word, stem in query_words(term).items():
         # Scan words sharing the stem minus its last letter, which Snowball may rewrite
@@ -287,16 +312,14 @@ def curated_pmids(hgnc_id: str) -> np.ndarray:
     return np.unique(gene_tags(hgnc_id)[1].pmid.to_numpy())
 
 
-def scope(hgnc_id, term, src, disease, ymin, ymax, curated, match, rank) -> tuple[pd.DataFrame, dict]:
-    """The current list before ranking: the gene's papers (or those linking it to one disease), the
-    curated-only and year filters, and for keyword ranking only the papers with the words: all of
+def scope(hgnc_id, term, ot, ep, ymin, ymax, match, rank) -> tuple[pd.DataFrame, dict]:
+    """The current list before ranking: the gene's papers (or those the disease facets pick, see
+    paper_set), the year filters, and for keyword ranking only the papers with the words: all of
     them by default (any of them if asked, or if no paper has all). Meaning and hybrid ranking
     keep every paper, ordered by how close it is."""
-    df = paper_set(hgnc_id, src, disease)
+    df = paper_set(hgnc_id, ot, ep)
     keep = np.ones(len(df), bool)
     year = df.year.to_numpy()
-    if curated:
-        keep &= np.isin(df.pmid.to_numpy(), curated_pmids(hgnc_id))
     if ymin:
         keep &= year >= ymin
     if ymax:
@@ -304,8 +327,8 @@ def scope(hgnc_id, term, src, disease, ymin, ymax, curated, match, rank) -> tupl
     info = {"n_scope": int(keep.sum())}
     df = df.assign(bm25=np.nan)
     if term := term.strip().lower():
-        scores, hits = bm25(hgnc_id, src, disease, term)
-        n_words = len(stem_forms(hgnc_id, src, disease, term))
+        scores, hits = bm25(hgnc_id, ot, ep, term)
+        n_words = len(stem_forms(hgnc_id, ot, ep, term))
         has_all, has_any = (hits == n_words) & (n_words > 0) & keep, (scores > 0) & keep
         info.update(n_words=n_words, n_all=int(has_all.sum()), n_any=int(has_any.sum()))
         df["bm25"] = scores
@@ -347,12 +370,11 @@ def ranks(score: np.ndarray, valid: np.ndarray) -> np.ndarray:
     return r
 
 
-def select(hgnc_id, term, src, disease, ymin, ymax, sort, match="all", curated=0, rank="keywords"
-           ) -> tuple[pd.DataFrame, dict]:
+def select(hgnc_id, term, ot, ep, ymin, ymax, sort, match="all", rank="keywords") -> tuple[pd.DataFrame, dict]:
     """The filtered, ranked paper list and how the words matched (see scope). Ranking: keywords =
     BM25; meaning = cosine of MedEmbed vectors; hybrid = reciprocal-rank fusion of the two (k=60).
     Raises Pending while meaning vectors are being computed."""
-    df, info = scope(hgnc_id, term, src, disease, ymin, ymax, curated, match, rank)
+    df, info = scope(hgnc_id, term, ot, ep, ymin, ymax, match, rank)
     df = df.assign(score=df.bm25, sim=np.nan, kw_rank=np.nan, sem_rank=np.nan)
     if (term := term.strip().lower()) and rank in ("meaning", "hybrid"):
         sim, sem = similarity(hgnc_id, df, term)
@@ -372,6 +394,9 @@ def describe(df: pd.DataFrame, hgnc_id: str, term: str) -> list[dict]:
     mentions, cur = gene_tags(hgnc_id)
     cur = cur[cur.pmid.isin(df.pmid)]
     cur_by = {p: g for p, g in cur.groupby("pmid")}
+    ep = gene_epmc(hgnc_id)
+    ep_by = {p: g.disease_id.tolist() for p, g in ep[ep.pmid.isin(df.pmid)].groupby("pmid")}
+    ep_n = epmc_counts(hgnc_id)
     stems = set(query_words(term).values()) if term.strip() else set()
     rows = df.row.to_numpy()
     t = take(rows.clip(0), ["title", "abstract", "year", "journal", "diseases"]).to_pylist()
@@ -391,6 +416,8 @@ def describe(df: pd.DataFrame, hgnc_id: str, term: str) -> list[dict]:
             "curated": [] if c is None else [
                 {"disease_id": d, "disease": n, "sources": sorted({s for x in g.sources for s in x})}
                 for (d, n), g in c.groupby(["disease_id", "disease_name"])],
+            "epmc": [{"disease_id": d, "disease": DISEASE_NAME.get(d, d)}
+                     for d in sorted(ep_by.get(pmid, []), key=lambda d: (-ep_n.get(d, 0), d))],
             "diseases": disease_tags(a["diseases"], text),
         })
     return out
@@ -452,35 +479,60 @@ def api_gene(hgnc_id: str):
          "sources": sorted({s for v in x.sources for s in v})}
         for (d, n), x in cur.groupby(["disease_id", "disease_name"])]
     curated.sort(key=lambda r: (-r["n_papers"], r["disease"]))
-    epmc = db().execute(
-        f"""SELECT disease_id, count(*) AS n FROM '{IDX}/epmc.parquet' WHERE ensembl = ?
-            GROUP BY 1 ORDER BY n DESC, disease_id LIMIT 25""", [g["ensembl"] or ""]).fetchall()
+    ep = gene_epmc(hgnc_id)
+    epmc = epmc_counts(hgnc_id).head(EPMC_TOP)
     df = paper_set(hgnc_id)
     return {
         **g, "n_tagged": len(tagged), "n_curated_papers": int(cur.pmid.nunique()),
         "n_set": len(df), "n_local": int((df.row >= 0).sum()),
         "year_min": int(df.year[df.year > 0].min()) if (df.year > 0).any() else None,
         "year_max": int(df.year.max()) if len(df) else None,
-        "curated": curated,
-        "epmc": [{"disease_id": d, "disease": DISEASE_NAME.get(d, d), "n_papers": n} for d, n in epmc],
+        "curated": curated, "n_epmc_papers": int(ep.pmid.nunique()), "n_epmc_diseases": int(ep.disease_id.nunique()),
+        "epmc": [{"disease_id": d, "disease": DISEASE_NAME.get(d, d), "n_papers": int(n)} for d, n in epmc.items()],
         "elapsed_ms": round(1000 * (time.perf_counter() - t0)),
     }
 
 
+@app.get("/api/facets")
+def api_facets(gene: str, ot: str = "", ep: str = "", term: str = "", ymin: int = 0, ymax: int = 0,
+               match: str = "all", rank: str = "keywords"):
+    """Papers per disease in each box within the other filters (the other box's pick and the years;
+    diseases with none are left out): what clicking a row gives. Clicking a disease clears the
+    "and..." words, so they count only for 'any' (that box's 'Any disease' row, which keeps them).
+    Each box counts within its own 'any' set, as a click on one of its rows does. Plus the names."""
+    _, cur = gene_tags(gene)
+
+    def counts(links: pd.DataFrame, box_ot: str, box_ep: str) -> dict:
+        def within(t: str) -> pd.DataFrame:
+            return links[links.pmid.isin(scope(gene, t, box_ot, box_ep, ymin, ymax, match, rank)[0].pmid)]
+        rows = within("")
+        return {**rows.groupby("disease_id").pmid.nunique().astype(int).to_dict(),
+                "any": int((within(term) if term.strip() else rows).pmid.nunique())}
+
+    out = {"ot": counts(cur[["pmid", "disease_id"]], "any", ep), "ep": counts(gene_epmc(gene), ot, "any")}
+    out["names"] = {i: DISEASE_NAME.get(i, i) for k in ("ot", "ep") for i in out[k] if i != "any"}
+    return out
+
+
 @app.get("/api/papers")
-def api_papers(gene: str, term: str = "", src: str = "", disease: str = "", ymin: int = 0, ymax: int = 0,
-               sort: str = "", match: str = "all", curated: int = 0, rank: str = "keywords", page: int = 1):
+def api_papers(gene: str, term: str = "", ot: str = "", ep: str = "", ymin: int = 0, ymax: int = 0,
+               sort: str = "", match: str = "all", rank: str = "keywords", page: int = 1):
     t0 = time.perf_counter()
     sort = sort or ("relevance" if term.strip() else "newest")
     try:
-        df, info = select(gene, term, src, disease, ymin, ymax, sort, match, curated, rank)
+        df, info = select(gene, term, ot, ep, ymin, ymax, sort, match, rank)
     except Pending as p:
         return {"pending": p.job.status()}
     n_pages = max(1, -(-len(df) // PAGE))
     page = min(max(1, page), n_pages)
     papers = describe(df.iloc[(page - 1) * PAGE: page * PAGE], gene, term)
     return {"n_matched": len(df), **info, "rank": rank, "page": page, "n_pages": n_pages, "sort": sort,
-            "papers": papers, "elapsed_ms": round(1000 * (time.perf_counter() - t0))}
+            "papers": papers, "names": facet_names(ot, ep), "elapsed_ms": round(1000 * (time.perf_counter() - t0))}
+
+
+def facet_names(*ids: str) -> dict[str, str]:
+    """Names of the diseases picked in the facets (the page may only have their ids, from a URL)."""
+    return {i: DISEASE_NAME.get(i, i) for i in ids if i and i != "any"}
 
 
 @app.get("/api/paper")
@@ -492,27 +544,90 @@ def api_paper(gene: str, pmid: int, term: str = ""):
 
 
 @app.get("/api/map")
-def api_map(gene: str, term: str = "", src: str = "", disease: str = "", ymin: int = 0, ymax: int = 0,
-            match: str = "all", curated: int = 0, rank: str = "keywords"):
+def api_map(gene: str, term: str = "", ot: str = "", ep: str = "", ymin: int = 0, ymax: int = 0,
+            match: str = "all", rank: str = "keywords", topic: str = ""):
     """Literature map of the current list (its papers with an abstract; a fixed sample of MAP_CAP
-    beyond that). Returns {"pending": progress} until it is ready."""
-    df, _ = scope(gene, term, src, disease, ymin, ymax, curated, match, rank)
+    beyond that). topic = a drill-in path ('3', '3.2'): a new map of only topic 3's papers, then of
+    its sub-topic 2. Returns {"pending": progress, "n": papers} until it is ready."""
+    df, _ = scope(gene, term, ot, ep, ymin, ymax, match, rank)
     pm = np.sort(df.pmid.to_numpy()[df.row.to_numpy() >= 0])
     about = {"n_list": len(df), "n_text": len(pm), "sampled": len(pm) > MAP_CAP}
     if len(pm) > MAP_CAP:  # pseudo-random by PMID: the same sample each time, overlapping across filters
         pm = np.sort(pm[np.argsort((pm * 2654435761) % 2**32, kind="stable")[:MAP_CAP]])
-    if len(pm) < 20:
-        return {**about, "too_few": True}
-    key = semantic.digest(gene, pm, semantic.source(), MAP_VERSION)  # gene: curated rings, stop words, names
+    about["n_shown"] = len(pm)
+    path, within = [], ""
+    for step in [s for s in topic.split(".") if s]:
+        if len(pm) < MIN_MAP:
+            break
+        try:
+            m, _ = get_map(gene, pm, within)
+        except Pending as p:
+            return {"pending": p.job.status(), "n": len(pm)}
+        cl = next((c for c in m["clusters"] if str(c["id"]) == step), None)
+        if cl is None:
+            raise HTTPException(404, f"no topic {step} in this map")
+        pm = np.asarray(m["pmid"], np.int64)[np.asarray(m["c"]) == cl["id"]]
+        within = cl["name"]
+        path.append({"id": cl["id"], "name": cl["name"], "n": len(pm)})
+    if len(pm) < MIN_MAP:
+        return {**about, "too_few": True, "path": path, "names": facet_names(ot, ep)}
+    try:
+        m, key = get_map(gene, pm, within)
+    except Pending as p:
+        return {"pending": p.job.status(), "n": len(pm)}
+    return {**m, **about, "key": key, "path": path, "names": facet_names(ot, ep)}
+
+
+MIN_MAP = 20  # fewest papers for a map
+
+
+def get_map(gene: str, pm: np.ndarray, within: str = "") -> tuple[dict, str]:
+    """The map of these papers (cached) and its key; raises Pending while it is made. within = the
+    name of the topic they all come from (a drill-in), so their sub-topics are named as such."""
+    key = semantic.digest(gene, pm, semantic.source(), MAP_VERSION,  # gene: curated rings, stop words, names
+                          *(["drill"] if within else []))  # not the name: an AI rename must not lose the map
     if (m := cached_map(key)) is None:
-        j = semantic.job(("map", key), lambda jb: make_map(gene, pm, key, jb))
+        j = semantic.job(("map", key), lambda jb: make_map(gene, pm, key, jb, within))
         if not j.finished or j.error:
-            return {"pending": j.status()}
+            raise Pending(j)
         m = j.result
-    elif m["named_by"] == "terms" and litmap.name_clusters(gene_info(gene_row(gene))["symbol"], m["clusters"]):
+    elif m["named_by"] == "terms" and litmap.name_clusters(gene_info(gene_row(gene))["symbol"], m["clusters"], within):
         m["named_by"] = "llm"  # the LLM answers now (e.g. credit added): keep its names
         save_map(key, m)
-    return {**m, **about}
+    return m, key
+
+
+@app.get("/api/axes")
+def api_axes(gene: str, key: str, a: str, b: str):
+    """Map Explorer: the papers of a map placed by how close each is in meaning to two things (the
+    axes): words, embedded as a query, or a topic's centre ('topic:3', the mean of its papers'
+    vectors). Closeness = cosine similarity, i.e. the paper vectors projected onto each axis."""
+    if not re.fullmatch(r"[0-9a-f]{20}", key) or (m := cached_map(key)) is None:
+        raise HTTPException(404, "That map is gone: open the map again.")
+    pm = np.asarray(m["pmid"], np.int64)
+    try:
+        vecs, ok = semantic.vectors(gene, pm, texts_for)
+    except Pending as p:
+        return {"pending": p.job.status(), "n": len(pm)}
+    labels = np.asarray(m["c"])
+
+    def axis(spec: str) -> np.ndarray:
+        if t := re.fullmatch(r"topic:(-?\d+)", spec.strip()):
+            members = vecs[(labels == int(t[1])) & ok]
+            if not len(members):
+                raise HTTPException(400, f"no topic {t[1]} in this map")
+            v = members.mean(0)
+            v /= np.linalg.norm(v)
+        elif spec.strip():
+            v = semantic.query_vector(spec.strip())
+        else:
+            raise HTTPException(400, "Give both axes some words or a topic.")
+        return np.where(ok, vecs @ v, np.nan)
+
+    x, y = axis(a), axis(b)
+    r = np.corrcoef(x[ok], y[ok])[0, 1] if ok.sum() > 2 else np.nan
+    as_list = lambda v: [None if np.isnan(s) else round(float(s), 4) for s in v]
+    return {"x": as_list(x), "y": as_list(y), "r": _num(r, 2)}
 
 
 MAPS = semantic.CACHE_DIR / "maps"
@@ -528,7 +643,7 @@ def cached_map(key: str) -> dict | None:
     return _read_map(f, f.stat().st_mtime) if f.exists() else None
 
 
-def make_map(gene: str, pm: np.ndarray, key: str, job: semantic.Job) -> dict:
+def make_map(gene: str, pm: np.ndarray, key: str, job: semantic.Job, within: str = "") -> dict:
     t0 = time.perf_counter()
     vecs, ok = job.wait_for(lambda: semantic.vectors(gene, pm, texts_for))
     pm, vecs = pm[ok], vecs[ok]
@@ -536,7 +651,7 @@ def make_map(gene: str, pm: np.ndarray, key: str, job: semantic.Job) -> dict:
     titles, abstracts = t["title"].to_pylist(), t["abstract"].to_pylist()
     g = gene_info(gene_row(gene))
     m = litmap.build(vecs, [f"{a or ''}\n{b or ''}" for a, b in zip(titles, abstracts)], titles,
-                     g["symbol"], {g["symbol"], *g["aliases"], *g["prev"]}, job)
+                     g["symbol"], {g["symbol"], *g["aliases"], *g["prev"]}, job, within)
     m.update(pmid=pm.tolist(), year=t["year"].fill_null(0).to_pylist(),
              title=[(x or "")[:220] for x in titles], curated=np.isin(pm, curated_pmids(gene)).astype(int).tolist(),
              source=semantic.source(), seconds=round(time.perf_counter() - t0, 1))
@@ -552,11 +667,11 @@ def save_map(key: str, m: dict):
 
 
 @app.get("/api/papers.csv")
-def api_papers_csv(gene: str, term: str = "", src: str = "", disease: str = "", ymin: int = 0, ymax: int = 0,
-                   sort: str = "", match: str = "all", curated: int = 0, rank: str = "keywords"):
+def api_papers_csv(gene: str, term: str = "", ot: str = "", ep: str = "", ymin: int = 0, ymax: int = 0,
+                   sort: str = "", match: str = "all", rank: str = "keywords"):
     sort = sort or ("relevance" if term.strip() else "newest")
     try:
-        df, _ = select(gene, term, src, disease, ymin, ymax, sort, match, curated, rank)
+        df, _ = select(gene, term, ot, ep, ymin, ymax, sort, match, rank)
     except Pending:
         raise HTTPException(409, "The meaning ranking is still being worked out. Wait for the list, then download.")
     _, cur = gene_tags(gene)
@@ -569,6 +684,9 @@ def api_papers_csv(gene: str, term: str = "", src: str = "", disease: str = "", 
     names = pa.array([DISEASE_NAME.get(i, i) for i in ids.dictionary.to_pylist()], pa.string())
     named = pa.ListArray.from_arrays(tags.offsets, names.take(ids.indices), mask=tags.is_null())
     cur_names = cur.groupby("pmid").disease_name.agg(lambda s: "; ".join(sorted(set(s))))
+    links = gene_epmc(gene)
+    links = links[links.pmid.isin(df.pmid)]
+    ep_names = links.groupby("pmid").disease_id.agg(lambda s: "; ".join(sorted({DISEASE_NAME.get(d, d) for d in s})))
     cols = {
         "pmid": df.pmid.to_numpy(),
         "year": pa.array(df.year.to_numpy(), mask=df.year.to_numpy() == 0),
@@ -579,6 +697,7 @@ def api_papers_csv(gene: str, term: str = "", src: str = "", disease: str = "", 
         cols["meaning_similarity"] = pa.array(df.sim.round(4).to_numpy(), from_pandas=True)
     cols.update({
         "curated_diseases": df.pmid.map(cur_names).fillna("").to_numpy(),
+        "textmined_diseases": df.pmid.map(ep_names).fillna("").to_numpy(),
         "pubtator_diseases": pc.if_else(have, pc.binary_join(named, "; ").fill_null(""), ""),
         "url": pc.binary_join_element_wise("https://pubmed.ncbi.nlm.nih.gov/",
                                            pc.cast(pa.array(df.pmid.to_numpy()), pa.string()), "/", ""),
@@ -586,9 +705,13 @@ def api_papers_csv(gene: str, term: str = "", src: str = "", disease: str = "", 
     buf = pa.BufferOutputStream()
     pa_csv.write_csv(pa.table(cols), buf)
     sym = gene_info(gene_row(gene))["symbol"]
-    name = re.sub(r"\W+", "_", f"{sym} {term} {DISEASE_NAME.get(disease, disease)} {'curated' if curated else ''}".strip())
-    return Response(buf.getvalue().to_pybytes(), media_type="text/csv",
-                    headers={"Content-Disposition": f'attachment; filename="{name}.csv"'})
+    facets = [f"{'curated' if k == 'ot' else 'textmined'} {'' if v == 'any' else DISEASE_NAME.get(v, v)}"
+              for k, v in (("ot", ot), ("ep", ep)) if v]
+    name = re.sub(r"\W+", "_", " ".join([sym, term, *facets]).strip()).strip("_")
+    # HTTP headers are Latin-1: an ASCII name ('TGF-β' -> 'TGF'), plus the real one for browsers that read it
+    ascii_name = re.sub(r"[^A-Za-z0-9]+", "_", unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode()).strip("_")
+    return Response(buf.getvalue().to_pybytes(), media_type="text/csv", headers={"Content-Disposition":
+                    f"attachment; filename=\"{ascii_name or 'papers'}.csv\"; filename*=UTF-8''{urllib.parse.quote(name)}.csv"})
 
 
 def warm_up():

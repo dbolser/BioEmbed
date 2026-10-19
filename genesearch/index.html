@@ -7,7 +7,7 @@
 <style>
   :root {
     --bg: #ffffff; --fg: #1d1d1f; --muted: #555; --line: #d8d8d8; --panel: #f4f5f7;
-    --gene: #005a8c; --term-bg: #ffe39a; --term-line: #9a4a00; --cur: #00664a; --cur-glow: #19c37d; --focus: #0072b2;
+    --gene: #005a8c; --term-bg: #ffe39a; --term-line: #9a4a00; --cur: #00664a; --ep: #5b3a96; --focus: #0072b2;
   }
   body.cream { --bg: #fbf5e6; --panel: #f1e9d4; --line: #d9cfb6; }
   * { box-sizing: border-box; }
@@ -16,7 +16,7 @@
     margin: 0; background: var(--bg); color: var(--fg);
     font: 1rem/1.65 "Atkinson Hyperlegible", Verdana, "DejaVu Sans", system-ui, sans-serif;
   }
-  .wrap { max-width: 60rem; margin: 0 auto; padding: 0 1.2rem 4rem; }
+  .wrap { max-width: 88rem; margin: 0 auto; padding: 0 1.2rem 4rem; }
   header { background: var(--panel); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 2; }
   header .wrap { padding-top: .8rem; padding-bottom: .8rem; }
   form { display: flex; flex-wrap: wrap; gap: .6rem; align-items: end; }
@@ -37,22 +37,32 @@
   h2 { font-size: 1.2rem; margin: 1.6rem 0 .4rem; }
   a { color: var(--gene); }
   .card p { margin: .25rem 0; max-width: 70ch; }
-  .links a { margin-right: 1rem; }
   .choices button { display: block; width: 100%; text-align: left; margin: .35rem 0; padding: .5rem .8rem; }
+  /* disease facets on the left, results on the right */
+  .cols { display: grid; grid-template-columns: minmax(14rem, 19rem) minmax(0, 1fr); gap: 1.6rem; align-items: start; }
+  @media (max-width: 56rem) { .cols { grid-template-columns: minmax(0, 1fr); } }
+  .facet { border: 1px solid var(--line); border-radius: 10px; background: var(--panel); padding: .6rem .7rem .7rem; margin-top: 1.4rem; }
+  .facet h2 { font-size: 1.1rem; margin: 0; display: flex; gap: .5rem; align-items: center; }
+  .facet .sub { font-size: .9rem; color: var(--muted); margin: .1rem 0 .5rem; line-height: 1.45; }
+  .src { display: inline-block; border-radius: 5px; padding: 0 .4rem; font-size: .9rem; font-weight: bold; color: #fff; line-height: 1.5; }
+  .src.ot { background: var(--cur); } .src.ep { background: var(--ep); }
   .dlist { list-style: none; padding: 0; margin: 0; }
   .dlist button {
-    width: 100%; text-align: left; border: 1px solid transparent; background: transparent;
-    padding: .2rem .5rem; border-radius: 6px; display: flex; gap: 1rem; justify-content: space-between;
+    width: 100%; text-align: left; border: 1px solid transparent; background: transparent; font-size: .95rem; line-height: 1.4;
+    padding: .25rem .45rem; border-radius: 6px; display: flex; gap: .8rem; justify-content: space-between;
   }
-  .dlist button:hover { border-color: var(--line); background: var(--panel); }
-  .dlist button.on { border-color: var(--cur); background: var(--panel); font-weight: bold; }
+  .dlist button:hover { border-color: var(--line); background: var(--bg); }
+  .facet.ot .dlist button[aria-pressed=true] { border: 2px solid var(--cur); background: var(--bg); font-weight: bold; }
+  .facet.ep .dlist button[aria-pressed=true] { border: 2px solid var(--ep); background: var(--bg); font-weight: bold; }
+  .dlist .any { font-style: italic; }
+  .dlist button.zero { color: var(--muted); }
   .dlist .n { white-space: nowrap; color: var(--muted); font-size: .9rem; }
-  details.more > summary { cursor: pointer; color: var(--gene); margin-top: .5rem; }
+  details.more > summary { cursor: pointer; color: var(--gene); margin-top: .4rem; font-size: .95rem; }
   .bar { display: flex; flex-wrap: wrap; gap: .8rem 1.2rem; align-items: center; margin: .6rem 0; }
   .bar input[type=number] { width: 5.5rem; }
   .status { font-size: 1.05rem; margin-top: 1rem; }
   .note { background: var(--panel); border-left: 4px solid var(--term-line); padding: .4rem .8rem; max-width: 70ch; }
-  /* tabs: List / Map */
+  /* tabs: List / Map / Map Explorer */
   .tabs { display: flex; gap: .4rem; margin-top: 1.4rem; border-bottom: 2px solid var(--line); }
   .tabs button { border: 2px solid var(--line); border-bottom: none; border-radius: 8px 8px 0 0; padding: .35rem 1.2rem;
     background: var(--panel); margin-bottom: -2px; font-weight: bold; }
@@ -66,17 +76,16 @@
   .fchip button { border: none; background: none; padding: 0 .45rem; font-weight: bold; color: var(--fg); }
   .fchip button:hover { color: #b00020; }
   .clearall { font-weight: bold; }
-  /* how this search works */
-  .how { max-width: 70ch; margin: .5rem 0; }
-  .how details > summary { cursor: pointer; color: var(--gene); display: inline; }
-  .how ul { margin: .4rem 0; padding-left: 1.3rem; }
-  .how li { margin: .25rem 0; }
-  /* curated toggle */
-  .curtoggle { border: 2px solid var(--cur); color: var(--cur); background: var(--bg); border-radius: 6px;
-    padding: 0 .55rem; margin: .2rem .5rem; font-weight: bold; font-size: .95rem; transition: box-shadow .2s; }
-  .curtoggle:hover { background: var(--panel); }
-  .curtoggle[aria-pressed=true] { background: var(--cur); color: #fff;
-    box-shadow: 0 0 0 3px var(--bg), 0 0 0 6px var(--cur-glow), 0 0 18px 6px rgba(25, 195, 125, .55); }
+  /* (i): how this search works */
+  .info { width: 1.6em; height: 1.6em; padding: 0; border: 1px solid #888; border-radius: 99px; background: var(--bg);
+    color: var(--gene); font: italic bold .9rem/1 Georgia, serif; vertical-align: .1em; margin-left: .3rem; }
+  .info:hover { background: var(--panel); }
+  #how { max-width: min(46rem, calc(100vw - 2rem)); max-height: 82vh; overflow: auto; padding: .9rem 1.3rem 1.1rem;
+    border: 1px solid var(--line); border-radius: 10px; background: var(--bg); color: var(--fg); box-shadow: 0 6px 24px rgba(0,0,0,.25); }
+  #how::backdrop { background: rgba(0, 0, 0, .12); }
+  #how h2 { margin-top: 0; display: flex; justify-content: space-between; gap: 1rem; }
+  #how ul { margin: .4rem 0; padding-left: 1.3rem; }
+  #how li { margin: .35rem 0; }
   /* progress */
   .working { margin-top: 1rem; padding: .7rem 1rem; border: 2px solid var(--focus); border-radius: 10px; max-width: 70ch; }
   .working progress { width: 100%; height: 1.1rem; margin: .4rem 0; accent-color: var(--focus); }
@@ -85,11 +94,13 @@
   .title { font-weight: bold; font-size: 1.15rem; line-height: 1.45; max-width: 70ch; }
   .meta { color: var(--muted); font-size: .95rem; }
   .meta a { color: var(--gene); }
-  .badge {
-    display: inline-block; border: 2px solid var(--cur); color: var(--cur); border-radius: 6px; background: var(--bg);
-    padding: 0 .45rem; font-size: .9rem; font-weight: bold; margin: .25rem .3rem 0 0;
-  }
-  .badge:hover { background: var(--panel); }
+  /* a paper's disease links: Open Targets curated (OT) and Europe PMC text-mined (ePMC); click = that facet */
+  .dchip { display: inline-flex; align-items: center; gap: .4rem; border: 2px solid var(--cur); border-radius: 6px;
+    background: var(--bg); padding: 0 .45rem 0 0; font-size: .9rem; margin: .25rem .3rem 0 0; overflow: hidden; }
+  .dchip .src { border-radius: 0; }
+  .dchip.ep { border-color: var(--ep); }
+  .dchip:hover { background: var(--panel); }
+  .dchip[aria-pressed=true] { font-weight: bold; box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--fg); }
   .tag { display: inline-block; border: 1px solid var(--line); color: var(--muted); border-radius: 6px;
     padding: 0 .4rem; font-size: .9rem; font-weight: normal; margin-left: .4rem; }
   .chip {
@@ -103,21 +114,33 @@
   .abstract { white-space: pre-line; max-width: 70ch; margin: .4rem 0 0; }
   mark.g { background: none; color: var(--gene); font-weight: bold; text-decoration: underline 2px solid; text-underline-offset: 3px; }
   mark.t { background: var(--term-bg); color: inherit; text-decoration: underline 2px dashed var(--term-line); text-underline-offset: 3px; }
-  .legend mark { padding: 0 .2rem; }
   nav.pager { display: flex; gap: .6rem; align-items: center; margin-top: 1rem; }
   /* map */
   .seg { display: inline-flex; border: 1px solid #888; border-radius: 6px; overflow: hidden; }
   .seg button { border: none; border-radius: 0; padding: .25rem .8rem; }
   .seg button + button { border-left: 1px solid #888; }
   .seg button[aria-pressed=true] { background: var(--gene); color: #fff; }
+  .years { display: inline-flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+  .years input[type=range] { width: 14rem; accent-color: var(--gene); padding: 0; }
+  #play { min-width: 8.5rem; }
+  #yrNote { font-variant-numeric: tabular-nums; }
   #plot { height: 74vh; min-height: 30rem; border: 1px solid var(--line); border-radius: 10px; margin-top: .6rem; }
   #mappaper ol.papers > li { border-top: 3px solid var(--gene); }
-  ol.topics { list-style: none; padding: 0; margin: 0; columns: 2 26rem; column-gap: 1.5rem; }
-  ol.topics li { break-inside: avoid; }
-  ol.topics button { width: 100%; text-align: left; border: 1px solid transparent; background: transparent;
+  .crumbs { display: flex; flex-wrap: wrap; gap: .3rem .5rem; align-items: center; margin: .4rem 0; }
+  .crumbs button { padding: .1rem .55rem; }
+  .axes { display: flex; flex-wrap: wrap; gap: .6rem 1.4rem; align-items: end; margin: .8rem 0 .2rem;
+    padding: .6rem .8rem; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+  .axes .axis { display: flex; gap: .5rem; align-items: end; flex-wrap: wrap; }
+  .axes input { width: 19rem; }
+  .axes select { max-width: 16rem; }
+  .axes label > span { font-weight: bold; color: var(--fg); }
+  ol.topics { list-style: none; padding: 0; margin: 0; columns: 2 24rem; column-gap: 1.5rem; }
+  ol.topics li { break-inside: avoid; display: flex; gap: .3rem; align-items: start; }
+  ol.topics button[data-topic] { flex: 1; text-align: left; border: 1px solid transparent; background: transparent;
     border-radius: 6px; padding: .3rem .5rem; display: flex; gap: .6rem; align-items: baseline; }
-  ol.topics button:hover { background: var(--panel); border-color: var(--line); }
-  ol.topics button.on { border-color: var(--fg); background: var(--panel); }
+  ol.topics button[data-topic]:hover { background: var(--panel); border-color: var(--line); }
+  ol.topics button[data-topic].on { border-color: var(--fg); background: var(--panel); }
+  ol.topics button.drill { flex: none; margin-top: .3rem; padding: .05rem .5rem; font-size: .9rem; }
   .sw { flex: none; width: .9rem; height: .9rem; border-radius: 3px; display: inline-block; transform: translateY(.1rem); }
   .terms { color: var(--muted); font-size: .9rem; display: block; }
 </style>
@@ -153,9 +176,12 @@
   <div id="msg"></div>
   <div id="choices" class="choices"></div>
   <section id="card" class="card"></section>
-  <section id="dis"></section>
-  <section id="list"></section>
+  <div class="cols">
+    <aside id="dis" aria-label="Diseases linked to this gene"></aside>
+    <section id="list"></section>
+  </div>
 </div>
+<div id="how" popover></div>
 
 <script>
 const $ = (id) => document.getElementById(id);
@@ -164,19 +190,35 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
   ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
 const reEsc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const plural = (n, w) => `${fmt(n)} ${w}${n === 1 ? "" : "s"}`;
+const ext = (url, html) => `<a href="${esc(url)}" target="_blank" rel="noopener">${html}</a>`;
+// Plotly's SVG text knows numeric entities but not &quot;: escape only what it would read as markup.
+const pesc = (s) => String(s ?? "").replace(/[&<>]/g, (c) => `&#${c.charCodeAt(0)};`);
+function setList(html) {  // replace the results; free the old map's WebGL context first
+  if (window.Plotly && $("plot")) Plotly.purge($("plot"));
+  $("list").innerHTML = html;
+}
 
 // ---- state <-> URL
-// gene, q, src, disease, dname, ymin, ymax, sort, match ("" = all words, "any"),
-// cur ("1" = curated only), rank ("" = keywords, "meaning", "hybrid"), view ("" = list, "map"), page
+// gene, q, ot and ep (disease facets: "" = off, "any", or a disease id; ot = Open Targets curated,
+// ep = Europe PMC text-mined), ymin, ymax, sort, match ("" = all words, "any"), rank ("" = keywords,
+// "meaning", "hybrid"), view ("" = list, "map", "explore"), topic (map drill-in path, e.g. "3.2"),
+// ax and ay (Map Explorer axes: words, or "topic:N"), page
 let S = {};
 let G = null;    // current gene record from /api/gene
 let reqNo = 0;   // bumps on every new request; stale answers and polls are dropped
-const KEYS = ["gene", "q", "src", "disease", "dname", "ymin", "ymax", "sort", "match", "cur", "rank", "view"];
+const KEYS = ["gene", "q", "ot", "ep", "ymin", "ymax", "sort", "match", "rank", "view", "topic", "ax", "ay"];
+const DN = {};   // disease id -> name (from the gene's facets, paper chips and the server)
+const dname = (id) => DN[id] || id;
 
 function readURL() {
   const p = new URLSearchParams(location.search);
   S = Object.fromEntries(KEYS.map((k) => [k, p.get(k) || ""]));
   S.page = +(p.get("page") || 1);
+  // Older links: src=curated|epmc + disease (+ dname), cur=1 (curated papers only)
+  const d = p.get("disease");
+  if (d && p.get("src")) S[p.get("src") === "curated" ? "ot" : "ep"] ||= d;
+  if (d && p.get("dname")) DN[d] = p.get("dname");
+  if (p.get("cur")) S.ot ||= "any";
 }
 function writeURL(push = true) {
   const p = new URLSearchParams();
@@ -184,8 +226,8 @@ function writeURL(push = true) {
   const url = "?" + p.toString();
   if (url !== location.search) (push ? history.pushState : history.replaceState).call(history, null, "", url);
 }
-const apiParams = (extra = {}) => new URLSearchParams({gene: G.hgnc_id, term: S.q, src: S.src, disease: S.disease,
-  ymin: S.ymin || 0, ymax: S.ymax || 0, sort: S.sort, match: S.match || "all", curated: S.cur ? 1 : 0,
+const apiParams = (extra = {}) => new URLSearchParams({gene: G.hgnc_id, term: S.q, ot: S.ot, ep: S.ep,
+  ymin: S.ymin || 0, ymax: S.ymax || 0, sort: S.sort, match: S.match || "all",
   rank: S.rank || "keywords", page: S.page, ...extra});
 
 async function getJSON(url) {
@@ -202,18 +244,19 @@ async function poll(url, my, show) {
     if (my !== reqNo) return null;
     if (!r.pending) return r;
     if (r.pending.error) throw new Error(r.pending.error);
-    show(progressHTML(r.pending));
+    show(progressHTML(r.pending, r.n));
     await sleep(1000);
     if (my !== reqNo) return null;
   }
 }
-function progressHTML(p) {
+function progressHTML(p, n) {  // n = how many papers the work is on, when the server says
   const pct = p.total ? Math.floor(100 * p.done / p.total) : null;
   const eta = p.eta_s == null ? "" : p.eta_s < 90 ? ` · about ${p.eta_s} s left` : ` · about ${Math.round(p.eta_s / 60)} min left`;
-  return `<div class="working" role="status" aria-live="polite">
-    <b>Working: ${esc(p.phase)}…</b>
+  return `<div class="working" role="status">
+    <b>Working${n ? ` on ${fmt(n)} papers` : ""}: ${esc(p.phase)}…</b>
     ${p.total ? `<progress max="${p.total}" value="${p.done}"></progress>
-      <div>${fmt(p.done)} of ${fmt(p.total)} papers (${pct}%)${eta}</div>` : `<progress></progress>`}
+      <div>${fmt(p.done)} of ${fmt(p.total)} papers (${pct}%)${eta}</div>`
+      : `<progress></progress><div class="hint">${fmt(p.elapsed_s)} s so far</div>`}
     ${p.note ? `<p class="hint">${esc(p.note)}</p>` : ""}
   </div>`;
 }
@@ -269,69 +312,141 @@ async function searchGene(push = true) {
   });
 }
 
-function clearGene() { G = null; $("card").innerHTML = ""; $("dis").innerHTML = ""; $("list").innerHTML = ""; }
+function clearGene() { G = null; M = null; $("card").innerHTML = ""; $("dis").innerHTML = ""; setList(""); }
 
 async function loadGene(g, also, push, picked = false) {
   if (picked) { S.gene = g.symbol; $("gene").value = g.symbol; }
   G = await getJSON("/api/gene/" + encodeURIComponent(g.hgnc_id));
+  for (const d of [...G.curated, ...G.epmc]) DN[d.disease_id] = d.disease;
   const otherNames = [G.aliases.length ? `Also known as: ${esc(G.aliases.join(", "))}` : "",
                       G.prev.length ? `Previous symbols: ${esc(G.prev.join(", "))}` : ""].filter(Boolean).join(" · ");
+  // Location and locus group are HGNC's (NCBI Gene gives the same); each links to its source.
+  const kind = !G.locus_group ? "" : G.entrez ? ext(`https://www.ncbi.nlm.nih.gov/gene/${G.entrez}`, `NCBI ${esc(G.locus_group)}`)
+                                              : esc(G.locus_group);
   $("card").innerHTML = `
     <h1>${esc(G.symbol)} <span class="nm">${esc(G.name)}</span></h1>
     ${otherNames ? `<p>${otherNames}</p>` : ""}
-    <p class="muted">${esc(G.location || "")} · ${esc(G.locus_group || "")} · ${esc(G.hgnc_id)}</p>
+    <p class="muted">${[esc(G.location || ""), kind,
+      ext(`https://www.genenames.org/data/gene-symbol-report/#!/hgnc_id/${G.hgnc_id}`, esc(G.hgnc_id))].filter(Boolean).join(" · ")}</p>
     <p><b>${fmt(G.n_tagged)}</b> papers tagged with this gene by PubTator3
        · <b>${fmt(G.n_curated_papers)}</b> curated papers (Open Targets)</p>
-    <p class="links">
-      <a href="https://www.genenames.org/data/gene-symbol-report/#!/hgnc_id/${esc(G.hgnc_id)}" target="_blank" rel="noopener">HGNC</a>
-      ${G.entrez ? `<a href="https://www.ncbi.nlm.nih.gov/gene/${G.entrez}" target="_blank" rel="noopener">NCBI Gene</a>` : ""}
-      ${G.ensembl ? `<a href="https://platform.opentargets.org/target/${esc(G.ensembl)}" target="_blank" rel="noopener">Open Targets</a>` : ""}
-    </p>
     ${also.length ? `<p class="muted">“${esc(S.gene)}” is also an alias or old symbol of:
        ${also.map((a) => `<a href="?gene=${encodeURIComponent(a.symbol)}">${esc(a.symbol)}</a>`).join(", ")}</p>` : ""}`;
   renderDiseases();
   await show(push);
 }
 
-function diseaseRows(list, src) {
-  return list.map((d) => `<li><button data-src="${src}" data-id="${esc(d.disease_id)}" data-name="${esc(d.disease)}"
-      class="${S.src === src && S.disease === d.disease_id ? "on" : ""}">
-      <span>${esc(d.disease)}${d.sources ? ` <span class="n">(${esc(d.sources.join(", "))})</span>` : ""}</span>
-      <span class="n">${fmt(d.n_papers)} paper${d.n_papers === 1 ? "" : "s"}</span></button></li>`).join("");
+// ---- disease facets: one box per source, the same look; a disease in each box = papers in both
+const SRC = {ot: ["OT", "Open Targets curated"], ep: ["ePMC", "Europe PMC text-mined"]};
+const srcTag = (k) => `<span class="src ${k}" title="${SRC[k][1]}">${SRC[k][0]}</span>`;
+const SOURCE_NAMES = {gene2phenotype: "Gene2Phenotype", genomics_england: "Genomics England", orphanet: "Orphanet",
+                      uniprot_literature: "UniProt"};
+const sources = (list) => list.map((s) => SOURCE_NAMES[s] || s).join(", ");
+
+const EPMC_TOP = 50;  // text-mined diseases listed per box
+// fc: counts within the other filters (rows = the diseases with papers there, most first), "wait"
+// while they load, or null when no filter is set (the gene's totals and lists).
+const BOX = {gene: "", rows: {}, total: {}, open: {}};  // per box: last rows drawn and whether "more" is open
+function facetHTML(k, fc) {
+  const ot = k === "ot", gene = ot ? G.curated : G.epmc;
+  let list = gene, nAll = ot ? G.n_curated_papers : G.n_epmc_papers, total = ot ? gene.length : G.n_epmc_diseases;
+  const counting = fc === "wait" && !BOX.rows[k];  // nothing drawn yet for this gene: no rows to keep
+  if (fc === "wait") {  // new counts on the way: the rows drawn last, without numbers
+    list = (BOX.rows[k] || []).map((d) => ({...d, n_papers: null})); nAll = null; total = BOX.total[k] ?? 0;
+  }
+  else if (fc) {
+    const at = Object.fromEntries(gene.map((d, i) => [d.disease_id, i]));
+    const ids = Object.keys(fc[k]).filter((id) => id !== "any")
+      .sort((a, b) => fc[k][b] - fc[k][a] || (at[a] ?? 1e9) - (at[b] ?? 1e9) || a.localeCompare(b));
+    total = ids.length;
+    list = ids.slice(0, ot ? ids.length : EPMC_TOP).map((id) => ({disease_id: id, disease: dname(id), n_papers: fc[k][id],
+                                                                   sources: gene[at[id]]?.sources}));
+    nAll = fc[k].any;
+  }
+  if (fc !== "wait") [BOX.rows[k], BOX.total[k]] = [list, total];
+  const row = (id, name, n, title) => `<li><button type="button" data-facet="${k}" data-id="${esc(id)}" data-name="${esc(name)}"
+      aria-pressed="${S[k] === id}"${n === 0 ? ` class="zero"` : ""}${title ? ` title="${esc(title)}"` : ""}>
+      <span${id === "any" ? ` class="any"` : ""}>${esc(name)}</span><span class="n">${n == null ? "" : fmt(n)}</span></button></li>`;
+  const rows = (ds) => ds.map((d) => row(d.disease_id, d.disease, d.n_papers, d.sources && `Curated by ${sources(d.sources)}`)).join("");
+  const top = list.slice(0, 12), rest = list.slice(12);
+  // A disease picked from a paper may be outside the list: show it, picked, under "Any disease".
+  const off = S[k] && S[k] !== "any" && !list.some((d) => d.disease_id === S[k])
+    ? row(S[k], dname(S[k]), fc && fc !== "wait" ? fc[k][S[k]] ?? 0 : null) : "";
+  const shown = total > list.length ? ` (top ${list.length} of ${fmt(total)})` : "";
+  const open = BOX.open[k] || rest.some((d) => d.disease_id === S[k]);
+  return `<section class="facet ${k}" aria-labelledby="fh-${k}">
+    <h2 id="fh-${k}">${srcTag(k)} ${ot ? "Curated diseases" : "Text-mined diseases"}</h2>
+    <p class="sub">${ot ? `Open Targets curators: Orphanet, Gene2Phenotype, Genomics England, UniProt.
+        ${G.ensembl ? ext(`https://platform.opentargets.org/target/${G.ensembl}`, "Open Targets page") : ""}`
+      : "Europe PMC text mining, via Open Targets."}</p>
+    ${counting ? `<ul class="dlist">${row("any", "Any disease", null)}${off}</ul><p class="hint">Counting…</p>`
+      : list.length || off || nAll || S[k] ? `<ul class="dlist">${row("any", "Any disease", nAll)}${off}${rows(top)}</ul>
+      ${rest.length ? `<details class="more" data-box="${k}"${open ? " open" : ""}>
+        <summary>${rest.length} more${shown}</summary><ul class="dlist">${rows(rest)}</ul></details>` : ""}`
+      : `<p class="muted">None ${fc && gene.length ? "within your other filters" : `for ${esc(G.symbol)}`}.</p>`}
+  </section>`;
 }
 
+let FC = null;  // box counts within the other filters, for FC.key
+const keyWords = () => S.q.trim() && !S.rank ? S.q.trim() : "";  // keyword words filter the list; meaning words only rank it
+const facetKey = () => [G?.hgnc_id, S.ot, S.ep, keyWords(), S.match, S.ymin, S.ymax].join("|");
 function renderDiseases() {
   if (!G) return;
-  const cur = G.curated, ep = G.epmc;
-  const top = cur.slice(0, 12), rest = cur.slice(12);
-  $("dis").innerHTML = `
-    <h2>Curated diseases <span class="muted" style="font-weight:normal">(Open Targets: Orphanet, Gene2Phenotype, Genomics England, UniProt)</span></h2>
-    ${cur.length ? `<ul class="dlist">${diseaseRows(top, "curated")}</ul>
-      ${rest.length ? `<details class="more"><summary>${rest.length} more curated diseases</summary>
-        <ul class="dlist">${diseaseRows(rest, "curated")}</ul></details>` : ""}`
-      : `<p class="muted">No curated gene–disease papers for ${esc(G.symbol)}.</p>`}
-    ${ep.length ? `<details class="more" ${S.src === "epmc" ? "open" : ""}><summary>Text-mined diseases (Europe PMC, top ${ep.length})</summary>
-      <ul class="dlist">${diseaseRows(ep, "epmc")}</ul></details>` : ""}
-    <p class="hint">Click a disease to list only the papers linking it to ${esc(G.symbol)}. This clears the “and…” words.</p>`;
-  $("dis").querySelectorAll(".dlist button").forEach((b) => b.onclick = () => {
-    const same = S.src === b.dataset.src && S.disease === b.dataset.id;
-    // A disease replaces the "and…" words: both together usually leave nothing (the words are
-    // often the same disease, spelled differently).
-    Object.assign(S, same ? {src: "", disease: "", dname: ""}
-                          : {src: b.dataset.src, disease: b.dataset.id, dname: b.dataset.name, q: "", match: "", sort: ""});
-    $("term").value = S.q;
-    S.page = 1; renderDiseases(); show(true);
-    $("list").scrollIntoView({behavior: "smooth", block: "start"});
-  });
+  const filtered = S.ot || S.ep || S.ymin || S.ymax || keyWords(), key = facetKey();
+  if (filtered && FC?.key !== key)
+    getJSON("/api/facets?" + new URLSearchParams({gene: G.hgnc_id, ot: S.ot, ep: S.ep, term: keyWords(), match: S.match || "all",
+                                                  ymin: S.ymin || 0, ymax: S.ymax || 0})).then((fc) => {
+      if (FC?.key === key || facetKey() !== key) return;  // already drawn, or the filters moved on
+      const named = Object.keys(fc.names).some((id) => DN[id] !== fc.names[id]);
+      Object.assign(DN, fc.names);
+      FC = {key, ...fc};
+      renderDiseases();
+      const bar = document.querySelector("#list .filters");  // a filter chip may still show a bare id
+      if (named && bar) { bar.outerHTML = filtersHTML(); wireTop(); }
+    }).catch(() => {});
+  const fc = !filtered ? null : FC?.key === key ? FC : "wait";
+  if (BOX.gene !== G.hgnc_id) Object.assign(BOX, {gene: G.hgnc_id, rows: {}, total: {}, open: {}});
+  const f = document.activeElement?.closest?.("#dis [data-facet]");  // keep keyboard focus on the row
+  $("dis").innerHTML = facetHTML("ot", fc) + facetHTML("ep", fc) +
+    `<p class="hint">Click a disease to show only its papers (clears the “and…” words). Pick one in each box = papers in both.
+      ${fc ? "Counts are within your other filters." : ""}</p>`;
+  if (f) $("dis").querySelector(`[data-facet="${f.dataset.facet}"][data-id="${CSS.escape(f.dataset.id)}"]`)?.focus();
 }
+function addNames(names) {  // disease names from the server; redraw the boxes if one was missing or differs
+  const fresh = Object.entries(names || {}).filter(([id, name]) => DN[id] !== name);
+  for (const [id, name] of fresh) DN[id] = name;
+  if (fresh.length) renderDiseases();
+}
+
+// A disease from a facet box or a paper's chip; clicking the one already picked turns it off.
+function pickDisease(k, id, name) {
+  if (name) DN[id] = name;
+  const off = S[k] === id;
+  S[k] = off ? "" : id;
+  // A disease replaces the "and…" words: both together usually leave nothing (the words are
+  // often the same disease, spelled differently).
+  if (!off && id !== "any") { Object.assign(S, {q: "", match: "", sort: ""}); $("term").value = ""; }
+  S.page = 1; S.topic = "";
+  renderDiseases(); show(true);
+  const top = $("list").getBoundingClientRect().top;
+  if (top < 0 || top > innerHeight * 0.6) $("list").scrollIntoView({behavior: "smooth", block: "start"});
+}
+$("dis").addEventListener("click", (e) => {  // remember each box's "more" list as the user leaves it (open or shut)
+  const d = e.target.closest("details.more > summary")?.parentElement;
+  if (d) BOX.open[d.dataset.box] = !d.open;  // (the click comes before the toggle)
+});
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-facet]");
+  if (b && G) pickDisease(b.dataset.facet, b.dataset.id, b.dataset.name);
+});
 
 // ---- shared top of the results: tabs, active filters, how it works
 function filtersHTML() {
   const f = [];
   const chip = (label, key) => f.push(`<span class="fchip">${label}<button type="button" data-clear="${key}"
       title="Remove this filter" aria-label="Remove filter: ${esc(label.replace(/<[^>]+>/g, ""))}">✕</button></span>`);
-  if (S.disease) chip(`Disease: <b>${esc(S.dname || S.disease)}</b> <span class="muted">(${S.src === "curated" ? "curated links" : "text-mined links"})</span>`, "disease");
-  if (S.cur) chip(`✓ <b>Curated papers only</b>`, "cur");
+  for (const k of ["ot", "ep"]) if (S[k])
+    chip(`${srcTag(k)} <b>${S[k] === "any" ? `any ${k === "ot" ? "curated" : "text-mined"} disease` : esc(dname(S[k]))}</b>`, k);
   if (S.q.trim() && !S.rank) chip(`Words: <b>“${esc(S.q.trim())}”</b>`, "q");  // meaning/hybrid rank, not filter
   if (S.ymin || S.ymax) chip(`Years: <b>${esc(S.ymin || "…")}–${esc(S.ymax || "…")}</b>`, "years");
   if (!f.length) return "";
@@ -339,12 +454,15 @@ function filtersHTML() {
     <button type="button" class="clearall" data-clear="all">${f.length > 1 ? "Clear all filters" : "Clear filter"}</button></div>`;
 }
 function clearFilter(key) {
-  if (key === "disease" || key === "all") Object.assign(S, {src: "", disease: "", dname: ""});
-  if (key === "cur" || key === "all") S.cur = "";
+  if (key === "ot" || key === "all") S.ot = "";
+  if (key === "ep" || key === "all") S.ep = "";
   if (key === "q" || key === "all") { Object.assign(S, {q: "", match: "", sort: ""}); $("term").value = ""; }
   if (key === "years" || key === "all") Object.assign(S, {ymin: "", ymax: ""});
-  S.page = 1; renderDiseases(); show(true);
+  S.page = 1; S.topic = ""; renderDiseases(); show(true);
 }
+
+const infoBtn = () => `<button type="button" class="info" popovertarget="how" title="How this search works"
+  aria-label="How this search works">i</button>`;
 
 function howHTML(r) {
   const term = S.q.trim(), sym = esc(G.symbol);
@@ -355,16 +473,16 @@ function howHTML(r) {
     : "Ranked by <b>keyword match and meaning together</b> (hybrid).";
   const src = r && r.sem_source === "full" ? "taken from a ready-made index of all PubMed abstracts"
     : "worked out on this computer for this gene’s papers the first time you ask, then saved";
-  const dis = esc(S.dname || S.disease);
-  const which = S.src === "curated" ? `the papers are those Open Targets curators linked to ${sym} and ${dis}.`
-    : S.src === "epmc" ? `the papers are those Europe PMC text mining links to ${sym} and ${dis}${S.cur ? ", and only the Open Targets curated ones" : ""}.`
-    : S.cur ? `the papers are the Open Targets curated papers for ${sym}.`
+  const linked = (who, k) => `${who} ${k === "ot" ? "linked" : "links"} to ${sym} and ${S[k] === "any" ? "a disease" : esc(dname(S[k]))}`;
+  const conds = [S.ot && linked("Open Targets curators", "ot"), S.ep && linked("Europe PMC text mining", "ep")].filter(Boolean);
+  const which = conds.length ? `the papers are those ${conds.join(", and that ")}.`
     : `the papers are those PubTator3 (NCBI text mining, done in advance) tagged with ${sym}, plus Open Targets curated papers.`;
-  return `<div class="how"><b>How this search works:</b> ${which} ${ranked}
-    <details><summary>More detail</summary><ul>
+  return `<h2>How this search works <button type="button" popovertarget="how" popovertargetaction="hide">Close</button></h2>
+    <p>Here ${which} ${ranked}</p>
+    <ul>
       <li><b>Which papers.</b> PubTator3 tags genes in all PubMed abstracts and in open-access PubMed Central full texts, ahead of time. Open Targets adds
-        curated gene–disease papers (Orphanet, Gene2Phenotype, Genomics England, UniProt). Clicking a disease uses Open
-        Targets’ curated or Europe PMC text-mined gene–disease links.</li>
+        curated gene–disease papers (Orphanet, Gene2Phenotype, Genomics England, UniProt). The disease boxes on the left use
+        Open Targets’ curated (OT) and Europe PMC text-mined (ePMC) gene–disease links; a disease in each box shows the papers in both.</li>
       <li><b>Keywords (BM25).</b> Worked out live over this gene’s papers. Counts your words (and their forms, such as
         fibrosis and fibroses) in each title and abstract. Rare words count more, long abstracts a bit less. By default
         only papers with all your words are listed. No AI.</li>
@@ -375,22 +493,16 @@ function howHTML(r) {
         (reciprocal rank fusion), so papers near the top of either list rise.</li>
       <li><b>Map.</b> Places the papers by meaning: UMAP squeezes the 384 numbers to 12 for finding topics (HDBSCAN,
         at most 8) and to 2 for drawing. Papers between topics join the nearest one; the least typical stay grey.
-        Topics are named by their most distinctive words, or by an AI when available.</li>
-    </ul></details></div>`;
+        Topics are named by their most distinctive words, or by an AI when available. “Drill in” makes a new map of one topic’s papers.</li>
+      <li><b>Map Explorer.</b> Each axis is how close each paper is in meaning to your words (embedded by the same model),
+        or to a topic’s centre (the average of its papers’ 384 numbers): the cosine similarity, which is the paper’s
+        384 numbers projected onto that direction.</li>
+    </ul>`;
 }
 
 function tabsHTML() {
   const t = (v, label) => `<button type="button" role="tab" data-view="${v}" aria-selected="${S.view === v}">${label}</button>`;
-  return `<div class="tabs" role="tablist">${t("", "List")}${t("map", "Map")}</div>`;
-}
-
-function curToggleHTML() {
-  const on = !!S.cur;
-  return `<button type="button" id="curBtn" class="curtoggle" data-curtoggle aria-pressed="${on}"
-      title="${on ? "Showing only Open Targets curated papers. Click to show all papers." : "Click to show only Open Targets curated papers"}">
-      ${on ? "✓ Showing curated only" : "Curated"}</button>
-    ${on ? `<span class="hint">Click again to show all papers.</span>`
-         : `= Open Targets curated paper for this gene. <span class="hint">Click it to show only these.</span>`}`;
+  return `<div class="tabs" role="tablist">${t("", "List")}${t("map", "Map")}${t("explore", "Map Explorer")}</div>`;
 }
 
 function wireTop() {
@@ -401,12 +513,13 @@ function wireTop() {
 }
 
 // ---- results: list or map
-function show(push = true) { return S.view === "map" ? loadMap(push) : loadPapers(push); }
+const isMap = () => S.view === "map" || S.view === "explore";
+function show(push = true) { playing = false; return isMap() ? loadMap(push) : loadPapers(push); }
 
-function scopeText() {
-  return S.disease
-    ? `papers ${S.src === "curated" ? "curated" : "text-mined (Europe PMC)"} for ${esc(G.symbol)} + ${esc(S.dname || S.disease)}${S.cur && S.src === "epmc" ? ", curated only" : ""}`
-    : `${S.cur ? "curated " : ""}papers for ${esc(G.symbol)}`;
+function scopeText(n) {
+  const conds = [S.ot && (S.ot === "any" ? "curated (any disease)" : `curated for ${esc(dname(S.ot))}`),
+                 S.ep && (S.ep === "any" ? "text-mined (any disease)" : `text-mined for ${esc(dname(S.ep))}`)].filter(Boolean);
+  return `paper${n === 1 ? "" : "s"} for ${esc(G.symbol)}${conds.length ? ", " + conds.join(" and ") : ""}`;
 }
 
 async function loadPapers(push = true) {
@@ -415,40 +528,42 @@ async function loadPapers(push = true) {
   const head = () => tabsHTML() + filtersHTML();
   const st = document.querySelector("#list .status");
   if (st && document.querySelector("#list ol.papers")) st.innerHTML = `<b>Searching…</b>`;
-  else { $("list").innerHTML = head() + `<p class="status"><b>Searching…</b></p>`; wireTop(); }
+  else { setList(head() + `<p class="status"><b>Searching…</b></p>`); wireTop(); }
+  $("how").innerHTML = howHTML(null);
   let r;
   try {
-    r = await poll("/api/papers?" + apiParams(), my, (html) => {
-      $("list").innerHTML = head() + howHTML(null) + html; wireTop();
-    });
-  } catch (e) { $("list").innerHTML = head() + `<p class="note">Error: ${esc(e.message)}</p>`; wireTop(); return; }
+    r = await poll("/api/papers?" + apiParams(), my, (html) => { setList(head() + html); wireTop(); });
+  } catch (e) { setList(head() + `<p class="note">Error: ${esc(e.message)}</p>`); wireTop(); return; }
   if (!r) return;  // a newer request superseded this one
+  addNames(r.names);
   const secs = ((performance.now() - t0) / 1000).toFixed(2);
-  const term = S.q.trim(), scope = scopeText();
+  const term = S.q.trim(), scope = scopeText(r.n_matched), scopeAll = scopeText(r.n_scope);
   const toggle = (to, label) => ` · <button type="button" class="linkish" data-match="${to}">${label}</button>`;
   let what;
   if (!term) what = `<b>${fmt(r.n_matched)}</b> ${scope}`;
   else if (S.rank) {
     what = `<b>${fmt(r.n_matched)}</b> ${scope}, ${S.rank === "meaning" ? `closest in meaning to “${esc(term)}” first`
                                                                        : `best for “${esc(term)}” by keywords and meaning first`}`
-      + ` · ${fmt(r.n_all)} contain all the words`;
+      + ` · ${fmt(r.n_all)} ${r.n_all === 1 ? "contains" : "contain"} all the words`;
   }
-  else if (!r.n_matched) what = `None of the ${fmt(r.n_scope)} ${scope} contain “${esc(term)}”`;
+  else if (!r.n_matched) what = !r.n_scope ? `No ${scopeAll} here` : r.n_scope === 1 ? `The 1 ${scopeAll} does not contain “${esc(term)}”`
+    : `None of the ${fmt(r.n_scope)} ${scopeAll} contain “${esc(term)}”`;
   // Several words: count papers with ALL of them (any-word counts are inflated: "19" in "COVID-19").
-  else what = r.n_words <= 1 ? `<b>${fmt(r.n_matched)}</b> of ${fmt(r.n_scope)} ${scope} match “${esc(term)}”`
-    : r.match === "all" ? `<b>${fmt(r.n_matched)}</b> of ${fmt(r.n_scope)} ${scope} contain all the words “${esc(term)}”` +
+  else what = r.n_words <= 1 ? `<b>${fmt(r.n_matched)}</b> of ${fmt(r.n_scope)} ${scopeAll} match “${esc(term)}”`
+    : r.match === "all" ? `<b>${fmt(r.n_matched)}</b> of ${fmt(r.n_scope)} ${scopeAll} contain all the words “${esc(term)}”` +
         (r.n_any > r.n_all ? toggle("any", `show the ${fmt(r.n_any)} with any word`) : "")
-    : r.n_all ? `<b>${fmt(r.n_matched)}</b> of ${fmt(r.n_scope)} ${scope} contain any of the words “${esc(term)}”` +
+    : r.n_all ? `<b>${fmt(r.n_matched)}</b> of ${fmt(r.n_scope)} ${scopeAll} contain any of the words “${esc(term)}”` +
         toggle("", `show only the ${fmt(r.n_all)} with all words`)
-    : `No paper has all the words “${esc(term)}”. Showing the <b>${fmt(r.n_matched)}</b> of ${fmt(r.n_scope)} ${scope} with any of them`;
+    : `No paper has all the words “${esc(term)}”. Showing the <b>${fmt(r.n_matched)}</b> of ${fmt(r.n_scope)} ${scopeAll} with any of them`;
   const capped = r.sem_capped ? `<p class="note">Meaning ranking covers the ${fmt(r.sem_capped.n)} best keyword matches of
       ${fmt(r.sem_capped.of)} papers; the rest follow, newest first. (A ready-made AI index of all PubMed is being built;
       once it is there, every paper is ranked.)</p>` : "";
   const sortName = {relevance: "best match first", newest: "newest first", oldest: "oldest first"}[r.sort];
   const csv = "/api/papers.csv?" + apiParams();
-  $("list").innerHTML = head() + `
-    <p class="status">${what} · ${sortName} · ${secs} s</p>
-    ${howHTML(r)}${capped}
+  $("how").innerHTML = howHTML(r);
+  setList(head() + `
+    <p class="status">${what} · ${sortName} · ${secs} s ${infoBtn()}</p>
+    ${capped}
     <div class="bar">
       <label>From year <input type="number" id="ymin" value="${esc(S.ymin)}" placeholder="${G.year_min ?? ""}"></label>
       <label>To year <input type="number" id="ymax" value="${esc(S.ymax)}" placeholder="${G.year_max ?? ""}"></label>
@@ -457,16 +572,14 @@ async function loadPapers(push = true) {
         <option value="newest">Newest first</option><option value="oldest">Oldest first</option></select></label>
       <a href="${csv}" download>Download CSV (all ${fmt(r.n_matched)}${r.n_matched > 50000 ? `, about ${fmt(Math.round(r.n_matched / 2000))} MB` : ""})</a>
     </div>
-    <p class="legend hint">Highlights: <mark class="g">gene mention</mark> ${term ? `· <mark class="t">your words</mark>` : ""}
-       · ${curToggleHTML()}</p>
-    ${r.n_matched ? "" : `<p class="note">No papers here. ${S.cur || S.disease || term || S.ymin || S.ymax ? "Remove a filter above." : ""}</p>`}
+    ${r.n_matched ? "" : `<p class="note">No papers here. ${S.ot || S.ep || term || S.ymin || S.ymax ? "Remove a filter above." : ""}</p>`}
     <ol class="papers">${r.papers.map((p) => paperHTML(p, hl(p))).join("")}</ol>
-    ${pager(r)}`;
+    ${pager(r)}`);
   wireTop();
   $("sort").value = r.sort;
   $("sort").onchange = (e) => { S.sort = e.target.value; S.page = 1; loadPapers(); };
-  document.querySelectorAll("#list [data-match]").forEach((b) => b.onclick = () => { S.match = b.dataset.match; S.page = 1; loadPapers(); });
-  for (const k of ["ymin", "ymax"]) $(k).onchange = (e) => { S[k] = e.target.value; S.page = 1; loadPapers(); };
+  document.querySelectorAll("#list [data-match]").forEach((b) => b.onclick = () => { S.match = b.dataset.match; S.page = 1; renderDiseases(); loadPapers(); });
+  for (const k of ["ymin", "ymax"]) $(k).onchange = (e) => { S[k] = e.target.value; S.page = 1; S.topic = ""; renderDiseases(); loadPapers(); };
   document.querySelectorAll("nav.pager button").forEach((b) => b.onclick = () => {
     S.page = +b.dataset.p; loadPapers().then(() => $("list").scrollIntoView({behavior: "smooth"}));
   });
@@ -479,6 +592,7 @@ function scoreText(p) {
   return p.bm25 != null ? `keyword score ${p.bm25}` : "";
 }
 
+const EP_SHOWN = 6;  // text-mined chips shown per paper before "+N more"
 function paperHTML(p, h) {
   const url = `https://pubmed.ncbi.nlm.nih.gov/${p.pmid}/`;
   const title = p.title ? h(p.title) : `<a href="${url}" target="_blank" rel="noopener">PMID ${p.pmid}</a><span class="tag">no abstract</span>`;
@@ -486,8 +600,14 @@ function paperHTML(p, h) {
   const named = (title + abs).includes('<mark class="g">');
   const meta = [p.journal && esc(p.journal), p.year, p.title && `<a href="${url}" target="_blank" rel="noopener">PMID ${p.pmid}</a>`,
                 S.q.trim() && scoreText(p)].filter(Boolean).join(" · ");
-  const badges = p.curated.map((c) => `<button type="button" class="badge" data-curtoggle aria-pressed="${!!S.cur}"
-      title="Curated by ${esc(c.sources.join(", "))}. ${S.cur ? "Click to show all papers." : "Click to show only curated papers."}">Curated: ${esc(c.disease)}</button>`).join("");
+  const link = (k, d, why) => `<button type="button" class="dchip ${k}" data-facet="${k}" data-id="${esc(d.disease_id)}"
+      data-name="${esc(d.disease)}" aria-pressed="${S[k] === d.disease_id}" title="${esc(`${why} ${S[k] === d.disease_id
+        ? "Click to show all papers again." : `Click to show only these papers for ${G.symbol} + ${d.disease}.`}`)}">${srcTag(k)}${esc(d.disease)}</button>`;
+  const first = (ds, k) => [...ds.filter((d) => S[k] === d.disease_id), ...ds.filter((d) => S[k] !== d.disease_id)];  // the picked one
+  const ot = first(p.curated, "ot").map((c) => link("ot", c, `Open Targets curated (${sources(c.sources)}).`));
+  const ep = first(p.epmc, "ep").map((d) => link("ep", d, "Europe PMC text-mined link."));
+  const links = [...ot, ...ep.slice(0, EP_SHOWN)].join("") + (ep.length > EP_SHOWN
+    ? `<details class="tags"><summary>+${ep.length - EP_SHOWN} more text-mined</summary>${ep.slice(EP_SHOWN).join("")}</details>` : "");
   const chip = (d) => `<span class="chip" title="PubTator: ${esc(d.id)} ${esc(d.canonical)}">${esc(d.name)}</span>`;
   const inAbs = p.diseases.filter((d) => d.in_abstract), other = p.diseases.filter((d) => !d.in_abstract);
   const chips = inAbs.map(chip).join("") + (other.length
@@ -496,7 +616,7 @@ function paperHTML(p, h) {
   return `<li>
     <div class="title">${title}</div>
     ${meta ? `<div class="meta">${meta}</div>` : ""}
-    ${badges ? `<div>${badges}</div>` : ""}
+    ${links ? `<div>${links}</div>` : ""}
     ${chips ? `<div>${chips}</div>` : ""}
     ${p.title && !named ? `<div class="hint">${esc(G.symbol)} is not named in the title or abstract (tagged in the full text, or linked by curation).</div>` : ""}
     ${abs ? `<details class="abs"><summary>Abstract</summary><p class="abstract">${abs}</p></details>` : ""}
@@ -511,14 +631,23 @@ function pager(r) {
     ${b(r.page + 1, "Next ›", r.page === r.n_pages)}${b(r.n_pages, "Last »", r.page === r.n_pages)}</nav>`;
 }
 
-// ---- literature map
+// ---- literature map (Map and Map Explorer tabs)
 // Categorical slots in fixed order (validated: CVD-safe adjacent pairs; light hues need the direct
 // labels and the topic list, which are always shown). The server makes at most 8 topics, one slot
 // each; papers in no topic are a pale grey, drawn smaller and underneath.
 const SLOTS = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a3aa7", "#e34948"];
 const NOISE = "#d6d5cf", INK = "#0b0b0b", FONT = "Atkinson Hyperlegible, Verdana, sans-serif";
 const topicColour = (c) => c < 1 ? NOISE : SLOTS[(c - 1) % SLOTS.length];
-let M = null, mapColour = "topic", mapFocus = 0;
+const DRILL_MIN = 30;  // smallest topic offered a map of its own
+// Map Explorer's plot margins: fixed (no growing for the year colour bar), so a glide starts and ends where the dots draw
+const exMargin = () => ({l: 74, r: mapColour === "year" ? 96 : 12, t: 12, b: 64, autoexpand: false});
+const AXES_HINT = "Each axis: how close each paper is in meaning to your words, or to a topic’s centre. Short words work best, e.g. “mouse model”.";
+let M = null;          // the map from /api/map (+ params, secs)
+let EX = null;         // Map Explorer positions for M: {id, ax, ay, x, y, r, range}
+let MORPH = null;      // in-between positions (in EX's units) while the dots glide onto new axes
+let mapColour = "topic", mapFocus = 0, hoverFocus = 0, lastHoverC = 0, shiftHeld = false, mapYear = null, playing = false, zoomK = 1;
+let drawn = {rev: "", cur: [], big: 11, annotations: []};  // what drawMap drew last
+let axesCall = 0;      // bumps on every axes request; a late answer to an older one is dropped
 
 function loadPlotly() {
   if (window.Plotly) return Promise.resolve();
@@ -531,50 +660,87 @@ function loadPlotly() {
 
 async function loadMap(push = true) {
   writeURL(push);
+  playing = false;
   const my = ++reqNo, t0 = performance.now();
   const head = () => tabsHTML() + filtersHTML();
-  $("list").innerHTML = head() + `<p class="status"><b>Making the map…</b></p>`; wireTop();
-  let r;
-  try {
-    [r] = await Promise.all([
-      poll("/api/map?" + apiParams(), my, (html) => { $("list").innerHTML = head() + html; wireTop(); }),
-      loadPlotly()]);
-  } catch (e) { $("list").innerHTML = head() + `<p class="note">Error: ${esc(e.message)}</p>`; wireTop(); return; }
-  if (!r) return;
-  M = r; mapFocus = 0;
-  const secs = ((performance.now() - t0) / 1000).toFixed(1);
-  if (r.too_few) {
-    $("list").innerHTML = head() + `<p class="status">Only ${plural(r.n_text, "paper")} with an abstract here: too few for a map.
-      Remove a filter, or use the list.</p>`;
-    wireTop(); return;
+  const params = apiParams({topic: S.topic, page: 1, sort: ""}).toString();
+  $("how").innerHTML = howHTML(null);
+  let r = M && M.params === params ? M : null;  // switching between Map and Map Explorer: same map
+  if (!r) {
+    setList(head() + `<p class="status"><b>Making the map…</b></p>`); wireTop();
+    try {
+      [r] = await Promise.all([
+        poll("/api/map?" + params, my, (html) => { setList(head() + html); wireTop(); }),
+        loadPlotly()]);
+    } catch (e) {  // a drill-in link can outlive its map (topics renumbered): offer the way back up
+      setList(head() + `<p class="note">${S.topic && e.message.startsWith("404") ? "That topic is not on this map any more."
+          : `Error: ${esc(e.message)}`}</p>
+        ${S.topic ? `<p><button type="button" data-crumb="">Show the map of all the papers</button></p>` : ""}`);
+      wireTop(); wireCrumbs(); return;
+    }
+    if (!r) return;
+    Object.assign(r, {params, secs: ((performance.now() - t0) / 1000).toFixed(1)});
   }
-  const n = r.pmid.length, noise = r.c.filter((c) => c < 1).length;
-  const sample = r.sampled ? ` A fixed random sample of ${fmt(n)} of the ${fmt(r.n_text)} papers is shown (more would be slow); it is the same sample each time.` : "";
-  const left = r.n_list - r.n_text ? ` ${plural(r.n_list - r.n_text, "paper")} without an abstract ${r.n_list - r.n_text === 1 ? "is" : "are"} left out.` : "";
-  $("list").innerHTML = head() + `
-    <p class="status">Map of <b>${fmt(n)}</b> ${scopeText()}: <b>${r.clusters.length}</b> topics
-      · ${fmt(noise)} papers in no clear topic (grey) · ${secs} s</p>
-    <p class="hint" style="max-width:70ch">Each dot is a paper; papers close together are close in meaning.${sample}${left}
-      Hover a dot for its title. Click a dot to show the paper under the map. Big dots with a black ring are curated papers.
-      ${r.named_by === "llm" ? "Topic names were written by an AI (Gemini Flash-Lite) from each topic’s words and titles."
-                             : "Topic names are each topic’s most distinctive words."}</p>
+  if (my !== reqNo) return;
+  addNames(r.names);
+  $("how").innerHTML = howHTML(null);
+  if (M !== r) {  // a different map
+    // Topic axes name this map's topics: drop them when you move to another map, but not on
+    // Back/Forward (push false), where the URL's axes go with the URL's map.
+    if (M && push && M.key !== r.key) for (const k of ["ax", "ay"]) if (S[k].startsWith("topic:")) S[k] = "";
+    writeURL(false);
+    M = r; EX = null; MORPH = null;
+    mapFocus = hoverFocus = 0; mapYear = null;
+  }
+  const path = r.path || [];
+  const all = r.sampled ? `All papers (a sample of ${fmt(r.n_shown)})` : `All ${fmt(r.n_text)} papers`;
+  const crumbs = path.length ? `<nav class="crumbs" aria-label="Drill-in path">
+      <button type="button" data-crumb="">${all}</button>
+      ${path.map((p, i) => ` › ${i < path.length - 1
+        ? `<button type="button" data-crumb="${path.slice(0, i + 1).map((q) => q.id).join(".")}">${p.id}. ${esc(p.name)}</button>`
+        : `<b>${p.id}. ${esc(p.name)}</b>`}`).join("")}</nav>` : "";
+  if (r.too_few) {
+    const few = path.length ? path.at(-1).n : r.n_text;
+    setList(head() + crumbs + `<p class="status">${few ? `Only ${plural(few, "paper")}` : "No papers"} with an abstract here:
+      too few for a map. ${path.length ? "Go back up above" : "Remove a filter, or use the list"}.</p>`);
+    wireTop(); wireCrumbs(); return;
+  }
+  const n = r.pmid.length, noise = r.c.filter((c) => c < 1).length, explore = S.view === "explore";
+  const within = path.length ? ` in topic “${esc(path.at(-1).name)}”` : "";
+  const sample = !r.sampled ? ""
+    : path.length ? ` These are the topic’s papers in a fixed sample of ${fmt(r.n_shown)} of the ${fmt(r.n_text)} papers.`
+    : ` A fixed sample of ${fmt(n)} of the ${fmt(r.n_text)} papers (more would be slow); the same sample each time.`;
+  const left = !path.length && r.n_list - r.n_text ? ` ${plural(r.n_list - r.n_text, "paper")} with no abstract left out.` : "";
+  const [y0, y1] = yearSpan();
+  if (explore && !(S.ax && S.ay)) EX = null;  // (Back to a page with no axes: no axes)
+  setList(head() + `
+    <p class="status">${explore ? "Map Explorer" : "Map"} of <b>${fmt(n)}</b> ${scopeText(n)}${within}:
+      ${r.clusters.length ? `<b>${r.clusters.length}</b> ` : "no clear "}${path.length ? "sub-topics" : "topics"} · ${fmt(noise)} in no clear topic (grey) · ${r.secs} s ${infoBtn()}</p>
+    ${crumbs}
+    <p class="hint" style="max-width:75ch">Dot = paper; close dots are close in meaning. Ring = curated paper. Click a dot to read it.
+      Hold <kbd>Shift</kbd> over a dot to pick out its topic; <kbd>Esc</kbd> clears.${sample}${left}
+      ${r.named_by === "llm" ? "Topic names: AI (Gemini Flash-Lite)." : "Topic names: each topic’s most distinctive words."}</p>
+    ${explore ? axesHTML(r) : ""}
     <div class="bar">
       <span>Colour by <span class="seg" role="group" aria-label="Colour by">
         <button type="button" data-colour="topic" aria-pressed="${mapColour === "topic"}">Topic</button>
         <button type="button" data-colour="year" aria-pressed="${mapColour === "year"}">Year</button></span></span>
-      <span class="legend hint">${curToggleHTML()}</span>
+      ${y1 > y0 ? `<span class="years"><button type="button" id="play" aria-pressed="false">▶ Play years</button>
+        <input type="range" id="yr" min="${y0}" max="${y1}" value="${mapYear ?? y1}" aria-label="Show the papers up to this year">
+        <span id="yrNote" aria-live="polite"></span></span>` : ""}
     </div>
     <div id="plot" role="img" aria-label="Literature map: ${fmt(n)} papers in ${r.clusters.length} topics. The topic list below gives the same information."></div>
     <p id="hiddenNote" class="hint"></p>
     <div id="mappaper"></div>
-    <h2>Topics <span class="muted" style="font-weight:normal">(click one to pick it out on the map)</span></h2>
-    <ol class="topics">${r.clusters.map((c) => `<li><button type="button" data-topic="${c.id}">
+    <h2>${path.length ? "Sub-topics" : "Topics"} <span class="muted" style="font-weight:normal">(click one to pick it out on the map)</span></h2>
+    <ol class="topics">${r.clusters.map((c) => `<li><button type="button" data-topic="${c.id}" class="${mapFocus === c.id ? "on" : ""}">
         <span class="sw" style="background:${topicColour(c.id)}"></span>
         <span><b>${c.id}. ${esc(c.name)}</b> <span class="muted">· ${plural(c.n, "paper")}</span>
-        <span class="terms">${esc(c.terms.join(", "))}</span></span></button></li>`).join("")}
-      ${noise ? `<li><button type="button" data-topic="-1"><span class="sw" style="background:${NOISE}"></span>
-        <span><b>No clear topic</b> <span class="muted">· ${plural(noise, "paper")}</span></span></button></li>` : ""}</ol>`;
-  wireTop();
+        <span class="terms">${esc(c.terms.join(", "))}</span></span></button>
+        ${c.n >= DRILL_MIN ? `<button type="button" class="drill" data-drill="${c.id}" title="Make a new map of only these ${fmt(c.n)} papers">Drill in</button>` : ""}</li>`).join("")}
+      ${noise ? `<li><button type="button" data-topic="-1" class="${mapFocus === -1 ? "on" : ""}"><span class="sw" style="background:${NOISE}"></span>
+        <span><b>No clear topic</b> <span class="muted">· ${plural(noise, "paper")}</span></span></button></li>` : ""}</ol>`);
+  wireTop(); wireCrumbs();
   document.querySelectorAll("[data-colour]").forEach((b) => b.onclick = () => {
     mapColour = b.dataset.colour;
     document.querySelectorAll("[data-colour]").forEach((x) => x.setAttribute("aria-pressed", x === b));
@@ -582,38 +748,205 @@ async function loadMap(push = true) {
   });
   document.querySelectorAll("[data-topic]").forEach((b) => b.onclick = () => {
     const c = +b.dataset.topic;
-    mapFocus = mapFocus === c ? 0 : c;
-    document.querySelectorAll("[data-topic]").forEach((x) => x.classList.toggle("on", +x.dataset.topic === mapFocus));
-    drawMap();
+    setFocus(mapFocus === c ? 0 : c);
     $("plot").scrollIntoView({behavior: "smooth", block: "nearest"});
   });
+  document.querySelectorAll("[data-drill]").forEach((b) => b.onclick = () => {
+    S.topic = [S.topic, b.dataset.drill].filter(Boolean).join(".");
+    loadMap(true).then(() => $("list").scrollIntoView({behavior: "smooth", block: "start"}));
+  });
+  if ($("play")) {
+    $("play").onclick = play;
+    $("yr").oninput = (e) => { playing = false; setYear(+e.target.value >= y1 ? null : +e.target.value); };
+    syncYear();
+  }
+  if (explore) wireAxes();
+  if (explore && S.ax && S.ay) await loadAxes(false);
+  else drawMap();
+}
+
+function wireCrumbs() {
+  document.querySelectorAll("[data-crumb]").forEach((b) => b.onclick = () => { S.topic = b.dataset.crumb; loadMap(true); });
+}
+
+function setFocus(c) {
+  mapFocus = c;
+  document.querySelectorAll("[data-topic]").forEach((x) => x.classList.toggle("on", +x.dataset.topic === mapFocus));
   drawMap();
 }
 
-// Topic names at their centres, biggest topic first. A name that would overlap one already placed
-// moves up or down (with a thin line to its centre); if there is no room it is left out until you
-// zoom in. Every name is also in the topic list below the map.
+// ---- years: a slider and a Play button; papers appear year by year, still coloured by topic
+function yearSpan() {  // from the 1st percentile year (skip a few very old papers) to the newest
+  const ys = M.year.filter((y) => y > 0).sort((a, b) => a - b);
+  return ys.length ? [ys[Math.floor(ys.length * 0.01)], ys.at(-1)] : [0, 0];
+}
+function syncYear() {
+  const note = $("yrNote");
+  if (!note) return;
+  $("yr").value = mapYear ?? $("yr").max;
+  $("play").textContent = playing ? "❚❚ Pause" : "▶ Play years";
+  $("play").setAttribute("aria-pressed", playing);
+  if (mapYear == null) { note.textContent = "All years"; return; }
+  let upTo = 0, now = 0;
+  for (const y of M.year) { if (y > 0 && y <= mapYear) upTo++; if (y === mapYear) now++; }
+  note.textContent = `Up to ${mapYear}: ${fmt(upTo)} papers (${fmt(now)} new)`;
+}
+function setYear(y) { mapYear = y; syncYear(); return drawMap(); }
+let playRun = 0;
+async function play() {  // one year every ~half second; at the end, back to all years
+  if (playing) { playing = false; syncYear(); return; }
+  const [y0, y1] = yearSpan(), my = reqNo, map = M, run = ++playRun;
+  const live = () => playing && run === playRun && my === reqNo && M === map;
+  let y = mapYear == null || mapYear >= y1 ? y0 : mapYear + 1;
+  playing = true; syncYear();
+  while (live() && y <= y1) {
+    await setYear(y++);
+    await sleep(450);
+  }
+  if (!live()) return;
+  playing = false; syncYear();
+  await sleep(1000);
+  if (run === playRun && !playing && M === map && mapYear === y1) setYear(null);
+}
+
+// ---- Map Explorer: put the papers on two axes of your choosing
+function axesHTML(r) {
+  const text = (k) => S[k].startsWith("topic:") ? "" : S[k] || (k === "ax" ? S.q.trim() : "");
+  const topics = (k) => `<option value="">—</option>` + r.clusters.map((c) =>
+    `<option value="topic:${c.id}"${S[k] === `topic:${c.id}` ? " selected" : ""}>${c.id}. ${esc(c.name)}</option>`).join("");
+  const axis = (k, label, eg) => `<div class="axis">
+      <label><span>${label}</span><input id="${k}" value="${esc(text(k))}" placeholder="words, e.g. ${eg}"></label>
+      <label>or a topic <select id="${k}t" aria-label="${label}: a topic">${topics(k)}</select></label></div>`;
+  return `<form class="axes" id="axes" autocomplete="off">
+      ${axis("ax", "Across →", "amyotrophic lateral sclerosis")}${axis("ay", "Up ↑", "mouse model")}
+      <button class="primary" type="submit">Draw</button></form>
+    <p class="hint" id="axesNote" style="max-width:75ch">${EX?.note ?? AXES_HINT}</p>`;
+}
+function wireAxes() {
+  for (const k of ["ax", "ay"]) {
+    $(k + "t").onchange = (e) => { if (e.target.value) $(k).value = ""; };
+    $(k).oninput = () => { $(k + "t").value = ""; };
+  }
+  $("axes").onsubmit = (e) => {
+    e.preventDefault();
+    const v = Object.fromEntries(["ax", "ay"].map((k) => [k, $(k + "t").value || $(k).value.trim()]));
+    if (!v.ax || !v.ay) { $("axesNote").textContent = "Give both axes some words or a topic."; return; }
+    Object.assign(S, v);
+    document.activeElement?.blur();
+    writeURL(true);
+    loadAxes(true);
+  };
+}
+const axisName = (spec) => {
+  const t = /^topic:(-?\d+)$/.exec(spec), c = t && M.clusters.find((c) => c.id === +t[1]);
+  return t ? `topic ${t[1]}${c ? `. ${c.name}` : ""}` : `“${spec}”`;
+};
+const padded = (a) => {  // an axis range: the values' span plus 4% each side
+  let lo = Infinity, hi = -Infinity;
+  for (const v of a) if (v != null) { if (v < lo) lo = v; if (v > hi) hi = v; }
+  const pad = (hi - lo || 1) * 0.04;
+  return [lo - pad, hi + pad];
+};
+async function loadAxes(animate) {
+  const {ax, ay} = S, id = [M.key, ax, ay].join("\n"), my = reqNo, call = ++axesCall, note = $("axesNote");
+  const mine = () => call === axesCall;  // a newer Draw takes over (and starts its own glide, if any)
+  MORPH = null;
+  if (EX && EX.id === id) { note.textContent = EX.note; return drawMap(); }
+  let r;
+  try {
+    r = await poll("/api/axes?" + new URLSearchParams({gene: G.hgnc_id, key: M.key, a: ax, b: ay}), my,
+                   (html) => { if (mine()) note.innerHTML = html; });
+  } catch (e) { if (mine()) { note.textContent = `Error: ${e.message}`; drawMap(); } return; }
+  if (!r || !mine()) return;
+  const from = animate && M.pmid.length <= 12000 ? onScreen() : null;
+  EX = {id, ax, ay, x: r.x, y: r.y, r: r.r, range: {x: padded(r.x), y: padded(r.y)},
+        note: r.r == null ? AXES_HINT : `r = ${r.r.toFixed(2)} between the two axes (0 = unrelated, 1 = the same).`};
+  note.textContent = EX.note;
+  if (from) await morph(from, mine);
+  if (mine()) return drawMap();
+}
+function onScreen() {  // where each dot is drawn now, in pixels from the plot's top left
+  const fl = $("plot")?._fullLayout;
+  if (!fl?.xaxis?.l2p) return null;
+  const xa = fl.xaxis, ya = fl.yaxis, P = pos();
+  return {w: fl.width, h: fl.height, x: P.x.map((v) => v == null ? null : xa._offset + xa.l2p(v)),
+          y: P.y.map((v) => v == null ? null : ya._offset + ya.l2p(v))};
+}
+async function morph(from, mine) {  // the dots glide from where they are drawn now to their places on EX's axes
+  const {l, r, t, b} = exMargin(), [x0, x1] = EX.range.x, [y0, y1] = EX.range.y;
+  const w = from.w - l - r, h = from.h - t - b;  // the plot area on the new axes: start where the dots are now
+  const start = {x: from.x.map((p) => p == null ? null : x0 + (p - l) / w * (x1 - x0)),
+                 y: from.y.map((p) => p == null ? null : y1 - (p - t) / h * (y1 - y0))};
+  const t0 = performance.now(), my = reqNo, ease = (k) => k < .5 ? 2 * k * k : 1 - (2 - 2 * k) ** 2 / 2, k0 = zoomK;
+  for (let k = 0; k < 1 && my === reqNo && mine();) {
+    k = Math.min(1, (performance.now() - t0) / 900);
+    const e = ease(k), mix = (a, b) => a.map((v, i) => v == null || b[i] == null ? null : v + (b[i] - v) * e);
+    MORPH = {x: mix(start.x, EX.x), y: mix(start.y, EX.y), k: k0 + (1 - k0) * e};
+    await drawMap();
+    await new Promise(requestAnimationFrame);
+  }
+  if (mine()) MORPH = null;  // (else a newer glide has taken over from here)
+}
+
+// ---- drawing
+const pos = () => S.view !== "explore" ? M : MORPH || EX || M;  // {x, y} of every paper
+function centres() {  // topic label positions: the topic's median position
+  if (pos() === M) return Object.fromEntries(M.clusters.map((c) => [c.id, [c.x, c.y]]));
+  const P = pos(), med = (a) => { a.sort((p, q) => p - q); return a[a.length >> 1]; }, by = {};
+  M.c.forEach((c, i) => { if (c > 0 && P.x[i] != null) (by[c] ??= []).push(i); });
+  return Object.fromEntries(Object.entries(by).map(([c, ids]) => [c, [med(ids.map((i) => P.x[i])), med(ids.map((i) => P.y[i]))]]));
+}
+
+const ctx2d = document.createElement("canvas").getContext("2d");
+const textWidth = (text, size) => { ctx2d.font = `${size}px ${FONT}`; return ctx2d.measureText(text).width; };
+// Topic names at their centres, biggest topic first. A name that would overlap one already placed,
+// or cover a curated paper, moves up, down or sideways (with a thin line to its centre); if there
+// is no room it is left out until you zoom in. Every name is also in the topic list below the map.
+// In Map Explorer topics overlap more, so names only move a little: no long crossing lines.
 function placeLabels() {
-  const el = $("plot"), fl = el._fullLayout;
-  if (!fl || !M) return;
-  const xa = fl.xaxis, ya = fl.yaxis, fs = 16, h = fs * 1.6, placed = [], out = [];
+  const el = $("plot"), fl = el?._fullLayout;
+  if (!fl?.xaxis?.l2p || !M || MORPH) return;
+  const xa = fl.xaxis, ya = fl.yaxis, fs = 16, h = fs * 1.6, placed = [], out = [], P = pos(), C = centres();
+  const X = (v) => xa._offset + xa.l2p(v), Y = (v) => ya._offset + ya.l2p(v);
+  const inside = (b) => b.x0 >= xa._offset && b.x1 <= xa._offset + xa._length && b.y0 >= ya._offset && b.y1 <= ya._offset + ya._length;
+  const focus = hoverFocus || mapFocus, explore = pos() !== M;
+  // Keep off every curated paper of the shown topics, also those not yet out while playing years
+  // (so names don't hop about from year to year).
+  const rad = drawn.big / 2 + 3, dots = [];
+  M.curated.forEach((cu, i) => { if (cu && P.x[i] != null && !(focus && M.c[i] !== focus)) dots.push([X(P.x[i]), Y(P.y[i])]); });
+  const covers = (b) => dots.filter(([x, y]) => x > b.x0 - rad && x < b.x1 + rad && y > b.y0 - rad && y < b.y1 + rad).length;
+  if (!M.firstYear) {  // each topic's first year, so Play shows a name once its topic has papers
+    M.firstYear = {};
+    M.c.forEach((c, i) => { const y = M.year[i]; if (y > 0 && !(M.firstYear[c] <= y)) M.firstYear[c] = y; });
+  }
+  const dys = explore ? [0, -h, h] : [0, -h, h, -2 * h, 2 * h, -3 * h, 3 * h, -4 * h, 4 * h];
   let hidden = 0;
-  for (const c of M.clusters.filter((c) => !mapFocus || c.id === mapFocus)) {
-    const text = `${c.id}. ${c.name}`, w = text.length * fs * 0.56 + 14;
-    const px = xa._offset + xa.l2p(c.x), py = ya._offset + ya.l2p(c.y);
+  for (const c of M.clusters.filter((c) => !focus || c.id === focus)) {
+    if (!C[c.id]) continue;
+    // While playing years, every name still takes its place (so names don't move as topics appear),
+    // but only the topics with papers out by then are shown.
+    const shownYet = mapYear == null || M.firstYear[c.id] <= mapYear;
+    const [cx, cy] = C[c.id], text = `${c.id}. ${c.name}`, w = textWidth(text, fs) + 16;  // + border, padding
+    const px = X(cx), py = Y(cy);
     if (px < xa._offset || px > xa._offset + xa._length || py < ya._offset || py > ya._offset + ya._length) continue;
-    const spot = [0, -h, h, -2 * h, 2 * h, -3 * h, 3 * h].map((dy) => ({x0: px - w / 2, x1: px + w / 2, y0: py + dy - h / 2, y1: py + dy + h / 2, dy}))
-      .find((b) => b.x0 >= xa._offset && b.x1 <= xa._offset + xa._length && b.y0 >= ya._offset && b.y1 <= ya._offset + ya._length
-                   && !placed.some((o) => b.x0 < o.x1 && o.x0 < b.x1 && b.y0 < o.y1 && o.y0 < b.y1));
-    if (!spot) { hidden++; continue; }
+    const spots = [];
+    for (const dy of dys)
+      for (const dx of explore ? [0] : [0, -0.6 * w, 0.6 * w, -1.2 * w, 1.2 * w])
+        spots.push({dx, dy, x0: px + dx - w / 2, x1: px + dx + w / 2, y0: py + dy - h / 2, y1: py + dy + h / 2});
+    spots.sort((a, b) => Math.hypot(a.dx, a.dy) - Math.hypot(b.dx, b.dy));  // nearest first (stable)
+    const free = spots.filter((b) => inside(b) && !placed.some((o) => b.x0 < o.x1 && o.x0 < b.x1 && b.y0 < o.y1 && o.y0 < b.y1));
+    if (!free.length) { hidden += shownYet; continue; }
+    const spot = free.find((b) => !covers(b)) ?? free.reduce((a, b) => covers(b) < covers(a) ? b : a);
+    if (explore && covers(spot) > 2) { hidden += shownYet; continue; }  // (only short moves there: rather leave it off)
     placed.push(spot);
-    out.push({x: c.x, y: c.y, text: esc(text), showarrow: spot.dy !== 0, ax: 0, ay: spot.dy, arrowhead: 0,
+    if (shownYet) out.push({x: cx, y: cy, text: pesc(text), showarrow: !!(spot.dx || spot.dy), ax: spot.dx, ay: spot.dy, arrowhead: 0,
       arrowwidth: 1.5, arrowcolor: "#555", font: {size: fs, color: INK, family: FONT},
       bgcolor: "rgba(255,255,255,0.9)", bordercolor: mapColour === "topic" ? topicColour(c.id) : "#888", borderwidth: 2, borderpad: 3});
   }
+  drawn.annotations = out;
   Plotly.relayout(el, {annotations: out});
   const note = $("hiddenNote");
-  if (note) note.textContent = hidden ? `${plural(hidden, "topic name")} left off the map where ${hidden === 1 ? "it" : "they"} would overlap: zoom in (scroll or the + button) to see more, or read the list below.` : "";
+  if (note) note.textContent = hidden ? `${plural(hidden, "topic name")} hidden here: zoom in, or see the list below.` : "";
 }
 
 function wrap(s, w = 60) {  // plotly hover text has no wrapping
@@ -624,72 +957,126 @@ function wrap(s, w = 60) {  // plotly hover text has no wrapping
   return [...out, line].join("<br>");
 }
 
+// How far in we are zoomed (1 = the whole map); dots grow with its square root, up to 4x.
+function zoomNow() {
+  const fl = $("plot")?._fullLayout, P = pos();
+  if (!fl?.xaxis?.range) return 1;
+  const k = (a, r) => {
+    let lo = Infinity, hi = -Infinity;
+    for (const v of a) if (v != null) { if (v < lo) lo = v; if (v > hi) hi = v; }
+    return (hi - lo) / Math.abs(r[1] - r[0]);
+  };
+  return Math.min(4, Math.max(1, Math.sqrt(Math.max(k(P.x, fl.xaxis.range), k(P.y, fl.yaxis.range)))));
+}
+
 function drawMap() {
-  const r = M, n = r.pmid.length, el = $("plot");
-  const name = Object.fromEntries(r.clusters.map((c) => [c.id, c.name]));
-  const size = n > 10000 ? 4 : n > 3000 ? 5.5 : 7;
-  const dim = (c) => mapFocus && c !== mapFocus;
-  const idx = (keep) => [...Array(n).keys()].filter(keep);
-  const hover = (i) => [wrap(esc(r.title[i] || `PMID ${r.pmid[i]}`)), r.year[i] || "no year",
-                        r.c[i] > 0 ? `${r.c[i]}. ${esc(name[r.c[i]])}` : "no clear topic", r.curated[i] ? " · curated" : ""];
-  // Most papers are recent: spread the colours over the 10th to 98th percentile of years.
+  const r = M, el = $("plot");
+  if (!el || !r || !window.Plotly) return Promise.resolve();
+  const n = r.pmid.length, P = pos(), explore = S.view === "explore" && !!EX;
+  const rev = MORPH ? "morph" : `${r.key}|${explore ? EX.id : "map"}`;  // a new rev = a fresh view, unzoomed
+  if (rev !== drawn.rev && el._wired) { Plotly.purge(el); el._wired = false; }  // double-click "reset" = this view
+  if (MORPH) zoomK = MORPH.k;  // gliding: dots ease from their zoomed size
+  else if (!el._wired) zoomK = 1;
+  r.range ??= {x: padded(r.x), y: padded(r.y)};  // a fixed start view, so Play's coming and going dots don't shift it
+  r.hover ??= r.pmid.map((p, i) => [wrap(pesc(r.title[i] || `PMID ${p}`)), r.year[i] || "no year",
+    r.c[i] > 0 ? `${r.c[i]}. ${pesc(r.clusters.find((c) => c.id === r.c[i])?.name)}` : "no clear topic", r.curated[i] ? " · curated" : "", p, i]);
+  const base = n > 10000 ? 4 : n > 3000 ? 5.5 : 7, size = Math.min(18, base * zoomK), big = Math.min(28, Math.max(11, base * 2) * zoomK);
+  const focus = hoverFocus || mapFocus, yr = mapYear;
+  const later = (i) => yr != null && !(r.year[i] > 0 && r.year[i] <= yr);  // not published yet (playing years)
+  const dim = (i) => focus && r.c[i] !== focus;
+  const fresh = (i) => yr != null && r.year[i] === yr;
+  const idx = (keep) => { const out = []; for (let i = 0; i < n; i++) if (keep(i)) out.push(i); return out; };
+  // Most papers are recent: spread the year colours over the 10th to 98th percentile of years.
   const years = r.year.filter((y) => y > 0).sort((a, b) => a - b);
   const y0 = years[Math.floor(years.length * 0.1)] ?? 0, y1 = years[Math.floor(years.length * 0.98)] ?? 0;
   const YEARS = [[0, "#b7d3f6"], [0.5, "#3987e5"], [1, "#0d366b"]];  // one hue, light (old) to dark (new)
+  const where = explore && !MORPH ? "<br>→ %{x:.2f} · ↑ %{y:.2f}" : "";
   const trace = (ids, extra = {}) => ({
-    type: "scattergl", mode: "markers", x: ids.map((i) => r.x[i]), y: ids.map((i) => r.y[i]),
-    customdata: ids.map((i) => [...hover(i), r.pmid[i]]),
-    hovertemplate: "<b>%{customdata[0]}</b><br>%{customdata[1]} · %{customdata[2]}%{customdata[3]}<extra></extra>",
+    type: "scattergl", mode: "markers", x: ids.map((i) => P.x[i]), y: ids.map((i) => P.y[i]),
+    customdata: ids.map((i) => r.hover[i]),
+    hovertemplate: `<b>%{customdata[0]}</b><br>%{customdata[1]} · %{customdata[2]}%{customdata[3]}${where}<extra></extra>`,
     ...extra,
   });
   const colourOf = (ids) => mapColour === "year"
     ? {color: ids.map((i) => r.year[i] || y0), colorscale: YEARS, cmin: y0, cmax: Math.max(y1, y0 + 1)}
     : {color: ids.map((i) => topicColour(r.c[i]))};
-  const traces = [];
-  // faded (not the picked topic) first, then the rest, then curated papers on top
-  const groups = mapFocus ? [idx((i) => dim(r.c[i])), idx((i) => !dim(r.c[i]) && !r.curated[i])]
-                          : [idx((i) => r.c[i] < 1 && !r.curated[i]), idx((i) => r.c[i] >= 1 && !r.curated[i])];
-  groups.forEach((ids, g) => {
-    const faded = mapFocus ? g === 0 : false, noise = !mapFocus && g === 0 && mapColour === "topic";
-    traces.push(trace(ids, {marker: {size: noise ? Math.max(3, size * 0.7) : size,
-      opacity: faded ? 0.3 : (mapFocus ? 0.9 : noise ? 0.7 : 0.8), ...(faded ? {color: NOISE} : colourOf(ids))}}));
-  });
-  if (mapColour === "year") Object.assign(traces[1].marker, {showscale: true, colorbar: {title: {text: "Year"}, thickness: 14}});
+  const traces = [], add = (ids, marker, extra) => { if (ids.length) traces.push(trace(ids, {marker, ...extra})); };
+  const shown = (i) => !later(i) && !dim(i) && !r.curated[i];
+  // Drawn bottom to top: not yet published (playing years), faded (not the picked topic), no topic,
+  // the rest, this year's papers (playing; big, white edge), then curated papers on top.
+  add(idx(later), {size: size * 0.7, color: NOISE, opacity: 0.15}, {hoverinfo: "skip"});
+  add(idx((i) => !later(i) && dim(i)), {size, color: NOISE, opacity: 0.3});
+  const topicMode = mapColour === "topic", rest = idx((i) => shown(i) && !fresh(i) && r.c[i] >= 1);
+  const none = idx((i) => shown(i) && !fresh(i) && r.c[i] < 1);
+  add(none, {size: topicMode && !focus ? Math.max(3, size * 0.7) : size, opacity: focus ? 0.9 : 0.7, ...colourOf(none),
+    ...(topicMode && focus === -1 ? {color: "#8a8984"} : {})});
+  add(rest, {size, opacity: yr != null ? 0.45 : focus ? 0.9 : 0.8, ...colourOf(rest),
+    ...(topicMode ? {} : {showscale: true, colorbar: {title: {text: "Year"}, thickness: 14}})});
+  const now = idx((i) => shown(i) && fresh(i));
+  add(now, {size: size * 1.6, opacity: 1, line: {width: 1, color: "#fff"}, ...colourOf(now)});
   // Curated papers: big dots with a ring, drawn last (on top). WebGL hover only measures the distance
   // to a dot's centre, so a small dot beside or under a big curated one would win the hover and the
   // click. So an invisible SVG copy (SVG hover counts the whole dot) takes most hovers, and
   // curatedAt() settles the rest: the mouse inside a curated dot always means that paper.
-  const cur = idx((i) => r.curated[i] && !dim(r.c[i])), big = Math.max(11, size * 2);
+  const cur = idx((i) => r.curated[i] && !later(i) && !dim(i));
   if (cur.length) {
     traces.push(trace(cur, {name: "curated", marker: {size: big, opacity: 1, line: {width: 2, color: INK}, ...colourOf(cur)}}));
     traces.push(trace(cur, {name: "curated", type: "scatter", marker: {size: big + 2, opacity: 0}}));
   }
-  const hit = traces.length - 1;
-  function curatedAt(e) {  // the curated dot under the mouse (the top one if they overlap), or -1
-    if (!cur.length || !e || e.clientX == null) return -1;
-    const xa = el._fullLayout.xaxis, ya = el._fullLayout.yaxis, bb = el.querySelector(".main-svg").getBoundingClientRect();
-    const px = e.clientX - bb.left - xa._offset, py = e.clientY - bb.top - ya._offset;
-    for (let j = cur.length - 1; j >= 0; j--)
-      if (Math.hypot(xa.l2p(r.x[cur[j]]) - px, ya.l2p(r.y[cur[j]]) - py) <= big / 2 + 1) return j;
-    return -1;
-  }
-  Plotly.react(el, traces, {
-    showlegend: false, hovermode: "closest", dragmode: "pan", margin: {l: 10, r: 10, t: 10, b: 10},
+  const axis = (k, range) => ({title: {text: pesc(`closer in meaning to ${axisName(EX[k])} →`), font: {size: 16, family: FONT, color: INK}, standoff: 8},
+    range: [...range], zeroline: false, gridcolor: "#e6e6e6", tickfont: {size: 14, family: FONT}, automargin: false});
+  const layout = {
+    showlegend: false, hovermode: "closest", dragmode: "pan", uirevision: rev,
+    margin: explore ? exMargin() : {l: 10, r: 10, t: 10, b: 10},
     paper_bgcolor: "rgba(0,0,0,0)", plot_bgcolor: "rgba(0,0,0,0)",
-    xaxis: {visible: false}, yaxis: {visible: false, scaleanchor: "x"}, annotations: [],
+    xaxis: explore ? axis("ax", EX.range.x) : {visible: false, range: [...(el._wired ? el.layout.xaxis.range : r.range.x)]},
+    yaxis: explore ? axis("ay", EX.range.y)
+      : {visible: false, range: [...(el._wired ? el.layout.yaxis.range : r.range.y)], scaleanchor: "x"},
+    annotations: rev === drawn.rev ? drawn.annotations : [],
     hoverlabel: {font: {size: 16, family: FONT, color: INK}, bgcolor: "#fff", bordercolor: "#888"},
-  }, {responsive: true, displaylogo: false, scrollZoom: true, modeBarButtonsToRemove: ["select2d", "lasso2d", "autoScale2d"]})
-    .then(placeLabels);
-  el.removeAllListeners?.("plotly_relayout");
-  el.on("plotly_relayout", (e) => { if (!("annotations" in e)) placeLabels(); });  // zoom/pan: re-place
-  el.removeAllListeners?.("plotly_hover");
-  el.on("plotly_hover", (ev) => {
-    const q = ev.points[0], j = curatedAt(ev.event);
-    if (j >= 0 && !(q.data.name === "curated" && q.pointNumber === j)) Plotly.Fx.hover(el, [{curveNumber: hit, pointNumber: j}]);
+  };
+  drawn = {rev, cur, big, annotations: layout.annotations};
+  return Plotly.react(el, traces, layout, {responsive: true, displaylogo: false, scrollZoom: true, doubleClick: "reset",
+                                           modeBarButtonsToRemove: ["select2d", "lasso2d", "autoScale2d"]})
+    .then(() => { wirePlot(el); placeLabels(); });
+}
+
+function curatedAt(e) {  // the curated paper (index) under the mouse, the top one if they overlap; else -1
+  const el = $("plot"), cur = drawn.cur, P = pos();
+  if (!cur.length || !e || e.clientX == null) return -1;
+  const xa = el._fullLayout.xaxis, ya = el._fullLayout.yaxis, bb = el.querySelector(".main-svg").getBoundingClientRect();
+  const px = e.clientX - bb.left - xa._offset, py = e.clientY - bb.top - ya._offset;
+  for (let j = cur.length - 1; j >= 0; j--)
+    if (Math.hypot(xa.l2p(P.x[cur[j]]) - px, ya.l2p(P.y[cur[j]]) - py) <= drawn.big / 2 + 1) return cur[j];
+  return -1;
+}
+
+function wirePlot(el) {  // once per plot element; the handlers read the current map and drawing
+  if (el._wired) return;
+  el._wired = true;
+  if (!el._blurs) {  // (a DOM listener: it outlives Plotly.purge, so add it once)
+    el._blurs = true;
+    el.addEventListener("pointerdown", () => { if (typing()) document.activeElement.blur(); }, true);
+  }
+  let resizing = 0;
+  el.on("plotly_relayout", (e) => {  // zoom/pan: re-place the names; zoom: resize the dots
+    if ("annotations" in e || MORPH) return;
+    const k = zoomNow();
+    placeLabels();
+    if (Math.abs(k - zoomK) > 0.05) { zoomK = k; clearTimeout(resizing); resizing = setTimeout(drawMap, 120); }
   });
-  el.removeAllListeners?.("plotly_click");
+  el.on("plotly_hover", (ev) => {
+    const q = ev.points[0], i = curatedAt(ev.event), hit = el.data.length - 1;
+    lastHoverC = M.c[i >= 0 ? i : q.customdata[5]];
+    // shiftHeld, not ev.event.shiftKey: a redraw replays the last mouse event, Shift and all
+    const want = shiftHeld && !typing() ? lastHoverC : 0;
+    if (want !== hoverFocus) { hoverFocus = want; setTimeout(drawMap); return; }
+    const j = drawn.cur.indexOf(i);
+    if (i >= 0 && !(q.data.name === "curated" && q.pointNumber === j)) Plotly.Fx.hover(el, [{curveNumber: hit, pointNumber: j}]);
+  });
+  el.on("plotly_unhover", () => { lastHoverC = 0; });
   el.on("plotly_click", async (ev) => {
-    const j = curatedAt(ev.event), pmid = j >= 0 ? r.pmid[cur[j]] : ev.points[0].customdata[4];
+    const j = curatedAt(ev.event), pmid = j >= 0 ? M.pmid[j] : ev.points[0].customdata[4];
     const p = await getJSON(`/api/paper?gene=${encodeURIComponent(G.hgnc_id)}&pmid=${pmid}&term=${encodeURIComponent(S.q)}`);
     $("mappaper").innerHTML = `<ol class="papers">${paperHTML(p, hl(p))}</ol>`;
     $("mappaper").querySelector("details.abs")?.setAttribute("open", "");
@@ -698,30 +1085,41 @@ function drawMap() {
 }
 
 // ---- wiring
-$("list").addEventListener("click", (e) => {  // the Curated toggle, and each paper's Curated badge
-  if (!e.target.closest("[data-curtoggle]")) return;
-  S.cur = S.cur ? "" : "1"; S.page = 1; show(true);
-});
 // Scrolling to the results must not hide their top under the sticky header.
 new ResizeObserver(([e]) => document.documentElement.style.scrollPaddingTop = `${e.target.offsetHeight + 8}px`)
   .observe(document.querySelector("header"));
 $("f").onsubmit = (e) => {
   e.preventDefault();
+  document.activeElement?.blur();
   const gene = $("gene").value.trim(), q = $("term").value.trim();
   const sameGene = G && gene.toUpperCase() === S.gene.toUpperCase();
-  S = {...S, gene, q, rank: $("rank").value, page: 1, sort: "", match: ""};
+  S = {...S, gene, q, rank: $("rank").value, page: 1, sort: "", match: "", topic: ""};
   if (sameGene) { renderDiseases(); show(); }
-  else { Object.assign(S, {src: "", disease: "", dname: "", ymin: "", ymax: "", cur: ""}); searchGene(); }
+  else { Object.assign(S, {ot: "", ep: "", ymin: "", ymax: ""}); searchGene(); }
 };
 $("rank").onchange = () => {  // keyword ranking lists only papers with the words; the others list all
-  S.rank = $("rank").value; S.page = 1; S.sort = "";
-  if (G) show();
+  S.rank = $("rank").value; S.page = 1; S.sort = ""; S.topic = "";
+  if (G) { renderDiseases(); show(); }
 };
+const typing = () => !!document.activeElement?.matches("textarea, input:not([type=range])");
 document.addEventListener("keydown", (e) => {
-  if (e.key === "/" && !["INPUT", "SELECT", "TEXTAREA"].includes(document.activeElement.tagName)) {
+  if (e.key === "/" && !typing()) {
     e.preventDefault(); $("gene").focus(); $("gene").select();
   }
+  if (!isMap() || !M) return;
+  if (e.key === "Escape" && !document.querySelector("#how:popover-open")) {  // Esc: drop the picked topic, else stop playing
+    if (mapFocus || hoverFocus) { hoverFocus = 0; setFocus(0); }
+    else if (playing) { playing = false; syncYear(); }
+  }
+  if (e.key === "Shift" && !typing() && lastHoverC && lastHoverC !== hoverFocus) { hoverFocus = lastHoverC; drawMap(); }  // Shift: pick out the hovered topic
 });
+document.addEventListener("keydown", (e) => { if (e.key === "Shift") shiftHeld = true; }, true);
+const shiftUp = () => {
+  shiftHeld = false;
+  if (hoverFocus && M) { hoverFocus = 0; drawMap(); }
+};
+document.addEventListener("keyup", (e) => { if (e.key === "Shift") shiftUp(); });
+window.addEventListener("blur", shiftUp);
 $("creamBtn").onclick = () => {
   document.body.classList.toggle("cream");
   localStorage.setItem("cream", document.body.classList.contains("cream") ? "1" : "");
