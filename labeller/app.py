@@ -31,6 +31,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 HERE = Path(__file__).resolve().parent
+OT_DISEASES = Path("/outsee5/home/danbolser/Work/IUK-IPF/data/sources/opentargets/26.06/disease/disease.parquet")
 REQUIRED = ["item_id", "round_id", "gene_symbol", "gene_name", "gene_aliases", "disease_name",
             "disease_synonyms", "pmid", "title", "abstract", "stratum", "is_repeat"]
 
@@ -188,7 +189,7 @@ def highlight(title: str, abstract: str, ms) -> dict:
 # --- items and scheduling -------------------------------------------------------------------
 
 class Items:
-    def __init__(self, path: Path, gap: int, hours: float):
+    def __init__(self, path: Path, gap: int, hours: float, diseases: Path | None = None):
         df = pd.read_parquet(path)
         if missing := sorted(set(REQUIRED) - set(df.columns)):
             raise SystemExit(f"{path}: missing columns {missing}")
@@ -198,13 +199,18 @@ class Items:
         if df.item_id.duplicated().any():
             raise SystemExit(f"{path}: duplicate item_id")
         self.gap, self.hours = gap, hours
+        about = {}  # disease id (last part of round_id) -> definition, as Open Targets gives it
+        if diseases and diseases.exists():
+            d = pd.read_parquet(diseases, columns=["id", "description"]).dropna()
+            about = dict(zip(d.id, d.description))
         self.items, self.rounds = {}, {}
         for rid, g in df.groupby("round_id", sort=False):
             if g[["gene_symbol", "disease_name"]].drop_duplicates().shape[0] != 1:
                 raise SystemExit(f"{path}: round {rid} has more than one gene-disease pair")
             r = g.iloc[0]
             gene = {"symbol": r.gene_symbol, "name": r.gene_name, "aliases": as_list(r.gene_aliases)}
-            disease = {"name": r.disease_name, "synonyms": as_list(r.disease_synonyms)}
+            disease = {"name": r.disease_name, "synonyms": as_list(r.disease_synonyms),
+                       "description": about.get(rid.split("|")[-1], "")}
             ms = matchers(gene, disease)
             self.rounds[rid] = {"gene": gene, "disease": disease,
                                 "ids": sorted(g.item_id), "repeat": sorted(g.item_id[g.is_repeat])}
@@ -369,6 +375,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--items", default=os.environ.get("LABELLER_ITEMS"), help="items parquet (or $LABELLER_ITEMS)")
     ap.add_argument("--db", type=Path, default=HERE / "labels.sqlite")
+    ap.add_argument("--diseases", type=Path, default=OT_DISEASES, help="Open Targets disease index, for the definitions shown on hover (skipped if missing)")
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--port", type=int, default=8765)
     ap.add_argument("--repeat-gap", type=int, default=2, help="min rounds between a round's two parts")
@@ -381,7 +388,7 @@ def main():
     if not a.items:
         ap.error("--items (or $LABELLER_ITEMS) is required")
     import uvicorn
-    uvicorn.run(create_app(Items(Path(a.items), a.repeat_gap, a.repeat_hours), a.db),
+    uvicorn.run(create_app(Items(Path(a.items), a.repeat_gap, a.repeat_hours, a.diseases), a.db),
                 host=a.host, port=a.port, log_level="warning")
 
 
