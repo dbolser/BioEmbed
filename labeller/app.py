@@ -3,8 +3,10 @@
 Serve:  uv run python app.py --items items_demo.parquet --port 8765 --host 0.0.0.0
 Export: uv run python app.py --export      # -> export/labels.csv and export/labels.parquet
 
-Blindness: the browser never receives item_id, pmid, round_id, stratum or is_repeat, only opaque
-handles that differ between a first look and a repeat.
+Blindness: the browser never receives item_id, round_id, stratum or is_repeat, only opaque
+handles that differ between a first look and a repeat. It gets an item's pmid (for a PubMed link)
+only once that item, in that pass, is rated, so the grade comes from the abstract alone, as the
+judges' did.
 
 Repeats: a round with is_repeat items is shown in two parts of equal size. Part 1 holds most of the
 fresh abstracts (including the repeat items' first look). Part 2 holds the rest of the fresh
@@ -20,7 +22,7 @@ import random
 import re
 import sqlite3
 from contextlib import closing, contextmanager
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pandas as pd
@@ -73,7 +75,7 @@ ON CONFLICT (labeller, item_id, pass) DO UPDATE SET
 
 
 def now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def seeded(*parts) -> random.Random:
@@ -346,7 +348,8 @@ def create_app(items: Items, db_path: Path) -> FastAPI:
             out["round"] = {
                 "key": handle(rid, k), "number": len(pr["done"]) + 1, "gene": r["gene"], "disease": r["disease"],
                 "items": [{"key": handle(i, p), "title": items.items[i]["title"],
-                           "abstract": items.items[i]["abstract"], "label": shown(pr["labs"].get((i, p)))}
+                           "abstract": items.items[i]["abstract"], "label": shown(pr["labs"].get((i, p))),
+                           **({"pmid": items.items[i]["pmid"]} if (i, p) in pr["labs"] else {})}
                           for i, p in pr["parts"][pr["current"]]]}
         elif pr["next_at"]:
             out["waiting"] = {"next_at": pr["next_at"].isoformat(timespec="seconds")}
@@ -375,7 +378,7 @@ def create_app(items: Items, db_path: Path) -> FastAPI:
             con.execute(UPSERT, row)
             con.execute("INSERT INTO log VALUES (:at, :labeller, :item_id, :pass, :grade, :unsure, :flag, "
                         ":note, :seconds)", row)
-        return {**progress(who)["stats"], "updated_at": row["at"]}
+        return {**progress(who)["stats"], "updated_at": row["at"], "pmid": row["pmid"]}
 
     @app.get("/api/export")
     def export_endpoint():
