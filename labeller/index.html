@@ -121,6 +121,12 @@
                     background: var(--accent); color: #fff; }
   .card button.go kbd { color: var(--fg); }
   .card button.alt { background: var(--panel); color: var(--fg); border-color: var(--line); }
+  #introBody { text-align: left; background: var(--panel); border-radius: 10px; padding: .8rem 1.2rem; }
+  #introBody p { margin: .4rem 0; }
+  #introBody dl, #introBody dd { margin: 0; }
+  #introBody .pick { display: grid; grid-template-columns: 1.6em 1fr; gap: .4rem; }
+  #introBody dt { font-weight: 700; font-size: 1.15em; }
+  #introStep { color: var(--muted); font-size: .85em; }
   .card input { font: inherit; padding: .4rem .7rem; border-radius: 6px; border: 1px solid var(--line); }
 </style>
 </head>
@@ -151,15 +157,15 @@
         <div id="noteRow"><label for="note">Note <kbd>N</kbd></label><textarea id="note" rows="3" autocomplete="off" placeholder="Optional"></textarea></div></article>
       <aside id="rubric">
         <h2>Guide to rating</h2>
-        <p><b>Goal: would a good gene–disease search show this paper?</b> 2 = yes, the paper we want. 1 = a near miss. 0 = no.</p>
-        <p>Grade from the abstract alone. Looking up disease terms is fine; looking up the paper isn't.</p>
+        <p id="gGoal"><b>Goal: would a good gene–disease search show this paper?</b> 2 = yes, the paper we want. 1 = a near miss. 0 = no.</p>
+        <p id="gAlone">Grade from the abstract alone to keep the comparison fair. Looking up disease info is fine.</p>
         <dl>
           <div class="pick" data-g="2" title="Rate 2"><dt>2</dt><dd><b>Evidence.</b> The abstract reports evidence that this gene (or a homolog) is involved in this disease, a synonym or a subtype, including in a model of the disease.</dd></div>
           <div class="pick" data-g="1" title="Rate 1"><dt>1</dt><dd><b>Related or mention.</b> The abstract discusses both the gene and the disease, but either indirectly or in a related disease (see below).</dd></div>
           <div class="pick" data-g="0" title="Rate 0"><dt>0</dt><dd><b>Unrelated.</b> Either an unrelated disease, the gene alone (e.g. basic research), or not this gene at all.</dd></div>
           <div class="pick" data-g="U" title="Rate unsure"><dt>U</dt><dd><b>Unsure.</b> If you can't decide 2, 1, or 0. Optionally leave a note before rating.</dd></div>
         </dl>
-        <p><b>Same disease, or related?</b> This disease by another name, a subtype of a broader disease, or the disease described only by its symptoms: all count as the same disease. Don't count a broader disease as the same unless the study includes this disease (rate it 1 or 0). Use your own scientific judgement to decide whether two different diseases are related, e.g. epilepsy and schizophrenia.</p>
+        <p id="gSame"><b>Same disease, or related?</b> This disease by another name, a subtype of a broader disease, or the disease described only by its symptoms: all count as the same disease. Rate a broader disease as 1 or 0 unless the study includes this disease. Use your own scientific judgement to decide whether two different diseases are related, e.g. epilepsy and schizophrenia.</p>
         <h3>Shortcuts</h3>
         <p><kbd>F</kbd>&nbsp;flag &nbsp; <kbd>N</kbd>&nbsp;note &nbsp; <kbd>&larr;</kbd>&nbsp;back &nbsp; <kbd>&rarr;</kbd>&nbsp;forward &nbsp; <kbd>C</kbd>&nbsp;continue &nbsp; <kbd>Esc</kbd>&nbsp;leave the note</p>
         <p>Key: <span class="hl g">gene</span> &nbsp;<span class="hl d">disease</span></p>
@@ -167,6 +173,13 @@
     </div>
     <div id="defSrc" popover></div>
     <div id="synSrc" popover>From the Open Targets disease index (release 26.06, built on the EFO ontology): the names it lists as exact synonyms. The LLM judges saw the same list.</div>
+  </section>
+
+  <section id="sIntro" class="card" hidden>
+    <h1>Guide to rating</h1>
+    <div id="introBody"></div>
+    <p id="introStep"></p>
+    <button class="go" id="introBtn">Continue <kbd>Enter</kbd></button>
   </section>
 
   <section id="sDone" class="card" hidden>
@@ -258,7 +271,7 @@ function show(screen) {
   S.screen = screen;
   if (document.activeElement !== $("note")) document.activeElement?.blur();  // no stray Enter/Space clicks
   $("synSrc").hidePopover(); $("defSrc").hidePopover();
-  for (const [s, id] of [["name", "sName"], ["label", "sLabel"], ["done", "sDone"], ["wait", "sWait"], ["end", "sEnd"]])
+  for (const [s, id] of [["name", "sName"], ["intro", "sIntro"], ["label", "sLabel"], ["done", "sDone"], ["wait", "sWait"], ["end", "sEnd"]])
     $(id).hidden = s !== screen;
   $("controls").hidden = screen !== "label";
   $("track").hidden = $("pcount").hidden = $("pairMini").hidden = !(screen === "label" || screen === "done");
@@ -325,7 +338,8 @@ async function load() {
     S.items = r.items;
     S.i = Math.max(0, S.items.findIndex((it) => !it.label));
     renderPair(r);
-    showItem();
+    if (!S.st.rated && !localStorage.getItem(`intro|${S.who}`)) intro(0);
+    else showItem();
   } else if (S.st.waiting) {
     const at = new Date(S.st.waiting.next_at);
     $("waitMsg").textContent = `Thank you! More rounds open ` +
@@ -337,6 +351,23 @@ async function load() {
     show("end");
   }
   renderBar();
+}
+
+// First visit: the guide one piece at a time (copied from the guide panel), then the first abstract.
+const INTRO = [["#gGoal", "#gAlone"], ['.pick[data-g="2"]'], ['.pick[data-g="1"]'], ['.pick[data-g="0"]'],
+               ['.pick[data-g="U"]'], ["#gSame"]];
+function intro(n) {
+  if (n >= INTRO.length) {
+    localStorage.setItem(`intro|${S.who}`, "1");
+    showItem();
+    $("saved").textContent = "Start grading!";
+    return setTimeout(() => { $("saved").textContent = ""; }, 4000);
+  }
+  S.introAt = n;
+  const nodes = INTRO[n].map((q) => $("rubric").querySelector(q).cloneNode(true));
+  $("introBody").replaceChildren(...(nodes[0].matches(".pick") ? [el("dl", nodes)] : nodes));
+  $("introStep").textContent = `${n + 1} of ${INTRO.length}`;
+  show("intro");
 }
 
 // Flag/note typed on an unrated abstract are kept in this browser until it is rated.
@@ -501,7 +532,7 @@ function openNote() { $("note").focus(); }
 for (const b of document.querySelectorAll(".rate[data-g], .pick"))
   b.onclick = () => answer(b.dataset.g === "U" ? "U" : +b.dataset.g);
 for (const [id, fn] of [["flagBtn", toggleFlag], ["prevBtn", () => move(-1)], ["contBtn", continueOn], ["backBtn", () => move(-1)],
-                        ["nextBtn", load], ["moreBtn", more]])
+                        ["nextBtn", load], ["moreBtn", more], ["introBtn", () => intro(S.introAt + 1)]])
   $(id).onclick = (e) => { e.currentTarget.blur(); fn(); };
 $("noteBtn").onclick = openNote;
 $("pubmed").onclick = $("pubmed").onauxclick = (e) => e.currentTarget.blur();  // opens in a new tab; keep the rating keys here
@@ -535,7 +566,8 @@ document.addEventListener("keydown", (e) => {
     else if (k === "ArrowRight") move(1);
     else if (k === "c") continueOn();
     else if (k !== "Enter" && k !== " ") return;  // Enter/Space: never click a focused button here
-  } else if (S.screen === "end" && S.st.more && k === "Enter") more();
+  } else if (S.screen === "intro" && k === "Enter") intro(S.introAt + 1);
+  else if (S.screen === "end" && S.st.more && k === "Enter") more();
   else if (S.screen === "done") {
     if (k === "Enter" || k === "ArrowRight") load();
     else if (k === "Backspace" || k === "ArrowLeft") move(-1);
