@@ -234,3 +234,14 @@ bge-base-gaf − bge-base +0.015 (p = 0.11, 7/12).
     cross-encoders (from MedCPT-CE and bge-reranker-base) by graded practice
     nDCG@10. Comparator: the best off-the-shelf reranker from the C1
     candidates by the same score. Both re-sort the C1 first pass.
+- 2026-10-19 12:31 (Dan's calibration labelling, round 1 of 20 done):
+  - **Disclosed:** in chat, Dan was told that PMID 29276004 (Straub et al.
+    2018) is curator-cited for RHOBTB2 x early-infantile DEE, before he had
+    graded it (it is in that round's second part). Calibration item
+    ENSG00000008853|MONDO_0800491|29276004 is no longer blind to stratum and
+    is left out of the judge-agreement stats.
+  - **Labelling app only:** the PMID and a PubMed link appear after an
+    abstract is rated (the grade is still made from the abstract alone, as
+    the judges did); the disease synonyms are shown open (the judges saw them
+    all); the guide says looking up disease terms is fine, looking up the
+    paper is not. Rubric text and LLM grades unchanged.
