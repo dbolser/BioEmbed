@@ -39,7 +39,8 @@
   .seg { flex: 1; height: .6rem; background: var(--panel); border: 1px solid var(--line); border-radius: 99px; }
   .seg.on { background: var(--accent); border-color: var(--accent); }
   .seg.cur { height: .9rem; border: 2px solid var(--fg); }  /* the abstract on screen */
-  #pubmed { color: var(--accent); text-underline-offset: .2em; }  /* up here, not in the footer: no button jump */
+  #source { margin: 1rem 0 0; font-size: .85em; color: var(--muted); }
+  #pubmed { color: var(--accent); text-underline-offset: .2em; }
 
   /* layout */
   main { padding: 1rem 1.5rem calc(var(--foot-h) + 2rem); }
@@ -134,7 +135,6 @@
   <div class="stats">
     <b id="roundNo"></b><span id="level"></span><span id="rated"></span>
     <span class="track" id="track" role="img" hidden></span><span id="pcount"></span>
-    <a id="pubmed" target="_blank" rel="noopener" hidden></a>
   </div>
 </header>
 
@@ -147,6 +147,7 @@
   <section id="sLabel" hidden>
     <div class="cols">
       <article><div id="pair"></div><h1 id="title"></h1><div id="abs"></div>
+        <p id="source"><a id="pubmed" target="_blank" rel="noopener"></a><span id="srcNote"></span></p>
         <div id="noteRow"><label for="note">Note <kbd>N</kbd></label><textarea id="note" rows="3" autocomplete="off" placeholder="Optional"></textarea></div></article>
       <aside id="rubric">
         <h2>Guide to rating</h2>
@@ -259,7 +260,6 @@ function show(screen) {
   for (const [s, id] of [["name", "sName"], ["label", "sLabel"], ["done", "sDone"], ["wait", "sWait"], ["end", "sEnd"]])
     $(id).hidden = s !== screen;
   $("controls").hidden = screen !== "label";
-  if (screen !== "label") $("pubmed").hidden = true;
   $("track").hidden = $("pcount").hidden = $("pairMini").hidden = !(screen === "label" || screen === "done");
 }
 
@@ -290,7 +290,7 @@ function renderPair(r) {
     const body = el("div", el("span", main, `what hl ${cls}`));
     if (extra) body.append(" ", extra);
     if (more.length) {
-      const chips = more.map((m) => el("span", m, "chip")), note = info ? [" ", info] : [];
+      const chips = more.flatMap((m) => [" ", el("span", m, "chip")]), note = info ? [" ", info] : [];  // spaces: double-click selects one name
       body.append(more.length > 8  // long lists can be folded, but start open: the judges saw them all
         ? Object.assign(el("details", [el("summary", [`${moreLabel} (${more.length})`, ...note]), ...chips], "also"), { open: true })
         : el("div", [el("span", [moreLabel, ...note], "lbl"), ...chips], "also"));
@@ -360,13 +360,14 @@ function showItem() {
   S.flag = !!d.flag;
   $("flagBtn").setAttribute("aria-pressed", S.flag);
   $("note").value = d.note || "";
-  const prev = S.items[S.i - 1], pm = it.pmid ? ["", it.pmid] : prev?.pmid ? ["Previous: ", prev.pmid] : null;
-  $("pubmed").hidden = !pm;
-  if (pm) Object.assign($("pubmed"), { textContent: `${pm[0]}PMID ${pm[1]} ↗`, href: `https://pubmed.ncbi.nlm.nih.gov/${pm[1]}/` });
+  $("pubmed").hidden = !it.pmid;  // only once rated: the grade is made from the abstract alone
+  if (it.pmid) Object.assign($("pubmed"), { textContent: `PMID ${it.pmid} on PubMed ↗`, href: `https://pubmed.ncbi.nlm.nih.gov/${it.pmid}/` });
+  $("srcNote").textContent = it.pmid ? " · Grade from the abstract alone." : "Grade from the abstract alone. The PubMed link appears after you rate.";
   $("contBtn").hidden = S.i >= firstOpen();
   $("err").textContent = "";
   window.scrollTo(0, 0);
   renderBar();
+  remember();
   timer.start();
 }
 
@@ -380,6 +381,7 @@ function showDone() {
     : `${left} more round${left > 1 ? "s" : ""} to level ${s.level + 1}.`;
   $("doneCount").textContent = `${s.rated} abstracts rated so far.`;
   renderBar();
+  remember();
 }
 
 let savedTimer;
@@ -425,6 +427,24 @@ async function leave(it) {  // before moving off an item: save a changed flag/no
   if (!it.label) putDraft(it);
   return true;
 }
+
+// Browser history: one entry per abstract visited in this round (the done screen is S.i = n).
+function remember() {
+  const st = { k: S.st.round.key, i: S.i }, h = history.state;
+  if (h?.k === st.k && h.i === st.i) return;
+  history[h?.k === st.k ? "pushState" : "replaceState"](st, "");
+}
+const visit = serial(async (st) => {  // browser back/forward: go there if it is in this round and reachable
+  const here = S.screen === "label" || S.screen === "done";
+  if (!here || st?.k !== S.st.round.key || st.i > firstOpen()) {
+    if (S.st?.round) history.replaceState({ k: S.st.round.key, i: S.i }, "");
+    return;
+  }
+  if (S.screen === "label" && !(await leave(S.items[S.i]))) return;
+  S.i = st.i;
+  showItem();
+});
+window.addEventListener("popstate", (e) => visit(e.state));
 
 const firstOpen = () => { const j = S.items.findIndex((it) => !it.label); return j < 0 ? S.items.length : j; };
 
