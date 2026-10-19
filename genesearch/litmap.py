@@ -43,9 +43,10 @@ def warm_up():
 
 
 def build(vecs: np.ndarray, texts: list[str] | None, titles: list[str] | None, symbol: str, skip_words: set[str],
-          job) -> dict:
+          job, within: str = "") -> dict:
     """Coordinates, cluster per paper (-1 = no cluster) and the clusters, biggest first.
-    Without texts (warm-up) it stops after the layout."""
+    Without texts (warm-up) it stops after the layout. within = the topic all these papers come
+    from (a drill-in), for naming."""
     from umap import UMAP
     from umap.umap_ import nearest_neighbors
 
@@ -58,7 +59,7 @@ def build(vecs: np.ndarray, texts: list[str] | None, titles: list[str] | None, s
         if job and text:
             job.step(text)
 
-    phase("start", f"Finding similar papers ({n:,} papers)")
+    phase("start", "Finding similar papers")
     knn = nearest_neighbors(vecs, k, "cosine", {}, False, None, n_jobs=N_JOBS)
     phase("neighbours", "Grouping papers by topic (UMAP to 12 dimensions, then HDBSCAN)")
     u12 = UMAP(n_components=12, n_neighbors=k, min_dist=0.0, metric="cosine", precomputed_knn=knn,
@@ -85,7 +86,7 @@ def build(vecs: np.ndarray, texts: list[str] | None, titles: list[str] | None, s
                          "x": float(np.median(xy[m, 0])), "y": float(np.median(xy[m, 1])),
                          "examples": [titles[i] for i in near if titles[i]]})
     phase("terms")
-    named = name_clusters(symbol, clusters)
+    named = name_clusters(symbol, clusters, within)
     phase("names")
     return {"x": np.round(xy[:, 0], 3).tolist(), "y": np.round(xy[:, 1], 3).tolist(), "c": labels.tolist(),
             "clusters": clusters, "named_by": "llm" if named else "terms", "timings_s": took}
@@ -133,11 +134,11 @@ def topics(u12: np.ndarray, most: int = MAX_TOPICS, outliers: float = 0.1) -> np
     return best
 
 
-def name_clusters(symbol: str, clusters: list[dict]) -> bool:
+def name_clusters(symbol: str, clusters: list[dict], within: str = "") -> bool:
     """Set each cluster's name: the LLM's if it answers (True), else its top 3 terms, taking first
     the terms no other cluster has ('cystic fibrosis' is a top term of most CFTR topics, so it
     doesn't tell them apart)."""
-    names = llm_names(symbol, clusters)
+    names = llm_names(symbol, clusters, within)
     shared = Counter(t for cl in clusters for t in set(cl["terms"]))
     for cl in clusters:
         terms = sorted(cl["terms"], key=lambda t: shared[t] > 1)  # stable: own terms first, in rank order
@@ -214,7 +215,7 @@ def _llm_config() -> dict | None:
     return cfg if cfg.get("token") else None
 
 
-def llm_names(symbol: str, clusters: list[dict]) -> dict[str, str]:
+def llm_names(symbol: str, clusters: list[dict], within: str = "") -> dict[str, str]:
     """{cluster id: short name} from the LLM, or {} (no key, no answer, or nothing to name)."""
     global _llm_down_until
     cfg = _llm_config()
@@ -222,7 +223,9 @@ def llm_names(symbol: str, clusters: list[dict]) -> dict[str, str]:
         return {}
     blocks = [f"Cluster {c['id']} ({c['n']} papers)\nTerms: {', '.join(c['terms'])}\nExample titles:\n" +
               "\n".join(f"- {t[:160]}" for t in c["examples"][:5]) for c in clusters]
-    prompt = (f"These are topic clusters from a map of PubMed papers about the human gene {symbol}. For each "
+    about = f"the human gene {symbol}" + (f", all from its topic \"{within}\", so name what sets each "
+                                           "cluster apart within it" if within else "")
+    prompt = (f"These are topic clusters from a map of PubMed papers about {about}. For each "
               "cluster you get its most distinctive terms and some typical titles. Give each cluster a short, "
               "plain-English name of 2 to 5 words that a biologist would recognise, naming its topic (for example "
               "a disease, a process, a method, a tissue or an organism). Do not put the gene symbol in the names, "
