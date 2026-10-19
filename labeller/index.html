@@ -53,6 +53,7 @@
   .also { font-size: .9em; margin-top: .2rem; }
   .also summary { cursor: pointer; color: var(--muted); }
   .lbl { color: var(--muted); margin-right: .4rem; }
+  .def { cursor: help; }
   .chip { display: inline-block; margin: .15rem .35rem .15rem 0; padding: 0 .5em; line-height: 1.5;
           border: 1px solid var(--line); border-radius: 99px; background: var(--bg); }
   .info { width: 1.5em; height: 1.5em; padding: 0; border: 1px solid var(--line); border-radius: 99px; background: var(--bg);
@@ -301,6 +302,8 @@ function renderPair(r) {
   $("pair").replaceChildren(
     line("Gene", r.gene.symbol, r.gene.name, "g", r.gene.aliases, "Also called"),
     line("Disease", r.disease.name, "", "d", r.disease.synonyms, "Synonyms", info));
+  const what = $("pair").querySelectorAll(".what")[1];  // hover the disease name for its definition
+  if (r.disease.description) Object.assign(what, { title: `${r.disease.description}\n\n(Definition from Open Targets 26.06 / EFO)`, className: `${what.className} def` });
   $("pairMini").replaceChildren(el("span", r.gene.symbol, "hl g"), " × ", el("span", r.disease.name, "hl d"));
   $("pairMini").title = `${r.gene.symbol} (${r.gene.name}) × ${r.disease.name}`;
 }
