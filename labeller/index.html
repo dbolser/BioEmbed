@@ -82,6 +82,7 @@
   #rubric dt { font-weight: 700; font-size: 1.15em; line-height: 1.35; }
   #rubric dd { margin: 0; }
   #rubric p { margin: .3rem 0; }
+  .goal { list-style: none; margin: .2rem 0 .5rem; padding-left: 1.2rem; }
   #tRubric { display: none; }
   kbd { font: inherit; font-weight: 700; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px;
         padding: 0 .3em; background: var(--bg); color: var(--fg); }
@@ -123,7 +124,9 @@
   .card button.alt { background: var(--panel); color: var(--fg); border-color: var(--line); }
   #introBody { text-align: left; background: var(--panel); border-radius: 10px; padding: .8rem 1.2rem; }
   #introBody p { margin: .4rem 0; }
-  #introBody dl, #introBody dd { margin: 0; }
+  #introBody dl { margin: .4rem 0 .4rem 1.5rem; }
+  #introBody dd { margin: 0; }
+  #introBody .pick + .pick { margin-top: .5rem; }
   #introBody .pick { display: grid; grid-template-columns: 1.6em 1fr; gap: .4rem; }
   #introBody dt { font-weight: 700; font-size: 1.15em; }
   #introStep { color: var(--muted); font-size: .85em; }
@@ -157,7 +160,8 @@
         <div id="noteRow"><label for="note">Note <kbd>N</kbd></label><textarea id="note" rows="3" autocomplete="off" placeholder="Optional"></textarea></div></article>
       <aside id="rubric">
         <h2>Guide to rating</h2>
-        <p id="gGoal"><b>Goal: would a good gene–disease search show this paper?</b> 2 = yes, the paper we want. 1 = a near miss. 0 = no.</p>
+        <div id="gGoal"><p><b>Goal: would a good gene–disease search show this paper?</b></p>
+          <ul class="goal"><li>2 = yes, the paper we want.</li><li>1 = a near miss.</li><li>0 = no.</li></ul></div>
         <p id="gAlone">Grade from the abstract alone to keep the comparison fair. Looking up disease info is fine.</p>
         <dl>
           <div class="pick" data-g="2" title="Rate 2"><dt>2</dt><dd><b>Evidence.</b> The abstract reports evidence that this gene (or a homolog) is involved in this disease, a synonym or a subtype, including in a model of the disease.</dd></div>
@@ -165,7 +169,7 @@
           <div class="pick" data-g="0" title="Rate 0"><dt>0</dt><dd><b>Unrelated.</b> Either an unrelated disease, the gene alone (e.g. basic research), or not this gene at all.</dd></div>
           <div class="pick" data-g="U" title="Rate unsure"><dt>U</dt><dd><b>Unsure.</b> If you can't decide 2, 1, or 0. Optionally leave a note before rating.</dd></div>
         </dl>
-        <p id="gSame"><b>Same disease, or related?</b> This disease by another name, a subtype of a broader disease, or the disease described only by its symptoms: all count as the same disease. Rate a broader disease as 1 or 0 unless the study includes this disease. Use your own scientific judgement to decide whether two different diseases are related, e.g. epilepsy and schizophrenia.</p>
+        <p id="gSame"><b>Same disease, or related?</b> This disease by another name, a subtype of a broader disease, or the disease described only by its symptoms: all count as <b>the same disease</b>. Rate a broader disease as 1 or 0 unless the study includes this disease. Use your own scientific judgement to decide whether two different diseases are related, e.g. epilepsy and schizophrenia.</p>
         <h3>Shortcuts</h3>
         <p><kbd>F</kbd>&nbsp;flag &nbsp; <kbd>N</kbd>&nbsp;note &nbsp; <kbd>&larr;</kbd>&nbsp;back &nbsp; <kbd>&rarr;</kbd>&nbsp;forward &nbsp; <kbd>C</kbd>&nbsp;continue &nbsp; <kbd>Esc</kbd>&nbsp;leave the note</p>
         <p>Key: <span class="hl g">gene</span> &nbsp;<span class="hl d">disease</span></p>
@@ -364,8 +368,10 @@ function intro(n) {
     return setTimeout(() => { $("saved").textContent = ""; }, 4000);
   }
   S.introAt = n;
-  const nodes = INTRO[n].map((q) => $("rubric").querySelector(q).cloneNode(true));
-  $("introBody").replaceChildren(...(nodes[0].matches(".pick") ? [el("dl", nodes)] : nodes));
+  const copy = (q) => $("rubric").querySelector(q).cloneNode(true);  // each step adds to what is shown
+  const picks = INTRO.slice(1, n + 1).flat().filter((q) => q.startsWith(".pick")).map(copy);
+  $("introBody").replaceChildren(...INTRO[0].map(copy), ...(picks.length ? [el("dl", picks)] : []),
+                                 ...(n === INTRO.length - 1 ? INTRO[n].map(copy) : []));
   $("introStep").textContent = `${n + 1} of ${INTRO.length}`;
   show("intro");
 }
