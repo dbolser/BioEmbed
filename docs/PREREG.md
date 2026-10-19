@@ -280,3 +280,7 @@ bge-base-gaf − bge-base +0.015 (p = 0.11, 7/12).
   so each round gets 2-3 extra labellers once ~10 blocks are done, for
   human-human agreement. A test run by "big al" was deleted at Dan's request
   (backup kept in labeller/).
+- 2026-10-19 16:23 (labelling app only): guide wording ("Rate a broader disease as 1 or 0
+  unless the study includes this disease"; "Grade from the abstract alone to
+  keep the comparison fair. Looking up disease info is fine"); new labellers
+  first step through the guide one piece at a time.
