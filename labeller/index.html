@@ -107,9 +107,9 @@
            background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }  /* floats: no layout jump */
   #saved:empty { display: none; }
   #err { color: #b00020; font-weight: 700; font-size: .85em; }
-  #noteRow { margin-top: .5rem; }
-  #noteRow label { font-size: .85em; }
-  #note { flex: 1; min-width: 12rem; max-width: 60ch; font: inherit; font-size: .85em; padding: .3rem .6rem;
+  #noteRow { display: grid; gap: .3rem; margin-top: 1.5rem; }  /* under the abstract; Esc leaves the box */
+  #noteRow label { font-size: .85em; color: var(--muted); }
+  #note { width: 100%; resize: vertical; font: inherit; font-size: .9em; line-height: 1.5; padding: .4rem .6rem;
           border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); }
 
   /* full-screen messages */
@@ -146,19 +146,20 @@
 
   <section id="sLabel" hidden>
     <div class="cols">
-      <article><div id="pair"></div><h1 id="title"></h1><div id="abs"></div></article>
+      <article><div id="pair"></div><h1 id="title"></h1><div id="abs"></div>
+        <div id="noteRow"><label for="note">Note <kbd>N</kbd></label><textarea id="note" rows="3" autocomplete="off" placeholder="Optional"></textarea></div></article>
       <aside id="rubric">
         <h2>Guide to rating</h2>
         <p><b>Goal: would a good gene–disease search show this paper?</b> 2 = yes, the paper we want. 1 = a near miss. 0 = no.</p>
         <p>Grade from the abstract alone. Looking up disease terms is fine; looking up the paper isn't. The PubMed link appears after you rate.</p>
         <dl>
-          <div class="pick" data-g="2" title="Rate 2"><dt>2</dt><dd><b>Evidence.</b> The abstract reports evidence that this gene (or a homolog) is involved in this disease, a synonym or a subtype, including in a model of the disease (e.g. human neurons in a dish, or a knockout mouse).</dd></div>
-          <div class="pick" data-g="1" title="Rate 1"><dt>1</dt><dd><b>Related or mention.</b> The abstract discusses both the gene and the disease, but either indirectly or in a related disease (for you to decide).</dd></div>
-          <div class="pick" data-g="0" title="Rate 0"><dt>0</dt><dd><b>Unrelated.</b> An unrelated disease, the gene with no disease (basic research), or not this gene at all.</dd></div>
+          <div class="pick" data-g="2" title="Rate 2"><dt>2</dt><dd><b>Evidence.</b> The abstract reports evidence that this gene (or a homolog) is involved in this disease, a synonym or a subtype, including in a model of the disease.</dd></div>
+          <div class="pick" data-g="1" title="Rate 1"><dt>1</dt><dd><b>Related or mention.</b> The abstract discusses both the gene and the disease, but either indirectly or in a related disease (see below).</dd></div>
+          <div class="pick" data-g="0" title="Rate 0"><dt>0</dt><dd><b>Unrelated.</b> Either an unrelated disease, the gene alone (e.g. basic research), or not this gene at all.</dd></div>
         </dl>
-        <p><b>Same disease, or related?</b> This disease by another name, a subtype of a broad disease, or the disease described only by its symptoms: all count as this disease. Don't count a broader disease as the same unless the study includes this disease (rate it 1 or 0).</p>
+        <p><b>Same disease, or related?</b> This disease by another name, a subtype of a broader disease, or the disease described only by its symptoms: all count as the same disease. Don't count a broader disease as the same unless the study includes this disease (rate it 1 or 0). Use your own scientific judgement to decide whether two different diseases are related, e.g. epilepsy and schizophrenia.</p>
         <h3>Shortcuts</h3>
-        <p><kbd>U</kbd>&nbsp;unsure &nbsp; <kbd>F</kbd>&nbsp;flag &nbsp; <kbd>N</kbd>&nbsp;note &nbsp; <kbd>&larr;</kbd>&nbsp;back &nbsp; <kbd>&rarr;</kbd>&nbsp;forward &nbsp; <kbd>C</kbd>&nbsp;continue</p>
+        <p><kbd>U</kbd>&nbsp;unsure &nbsp; <kbd>F</kbd>&nbsp;flag &nbsp; <kbd>N</kbd>&nbsp;note &nbsp; <kbd>&larr;</kbd>&nbsp;back &nbsp; <kbd>&rarr;</kbd>&nbsp;forward &nbsp; <kbd>C</kbd>&nbsp;continue &nbsp; <kbd>Esc</kbd>&nbsp;leave the note</p>
         <p>Key: <span class="hl g">gene</span> &nbsp;<span class="hl d">disease</span></p>
       </aside>
     </div>
@@ -197,10 +198,6 @@
     <button class="rate small" id="prevBtn"><kbd>&larr;</kbd>Back</button>
     <button class="rate small" id="contBtn" hidden><kbd>C</kbd>Continue</button>
     <span id="saved" aria-live="polite"></span><span id="err" aria-live="assertive"></span>
-  </div>
-  <div class="row" id="noteRow" hidden>
-    <label for="note">Note</label>
-    <input id="note" autocomplete="off" placeholder="optional (Enter or Esc to leave the box)">
   </div>
 </footer>
 
@@ -362,7 +359,6 @@ function showItem() {
   S.flag = !!d.flag;
   $("flagBtn").setAttribute("aria-pressed", S.flag);
   $("note").value = d.note || "";
-  $("noteRow").hidden = !(S.flag || $("note").value);
   const prev = S.items[S.i - 1], pm = it.pmid ? ["", it.pmid] : prev?.pmid ? ["Previous: ", prev.pmid] : null;
   $("pubmed").hidden = !pm;
   if (pm) Object.assign($("pubmed"), { textContent: `${pm[0]}PMID ${pm[1]} ↗`, href: `https://pubmed.ncbi.nlm.nih.gov/${pm[1]}/` });
@@ -461,7 +457,6 @@ const toggleFlag = serial(async () => {  // F only flips the flag; N opens the n
   const it = S.items[S.i];
   S.flag = !S.flag;
   $("flagBtn").setAttribute("aria-pressed", S.flag);
-  if (S.flag) $("noteRow").hidden = false;
   if (!it.label) return putDraft(it);
   if (await save()) saidSaved(S.flag ? "Flag saved." : "Flag removed.");
 });
@@ -473,7 +468,7 @@ const saveNote = serial(async () => {
   if (changed() && await save()) saidSaved("Note saved.");
 });
 
-function openNote() { $("noteRow").hidden = false; $("note").focus(); }
+function openNote() { $("note").focus(); }
 
 // Mouse
 for (const b of document.querySelectorAll(".rate[data-g], .pick"))
@@ -497,7 +492,7 @@ $("who").onclick = () => {
 // Keyboard
 document.addEventListener("keydown", (e) => {
   if (e.target.id === "note") {
-    if (e.key === "Escape" || e.key === "Enter") { e.preventDefault(); e.target.blur(); }
+    if (e.key === "Escape") { e.preventDefault(); e.target.blur(); }  // Enter is a new line
     return;
   }
   if (e.target.matches("input, textarea") || e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
