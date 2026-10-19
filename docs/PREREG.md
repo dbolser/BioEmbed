@@ -268,3 +268,8 @@ bge-base-gaf − bge-base +0.015 (p = 0.11, 7/12).
     "same phenotype in a model organism" (cell models). The judges' rubric and
     grades are unchanged; agreement is reported with the labels split at this
     point.
+- 2026-10-19 14:52 (labelling app only, Dan's wording): small edits to the human guide
+  (model examples dropped from 2; 0 reads "the gene alone (e.g. basic
+  research)"); the related-disease note adds "Use your own scientific
+  judgement to decide whether two different diseases are related, e.g.
+  epilepsy and schizophrenia". Note box moved under the abstract.
