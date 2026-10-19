@@ -96,21 +96,12 @@ def as_list(v) -> list[str]:
 
 
 # --- highlighting ---------------------------------------------------------------------------
-# Kinds: 'g' gene, 'd' disease (name or synonym), 'dp' part of a disease name (a broader or
-# related name, shown lighter so it does not suggest "same disease").
+# Kinds: 'g' gene, 'd' disease (name or synonym). Only listed names are marked: whether a broader
+# or related name counts as this disease is for the labeller to judge, unprompted.
 
 GREEK = {"alpha": "α", "beta": "β", "gamma": "γ", "delta": "δ", "kappa": "κ"}
-STOP = {"a", "an", "the", "of", "and", "or", "and/or", "with", "to", "in", "due", "for", "by", "on",
-        "type", "form", "onset", "associated", "related", "induced"}
-GENERIC = {"disease", "diseases", "disorder", "disorders", "syndrome", "syndromes", "type", "form",
-           "deficiency", "cancer", "carcinoma", "tumor", "tumour", "neoplasm", "infection", "defect",
-           "abnormality", "familial", "hereditary", "congenital", "inherited", "autosomal", "dominant",
-           "recessive", "x-linked", "early", "late", "onset", "juvenile", "adult", "childhood", "primary",
-           "chronic", "acute", "severe", "mild", "generalized", "generalised", "localized", "isolated",
-           "progressive", "syndromic", "non-syndromic", "nonsyndromic", "rare"}
-TRAIL = re.compile(r"\s+(?:(?i:type|form|group)\s+)?(?:\d+[A-Za-z]?|[IVX]+)$")  # '... type 2A', '... 5'
 ABBR = re.compile(r"\s*\(([A-Z][A-Za-z0-9αβγδκ-]{1,11})\)")                    # '... fibrosis (IPF)'
-PRIORITY = {"d": 0, "dp": 1, "g": 2}  # on equal spans, disease wins (gene aliases like ALS, CF)
+PRIORITY = {"d": 0, "g": 1}  # on equal spans, disease wins (gene aliases like ALS, CF)
 
 
 def sym_pat(s: str) -> str:
@@ -131,29 +122,6 @@ def compile_terms(pats) -> re.Pattern | None:
     return re.compile(rf"(?<![A-Za-z0-9])(?:{'|'.join(pats)})(?![A-Za-z0-9])") if pats else None
 
 
-def disease_partials(terms: list[str]) -> list[str]:
-    """Broader names hidden in long disease names: the part before the first comma, a part after
-    'and/or', trailing numbers/types dropped, and head phrases with leading qualifiers dropped
-    ('Generalized junctional epidermolysis bullosa' -> 'junctional epidermolysis bullosa',
-    'epidermolysis bullosa')."""
-    exact, out = {t.casefold() for t in terms}, set()
-    for t in terms:
-        segs = [s.strip() for s in t.split(",")]
-        heads = [segs[0]] + [re.sub(r"^(?:and/or|and|or)\s+", "", s) for s in segs[1:]
-                             if re.match(r"(?:and/or|and|or)\s", s)]
-        for head in heads:
-            head = TRAIL.sub("", head)
-            w = head.split()
-            for c in [head] + [" ".join(w[k:]) for k in range(1, len(w) - 1)]:
-                cw = c.split()
-                if (c.casefold() in exact or not cw or cw[0].lower() in STOP or not cw[0][0].isalpha()
-                        or (len(cw) == 1 and len(c) < 5)
-                        or not any(len(x) >= 4 and x.lower() not in GENERIC for x in cw)):
-                    continue
-                out.add(c)
-    return sorted(out)
-
-
 def matchers(gene: dict, disease: dict) -> list[tuple[str, re.Pattern, bool]]:
     """[(kind, regex, mid_sentence_only)]. Gene symbols are case-sensitive (CAT the gene, not the
     cat). Upper-case symbols also match the zebrafish form (zmynd10) and mouse form (Cfh); for
@@ -171,7 +139,6 @@ def matchers(gene: dict, disease: dict) -> list[tuple[str, re.Pattern, bool]]:
     if len(gene["name"]) > 3:
         strict.append(name_pat(gene["name"]))
     out = [("d", compile_terms(name_pat(t) for t in dterms if len(t) > 1), False),
-           ("dp", compile_terms(name_pat(t) for t in disease_partials(dterms)), False),
            ("g", compile_terms(strict), False), ("g", compile_terms(mid), True)]
     return [m for m in out if m[1]]
 
@@ -187,7 +154,7 @@ def find_spans(text: str, ms: list[tuple[str, re.Pattern, bool]]) -> list[tuple[
 
 
 def segments(text: str, ms) -> list[list[str]]:
-    """Split text into [chunk, kind] with kind 'g', 'd', 'dp' or '' (plain). Longest span wins."""
+    """Split text into [chunk, kind] with kind 'g', 'd' or '' (plain). Longest span wins."""
     spans = sorted(find_spans(text, ms), key=lambda s: (s[0], s[0] - s[1], PRIORITY[s[2]]))
     out, pos = [], 0
     for a, b, k in spans:
