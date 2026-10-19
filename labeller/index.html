@@ -152,7 +152,7 @@
       <aside id="rubric">
         <h2>Guide to rating</h2>
         <p><b>Goal: would a good gene–disease search show this paper?</b> 2 = yes, the paper we want. 1 = a near miss. 0 = no.</p>
-        <p>Grade from the abstract alone. Looking up disease terms is fine; looking up the paper isn't. The PubMed link appears after you rate.</p>
+        <p>Grade from the abstract alone. Looking up disease terms is fine; looking up the paper isn't.</p>
         <dl>
           <div class="pick" data-g="2" title="Rate 2"><dt>2</dt><dd><b>Evidence.</b> The abstract reports evidence that this gene (or a homolog) is involved in this disease, a synonym or a subtype, including in a model of the disease.</dd></div>
           <div class="pick" data-g="1" title="Rate 1"><dt>1</dt><dd><b>Related or mention.</b> The abstract discusses both the gene and the disease, but either indirectly or in a related disease (see below).</dd></div>
@@ -185,6 +185,7 @@
   <section id="sEnd" class="card" hidden>
     <h1>All rounds finished</h1>
     <p class="big" id="endMsg"></p>
+    <button class="go" id="moreBtn" hidden>More rounds <kbd>Enter</kbd></button>
   </section>
 </main>
 
@@ -331,7 +332,8 @@ async function load() {
       `${at.toLocaleString([], { weekday: "long", hour: "2-digit", minute: "2-digit" })}.`;
     show("wait");
   } else {
-    $("endMsg").textContent = `You rated ${S.st.rated} abstracts. Thank you!`;
+    $("endMsg").textContent = `You rated ${S.st.rated} abstracts. Thank you!` + (S.st.more ? " Up for a few more rounds?" : "");
+    $("moreBtn").hidden = !S.st.more;
     show("end");
   }
   renderBar();
@@ -360,9 +362,8 @@ function showItem() {
   S.flag = !!d.flag;
   $("flagBtn").setAttribute("aria-pressed", S.flag);
   $("note").value = d.note || "";
-  $("pubmed").hidden = !it.pmid;  // only once rated: the grade is made from the abstract alone
-  if (it.pmid) Object.assign($("pubmed"), { textContent: `PMID ${it.pmid} on PubMed ↗`, href: `https://pubmed.ncbi.nlm.nih.gov/${it.pmid}/` });
-  $("srcNote").textContent = it.pmid ? " · Grade from the abstract alone." : "Grade from the abstract alone. The PubMed link appears after you rate.";
+  Object.assign($("pubmed"), { textContent: `PMID ${it.pmid} on PubMed ↗`, href: `https://pubmed.ncbi.nlm.nih.gov/${it.pmid}/` });
+  $("srcNote").textContent = " · Please grade from the abstract alone.";
   $("contBtn").hidden = S.i >= firstOpen();
   $("err").textContent = "";
   window.scrollTo(0, 0);
@@ -473,6 +474,11 @@ const continueOn = serial(async () => {  // C: after going back, on to the first
   showItem();
 });
 
+const more = serial(async () => {  // a labeller with a block of rounds asks for another block
+  try { await api("/api/more", { labeller: S.who }); } catch (e) { alert(`Couldn't get more rounds: ${e.message}`); return; }
+  await load();
+});
+
 const toggleFlag = serial(async () => {  // F only flips the flag; N opens the note box
   if (S.screen !== "label") return;
   const it = S.items[S.i];
@@ -495,7 +501,7 @@ function openNote() { $("note").focus(); }
 for (const b of document.querySelectorAll(".rate[data-g], .pick"))
   b.onclick = () => answer(b.dataset.g === "U" ? "U" : +b.dataset.g);
 for (const [id, fn] of [["flagBtn", toggleFlag], ["prevBtn", () => move(-1)], ["contBtn", continueOn], ["backBtn", () => move(-1)],
-                        ["nextBtn", load]])
+                        ["nextBtn", load], ["moreBtn", more]])
   $(id).onclick = (e) => { e.currentTarget.blur(); fn(); };
 $("noteBtn").onclick = openNote;
 $("pubmed").onclick = $("pubmed").onauxclick = (e) => e.currentTarget.blur();  // opens in a new tab; keep the rating keys here
@@ -529,7 +535,8 @@ document.addEventListener("keydown", (e) => {
     else if (k === "ArrowRight") move(1);
     else if (k === "c") continueOn();
     else if (k !== "Enter" && k !== " ") return;  // Enter/Space: never click a focused button here
-  } else if (S.screen === "done") {
+  } else if (S.screen === "end" && S.st.more && k === "Enter") more();
+  else if (S.screen === "done") {
     if (k === "Enter" || k === "ArrowRight") load();
     else if (k === "Backspace" || k === "ArrowLeft") move(-1);
     else return;

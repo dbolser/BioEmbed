@@ -4,9 +4,16 @@ Serve:  uv run python app.py --items items_demo.parquet --port 8765 --host 0.0.0
 Export: uv run python app.py --export      # -> export/labels.csv and export/labels.parquet
 
 Blindness: the browser never receives item_id, round_id, stratum or is_repeat, only opaque
-handles that differ between a first look and a repeat. It gets an item's pmid (for a PubMed link)
-only once that item, in that pass, is rated, so the grade comes from the abstract alone, as the
-judges' did.
+handles that differ between a first look and a repeat. It does get each item's pmid, for a PubMed
+link under the abstract, with a reminder to grade from the abstract alone (as the judges did).
+
+Labellers: those named in --full (default: dan) get every round, with repeats. Anyone else gets a
+block of --block rounds (default 5), shown whole with no repeats, and may ask for another block
+when done. Blocks overlap so every pair of neighbouring labellers shares a round: block s starts
+at round (B-1)*(s mod W) + offset(s div W), W = ceil(R/(B-1)), offsets 0, (B-1)/2, ... so each
+wave of W blocks covers all R rounds and later waves straddle the earlier seams. A new labeller
+takes the lowest block not held by someone who has rated (or was handed it in the last 2 hours);
+a second block for the same labeller is the free one that overlaps their own rounds least.
 
 Repeats: a round with is_repeat items is shown in two parts of equal size. Part 1 holds most of the
 fresh abstracts (including the repeat items' first look). Part 2 holds the rest of the fresh
@@ -52,6 +59,9 @@ CREATE TABLE IF NOT EXISTS labels (
     updated_at TEXT NOT NULL,
     PRIMARY KEY (labeller, item_id, pass),
     CHECK ((grade IS NULL) = (unsure = 1))
+);
+CREATE TABLE IF NOT EXISTS blocks (       -- rounds handed out to labellers not in --full
+    labeller TEXT NOT NULL, slot INTEGER NOT NULL, at TEXT NOT NULL, PRIMARY KEY (labeller, slot)
 );
 CREATE TABLE IF NOT EXISTS log (          -- append-only: every submission, for audit
     at TEXT NOT NULL, labeller TEXT NOT NULL, item_id TEXT NOT NULL, pass INTEGER NOT NULL,
@@ -189,7 +199,7 @@ def highlight(title: str, abstract: str, ms) -> dict:
 # --- items and scheduling -------------------------------------------------------------------
 
 class Items:
-    def __init__(self, path: Path, gap: int, hours: float, diseases: Path | None = None):
+    def __init__(self, path: Path, gap: int, hours: float, diseases: Path | None = None, block: int = 5):
         df = pd.read_parquet(path)
         if missing := sorted(set(REQUIRED) - set(df.columns)):
             raise SystemExit(f"{path}: missing columns {missing}")
@@ -198,7 +208,7 @@ class Items:
         df["is_repeat"] = df.is_repeat.fillna(False).astype(bool)
         if df.item_id.duplicated().any():
             raise SystemExit(f"{path}: duplicate item_id")
-        self.gap, self.hours = gap, hours
+        self.gap, self.hours, self.size = gap, hours, block
         about = {}  # disease id (last part of round_id) -> definition, as Open Targets gives it
         if diseases and diseases.exists():
             d = pd.read_parquet(diseases, columns=["id", "description"]).dropna()
@@ -220,9 +230,20 @@ class Items:
         self.round_by_handle = {handle(rid, k): (rid, k) for rid, r in self.rounds.items()
                                 for k in ([0, 1] if r["repeat"] else [0])}
 
-    def order(self, who: str) -> list[tuple[str, int]]:
-        """(round_id, part): first parts in file order; each second part inserted at a seeded spot
-        at least `gap` rounds after its first part."""
+    def block(self, s: int) -> list[str]:
+        """Round ids of block s (see the module docstring)."""
+        ids, step = list(self.rounds), max(1, self.size - 1)
+        w = -(-len(ids) // step)
+        offs = [0, step // 2, step // 4, 3 * step // 4]
+        start = step * (s % w) + offs[(s // w) % len(offs)] + s // (w * len(offs))
+        return [ids[(start + j) % len(ids)] for j in range(min(self.size, len(ids)))]
+
+    def order(self, who: str, rids: list[str] | None = None) -> list[tuple[str, int]]:
+        """(round_id, part). Given rids (a block labeller): those rounds, whole. Else every round:
+        first parts in file order; each second part inserted at a seeded spot at least `gap`
+        rounds after its first part."""
+        if rids is not None:
+            return [(rid, 0) for rid in dict.fromkeys(rids)]
         rng, order = seeded(who, "order"), [(rid, 0) for rid in self.rounds]
         for rid, r in self.rounds.items():
             if r["repeat"]:
@@ -230,10 +251,10 @@ class Items:
                 order.insert(rng.randint(lo, len(order)), (rid, 1))
         return order
 
-    def part(self, who: str, rid: str, k: int) -> list[tuple[str, int]]:
-        """Shuffled (item_id, pass) list for part k of a round."""
+    def part(self, who: str, rid: str, k: int, whole: bool = False) -> list[tuple[str, int]]:
+        """Shuffled (item_id, pass) list for part k of a round (whole: all of it, no repeats)."""
         r = self.rounds[rid]
-        if not r["repeat"]:
+        if whole or not r["repeat"]:
             parts = [[(i, 0) for i in r["ids"]]]
         else:
             fresh = [i for i in r["ids"] if i not in r["repeat"]]
@@ -260,7 +281,11 @@ class LabelIn(BaseModel):
     expect: str | None = None  # updated_at the client last saw (None = not yet rated)
 
 
-def create_app(items: Items, db_path: Path) -> FastAPI:
+class MoreIn(BaseModel):
+    labeller: str = Field(min_length=1, max_length=64)
+
+
+def create_app(items: Items, db_path: Path, full: set[str] = frozenset({"dan"})) -> FastAPI:
     app = FastAPI(title="labeller", docs_url=None, redoc_url=None)
 
     @contextmanager
@@ -278,12 +303,38 @@ def create_app(items: Items, db_path: Path) -> FastAPI:
             raise HTTPException(422, "empty labeller name")
         return s
 
+    def blocks(who: str, more: bool = False) -> list[int] | None:
+        """The labeller's block slots (None = every round), handing out one if none, or one
+        more if asked."""
+        if who in full:
+            return None
+        with db() as con:
+            con.execute("BEGIN IMMEDIATE")
+            mine = [r[0] for r in con.execute("SELECT slot FROM blocks WHERE labeller = ? ORDER BY at", (who,))]
+            if mine and not more:
+                return mine
+            recent = (now() - timedelta(hours=2)).isoformat(timespec="milliseconds")
+            taken = {r[0] for r in con.execute(
+                "SELECT slot FROM blocks b WHERE at > ? OR EXISTS (SELECT 1 FROM labels l WHERE l.labeller = b.labeller)",
+                (recent,))}
+            have = {rid for s in mine for rid in items.block(s)}
+            free = [s for s in range(10_000) if s not in taken and s not in mine][: 4 * len(items.rounds)]
+            s = min(free, key=lambda s: (len(have & set(items.block(s))), s))
+            con.execute("INSERT INTO blocks VALUES (?, ?, ?)", (who, s, now().isoformat(timespec="milliseconds")))
+            return [*mine, s]
+
+    def plan(who: str) -> tuple[list[tuple[str, int]], bool]:
+        """(order of (round_id, part), whole rounds?) for this labeller."""
+        slots = blocks(who)
+        rids = None if slots is None else [rid for s in slots for rid in items.block(s)]
+        return items.order(who, rids), slots is not None
+
     def progress(who: str) -> dict:
         with db() as con:
             labs = {(r["item_id"], r["pass"]): r for r in
                     con.execute("SELECT * FROM labels WHERE labeller = ?", (who,))}
-        order = items.order(who)
-        parts = {k: items.part(who, *k) for k in order}
+        order, whole = plan(who)
+        parts = {k: items.part(who, *k, whole) for k in order}
         n_done = {k: sum(x in labs for x in parts[k]) for k in order}
         done = [k for k in order if n_done[k] == len(parts[k])]
         started = [k for k in order if 0 < n_done[k] < len(parts[k])]
@@ -300,7 +351,7 @@ def create_app(items: Items, db_path: Path) -> FastAPI:
                 "current": started[0] if started else pick,
                 "next_at": min((t for k, t in locked.items() if k not in ready), default=None),
                 "stats": {"rounds_done": len(done), "n_rounds": len(order), "rated": len(labs),
-                          "level": len(done) // 2 + 1}}
+                          "level": len(done) // 2 + 1, "more": whole}}
 
     def shown(lab: sqlite3.Row | None) -> dict | None:
         return lab and {"grade": lab["grade"], "unsure": bool(lab["unsure"]), "flag": bool(lab["flag"]),
@@ -322,7 +373,7 @@ def create_app(items: Items, db_path: Path) -> FastAPI:
                 "key": handle(rid, k), "number": len(pr["done"]) + 1, "gene": r["gene"], "disease": r["disease"],
                 "items": [{"key": handle(i, p), "title": items.items[i]["title"],
                            "abstract": items.items[i]["abstract"], "label": shown(pr["labs"].get((i, p))),
-                           **({"pmid": items.items[i]["pmid"]} if (i, p) in pr["labs"] else {})}
+                           "pmid": items.items[i]["pmid"]}
                           for i, p in pr["parts"][pr["current"]]]}
         elif pr["next_at"]:
             out["waiting"] = {"next_at": pr["next_at"].isoformat(timespec="seconds")}
@@ -333,7 +384,8 @@ def create_app(items: Items, db_path: Path) -> FastAPI:
         who = name(x.labeller)
         if (rk := items.round_by_handle.get(x.round)) is None:
             raise HTTPException(404, "unknown round")
-        if (ip := {handle(i, p): (i, p) for i, p in items.part(who, *rk)}.get(x.item)) is None:
+        order, whole = plan(who)
+        if rk not in order or (ip := {handle(i, p): (i, p) for i, p in items.part(who, *rk, whole)}.get(x.item)) is None:
             raise HTTPException(404, "item not in round")
         if (x.grade is None) != x.unsure:
             raise HTTPException(422, "give a grade 0/1/2, or unsure with no grade")
@@ -352,6 +404,15 @@ def create_app(items: Items, db_path: Path) -> FastAPI:
             con.execute("INSERT INTO log VALUES (:at, :labeller, :item_id, :pass, :grade, :unsure, :flag, "
                         ":note, :seconds)", row)
         return {**progress(who)["stats"], "updated_at": row["at"], "pmid": row["pmid"]}
+
+    @app.post("/api/more")
+    def more(x: MoreIn):
+        """Another block, for a labeller (not in --full) who has finished theirs."""
+        who = name(x.labeller)
+        if who in full or progress(who)["current"]:
+            raise HTTPException(409, "finish the rounds you have first")
+        blocks(who, more=True)
+        return progress(who)["stats"]
 
     @app.get("/api/export")
     def export_endpoint():
@@ -376,6 +437,8 @@ def main():
     ap.add_argument("--items", default=os.environ.get("LABELLER_ITEMS"), help="items parquet (or $LABELLER_ITEMS)")
     ap.add_argument("--db", type=Path, default=HERE / "labels.sqlite")
     ap.add_argument("--diseases", type=Path, default=OT_DISEASES, help="Open Targets disease index, for the definitions shown on hover (skipped if missing)")
+    ap.add_argument("--full", nargs="*", default=["dan"], help="labellers who get every round, with repeats")
+    ap.add_argument("--block", type=int, default=5, help="rounds per block for everyone else")
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--port", type=int, default=8765)
     ap.add_argument("--repeat-gap", type=int, default=2, help="min rounds between a round's two parts")
@@ -388,7 +451,8 @@ def main():
     if not a.items:
         ap.error("--items (or $LABELLER_ITEMS) is required")
     import uvicorn
-    uvicorn.run(create_app(Items(Path(a.items), a.repeat_gap, a.repeat_hours, a.diseases), a.db),
+    uvicorn.run(create_app(Items(Path(a.items), a.repeat_gap, a.repeat_hours, a.diseases, a.block), a.db,
+                           {n.strip().lower() for n in a.full}),
                 host=a.host, port=a.port, log_level="warning")
 
 

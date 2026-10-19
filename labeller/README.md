@@ -16,3 +16,8 @@ The browser only ever sees opaque handles: no item_id, stratum or repeat flag, a
 (for the PubMed link) only once it is rated.
 Item builders should clean `gene_aliases` as `make_demo_items.py` does (drop ≤2 chars, approved or
 shared symbols, disease names), since aliases drive the gene highlighting.
+
+Several labellers: `--full dan` (default) get every round with repeats; anyone else gets a block of
+`--block 5` rounds, whole, no repeats, overlapping their neighbours' blocks by a round, and can ask
+for another block when done (`blocks` table). Every abstract shows its PMID and a PubMed link, with
+a reminder to grade from the abstract alone.
