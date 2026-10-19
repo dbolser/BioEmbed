@@ -256,3 +256,15 @@ bge-base-gaf − bge-base +0.015 (p = 0.11, 7/12).
     disease, the gene with no disease, or not this gene). The rubric text the
     judges saw and their grades are unchanged. The 12 labels made before this
     are kept and reported with and without.
+- 2026-10-19 14:32 (Dan's calibration labelling, 16 of 200 rated; Dan's wording):
+  - **Labelling app only: the human guide's grade definitions are now
+    reworded and no longer verbatim the judges' rubric.** 2: "evidence that
+    this gene (or a homolog) is involved in this disease, a synonym or a
+    subtype, including in a model of the disease (e.g. human neurons in a
+    dish, or a knockout mouse)". 1: "discusses both the gene and the disease,
+    but either indirectly or in a related disease (for you to decide)". The
+    "same disease, or related?" note now says a broader disease counts only if
+    the study includes this disease. The 2 wording is broader than the judges'
+    "same phenotype in a model organism" (cell models). The judges' rubric and
+    grades are unchanged; agreement is reported with the labels split at this
+    point.
