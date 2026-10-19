@@ -273,3 +273,10 @@ bge-base-gaf − bge-base +0.015 (p = 0.11, 7/12).
   research)"); the related-disease note adds "Use your own scientific
   judgement to decide whether two different diseases are related, e.g.
   epilepsy and schizophrenia". Note box moved under the abstract.
+- 2026-10-19 16:00 (labelling app; Dan's decision): **every abstract now shows its PMID
+  and a PubMed link** before rating, with a reminder to grade from the
+  abstract alone. **More labellers:** Dan grades all 20 rounds (with
+  repeats); colleagues get overlapping blocks of 5 whole rounds (no repeats),
+  so each round gets 2-3 extra labellers once ~10 blocks are done, for
+  human-human agreement. A test run by "big al" was deleted at Dan's request
+  (backup kept in labeller/).
