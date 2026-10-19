@@ -245,3 +245,14 @@ bge-base-gaf − bge-base +0.015 (p = 0.11, 7/12).
     the judges did); the disease synonyms are shown open (the judges saw them
     all); the guide says looking up disease terms is fine, looking up the
     paper is not. Rubric text and LLM grades unchanged.
+- 2026-10-19 14:13 (Dan's calibration labelling, 12 of 200 rated; agreed with Dan):
+  - **Labelling app only, a clarification of the rubric, not a change:**
+    the guide now opens with the goal ("would a good gene-disease search
+    show this paper? 2 = yes, 1 = a near miss, 0 = no") and a "same disease,
+    or related?" note (another name, a subtype, or the disease described by
+    its signs count as this disease; a broader name only if the abstract
+    shows the patients have it; evidence in a related or broader disease is
+    1). Short labels: 1 "Related or mention", 0 "Unrelated" (an unrelated
+    disease, the gene with no disease, or not this gene). The rubric text the
+    judges saw and their grades are unchanged. The 12 labels made before this
+    are kept and reported with and without.
