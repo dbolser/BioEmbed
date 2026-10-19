@@ -15,7 +15,6 @@
     --dis-bg: #fde0c5;  --dis-ul: #c24e00;          /* disease: vermillion fill, dashed underline */
     --top-h: 6rem; --foot-h: 5rem;                  /* measured by JS */
   }
-  body.big   { --fs: 24px; }
   body.cream { --bg: #fbf6e8; --panel: #f1e9d4; --line: #d8ccb0; }
   * { box-sizing: border-box; }
   body {
@@ -36,8 +35,10 @@
   #who { font-size: .8em; cursor: pointer; }
   .stats { display: flex; flex-wrap: wrap; align-items: center; gap: .2rem 1rem; margin-top: .25rem; font-size: .8em; color: var(--muted); }
   .stats b { color: var(--fg); }
-  .track { flex: 1 1 8rem; height: .6rem; background: var(--panel); border: 1px solid var(--line); border-radius: 99px; overflow: hidden; }
-  #pbar { height: 100%; width: 0; background: var(--accent); transition: width .25s; }
+  .track { flex: 1 1 8rem; display: flex; align-items: center; gap: 3px; height: .9rem; }
+  .seg { flex: 1; height: .6rem; background: var(--panel); border: 1px solid var(--line); border-radius: 99px; }
+  .seg.on { background: var(--accent); border-color: var(--accent); }
+  .seg.cur { height: .9rem; border: 2px solid var(--fg); }  /* the abstract on screen */
 
   /* layout */
   main { padding: 1rem 1.5rem calc(var(--foot-h) + 2rem); }
@@ -53,6 +54,10 @@
   .lbl { color: var(--muted); margin-right: .4rem; }
   .chip { display: inline-block; margin: .15rem .35rem .15rem 0; padding: 0 .5em; line-height: 1.5;
           border: 1px solid var(--line); border-radius: 99px; background: var(--bg); }
+  .info { width: 1.5em; height: 1.5em; padding: 0; border: 1px solid var(--line); border-radius: 99px; background: var(--bg);
+          color: var(--muted); font-size: .8em; font-weight: 700; line-height: 1; vertical-align: .1em; }
+  #synSrc { max-width: min(26rem, calc(100vw - 2rem)); padding: .7rem 1rem; font-size: .85em; line-height: 1.5; color: var(--fg);
+            background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 6px 24px rgba(0,0,0,.25); }
 
   /* abstract */
   #title { font-size: 1.1em; line-height: 1.45; margin: .2rem 0 1rem; }
@@ -60,7 +65,7 @@
   .hl { border-radius: 3px; padding: 0 .08em; text-underline-offset: .22em; text-decoration-thickness: 2px; text-decoration-line: underline; }
   .g  { background: var(--gene-bg); text-decoration-style: solid;  text-decoration-color: var(--gene-ul); }
   .d  { background: var(--dis-bg);  text-decoration-style: dashed; text-decoration-color: var(--dis-ul); }
-  .dp { text-decoration-style: dotted; text-decoration-color: var(--dis-ul); text-decoration-thickness: 3px; }
+  .dp { text-decoration-line: none; padding: 0 .15em; border: 2px dotted var(--dis-ul); -webkit-box-decoration-break: clone; box-decoration-break: clone; }
 
   /* rubric: sticky beside the abstract, kept clear of the top bar and the button bar */
   #rubric { position: sticky; top: calc(var(--top-h) + 1rem); max-height: calc(100vh - var(--top-h) - var(--foot-h) - 2rem);
@@ -92,6 +97,7 @@
   .rate[aria-pressed="true"] { border-color: var(--accent); background: var(--accent); color: #fff; }
   .rate.small { font-size: .85em; }
   .gap { width: 1rem; }
+  #pubmed { margin-left: auto; font-size: .85em; color: var(--accent); text-underline-offset: .2em; }
   #saved { position: fixed; right: 1.5rem; bottom: calc(var(--foot-h) + .5rem); font-size: .85em; padding: .15rem .7rem;
            background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }  /* floats: no layout jump */
   #saved:empty { display: none; }
@@ -116,14 +122,13 @@
 <header id="top">
   <div class="bar">
     <span id="pairMini"></span>
-    <button class="tog" id="tRubric" aria-pressed="false" title="Show the rubric (R)">Rubric <kbd>R</kbd></button>
-    <button class="tog" id="tBig" aria-pressed="false" title="Larger text">A+</button>
+    <button class="tog" id="tRubric" aria-pressed="false" title="Show the guide to rating (R)">Guide <kbd>R</kbd></button>
     <button class="tog" id="tCream" aria-pressed="false" title="Cream background">Cream</button>
     <span id="who" title="Click to switch labeller"></span>
   </div>
   <div class="stats">
     <b id="roundNo"></b><span id="level"></span><span id="rated"></span>
-    <span class="track" id="track" hidden><span id="pbar" style="display:block"></span></span><span id="pcount"></span>
+    <span class="track" id="track" role="img" hidden></span><span id="pcount"></span>
   </div>
 </header>
 
@@ -137,16 +142,18 @@
     <div class="cols">
       <article><div id="pair"></div><h1 id="title"></h1><div id="abs"></div></article>
       <aside id="rubric">
-        <h2>How to rate</h2>
+        <h2>Guide to rating</h2>
         <dl>
           <dt>2</dt><dd><b>Evidence.</b> The abstract reports evidence that this gene is involved in this disease (or a synonym, subtype, or the same phenotype in a model organism of the gene).</dd>
           <dt>1</dt><dd><b>Both, not evidence.</b> The abstract discusses both, but the link is not its evidence (a review mention, a candidate in a screen with no result, or a related disease).</dd>
           <dt>0</dt><dd><b>Otherwise.</b></dd>
         </dl>
-        <p><kbd>U</kbd> unsure &nbsp; <kbd>F</kbd> flag &nbsp; <kbd>N</kbd> note &nbsp; <kbd>&larr;</kbd> back &nbsp; <kbd>&rarr;</kbd> forward</p>
-        <p><span class="hl g">gene</span> &nbsp;<span class="hl d">disease</span> &nbsp;<span class="hl dp">part of the disease name</span> (broader or related)</p>
+        <p>Grade from the abstract alone. The PubMed link appears after you rate.</p>
+        <p><kbd>U</kbd>&nbsp;unsure &nbsp; <kbd>F</kbd>&nbsp;flag &nbsp; <kbd>N</kbd>&nbsp;note &nbsp; <kbd>&larr;</kbd>&nbsp;back &nbsp; <kbd>&rarr;</kbd>&nbsp;forward &nbsp; <kbd>C</kbd>&nbsp;continue</p>
+        <p><span class="hl g">gene</span> &nbsp;<span class="hl d">disease</span> &nbsp;<span class="hl dp">partial match</span> (a broader or related name)</p>
       </aside>
     </div>
+    <div id="synSrc" popover>From the Open Targets disease index (release 26.06, built on the EFO ontology): the names it lists as exact synonyms. The LLM judges saw the same list.</div>
   </section>
 
   <section id="sDone" class="card" hidden>
@@ -178,6 +185,8 @@
     <button class="rate small" id="flagBtn" aria-pressed="false"><kbd>F</kbd>Flag problem</button>
     <button class="rate small" id="noteBtn"><kbd>N</kbd>Note</button>
     <button class="rate small" id="prevBtn"><kbd>&larr;</kbd>Back</button>
+    <button class="rate small" id="contBtn" hidden><kbd>C</kbd>Continue</button>
+    <a id="pubmed" target="_blank" rel="noopener" hidden></a>
     <span id="saved" aria-live="polite"></span><span id="err" aria-live="assertive"></span>
   </div>
   <div class="row" id="noteRow" hidden>
@@ -222,7 +231,7 @@ bars.observe($("top"));
 bars.observe($("controls"));
 
 // Display toggles, remembered in this browser.
-for (const [id, cls] of [["tBig", "big"], ["tCream", "cream"], ["tRubric", "rubricOpen"]]) {
+for (const [id, cls] of [["tCream", "cream"], ["tRubric", "rubricOpen"]]) {
   const set = (on) => { document.body.classList.toggle(cls, on); $(id).setAttribute("aria-pressed", on);
                         localStorage.setItem(cls, on ? "1" : ""); };
   set(!!localStorage.getItem(cls));
@@ -260,27 +269,31 @@ function renderBar() {
   $("rated").textContent = s ? `${s.rated} rated` : "";
   $("who").textContent = S.who;
   if (r) {
-    const n = S.items.length, k = S.items.filter((it) => it.label).length;
-    $("pbar").style.width = `${100 * k / n}%`;
-    $("pcount").textContent = S.screen === "done" ? `${n} of ${n}` : `Abstract ${Math.min(S.i + 1, n)} of ${n}`;
+    const n = S.items.length, k = S.items.filter((it) => it.label).length, done = S.screen === "done", at = Math.min(S.i + 1, n);
+    $("track").replaceChildren(...S.items.map((it, j) => el("span", [], `seg${it.label ? " on" : ""}${!done && j === S.i ? " cur" : ""}`)));
+    $("track").setAttribute("aria-label", done ? `All ${n} abstracts rated` : `Abstract ${at} of ${n}; ${k} rated`);
+    $("pcount").textContent = done ? `${n} of ${n}` : `Abstract ${at} of ${n}`;
   }
 }
 
 function renderPair(r) {
-  const line = (tag, main, extra, cls, more, moreLabel) => {
+  const line = (tag, main, extra, cls, more, moreLabel, info) => {
     const body = el("div", el("span", main, `what hl ${cls}`));
     if (extra) body.append(" ", extra);
     if (more.length) {
-      const chips = more.map((m) => el("span", m, "chip"));
-      body.append(more.length > 8
-        ? el("details", [el("summary", `${moreLabel} (${more.length})`), ...chips], "also")
-        : el("div", [el("span", moreLabel, "lbl"), ...chips], "also"));
+      const chips = more.map((m) => el("span", m, "chip")), note = info ? [" ", info] : [];
+      body.append(more.length > 8  // long lists can be folded, but start open: the judges saw them all
+        ? Object.assign(el("details", [el("summary", [`${moreLabel} (${more.length})`, ...note]), ...chips], "also"), { open: true })
+        : el("div", [el("span", [moreLabel, ...note], "lbl"), ...chips], "also"));
     }
     return el("div", [el("span", tag, "tag"), body], "prow");
   };
+  const info = Object.assign(el("button", "i", "info"), { title: "Where the synonyms come from", ariaLabel: "Where the synonyms come from",
+                                                          onclick: (e) => e.currentTarget.blur() });
+  info.setAttribute("popovertarget", "synSrc");
   $("pair").replaceChildren(
     line("Gene", r.gene.symbol, r.gene.name, "g", r.gene.aliases, "Also called"),
-    line("Disease", r.disease.name, "", "d", r.disease.synonyms, "Synonyms"));
+    line("Disease", r.disease.name, "", "d", r.disease.synonyms, "Synonyms", info));
   $("pairMini").replaceChildren(el("span", r.gene.symbol, "hl g"), " × ", el("span", r.disease.name, "hl d"));
   $("pairMini").title = `${r.gene.symbol} (${r.gene.name}) × ${r.disease.name}`;
 }
@@ -332,6 +345,10 @@ function showItem() {
   $("flagBtn").setAttribute("aria-pressed", S.flag);
   $("note").value = d.note || "";
   $("noteRow").hidden = !(S.flag || $("note").value);
+  const prev = S.items[S.i - 1], pm = it.pmid ? ["", it.pmid] : prev?.pmid ? ["Previous: ", prev.pmid] : null;
+  $("pubmed").hidden = !pm;
+  if (pm) Object.assign($("pubmed"), { textContent: `${pm[0]}PMID ${pm[1]} ↗`, href: `https://pubmed.ncbi.nlm.nih.gov/${pm[1]}/` });
+  $("contBtn").hidden = S.i >= firstOpen();
   $("err").textContent = "";
   window.scrollTo(0, 0);
   renderBar();
@@ -377,6 +394,7 @@ async function save(g) {
   it.carry = 0;
   timer.start();
   it.label = { grade: body.grade, unsure: body.unsure, flag: body.flag, note: body.note, updated_at: res.updated_at };
+  it.pmid = res.pmid;
   localStorage.removeItem(draftKey(it));
   return true;
 }
@@ -385,6 +403,15 @@ function changed() {  // flag/note differ from what is stored for the current it
   const lab = S.items[S.i].label || {};
   return S.flag !== !!lab.flag || $("note").value.trim() !== (lab.note || "");
 }
+
+async function leave(it) {  // before moving off an item: save a changed flag/note, else keep its time (and draft)
+  if (it.label && changed()) return save();
+  it.carry = (it.carry || 0) + timer.secs();
+  if (!it.label) putDraft(it);
+  return true;
+}
+
+const firstOpen = () => { const j = S.items.findIndex((it) => !it.label); return j < 0 ? S.items.length : j; };
 
 const answer = serial(async (g) => {
   if (S.screen !== "label" || performance.now() - S.shownAt < DWELL) return;
@@ -400,10 +427,14 @@ const move = serial(async (step) => {  // step -1 back, +1 forward (forward only
   if (S.screen === "done") { if (step < 0) { S.i = S.items.length - 1; showItem(); } return; }
   if (S.screen !== "label") return;
   const it = S.items[S.i];
-  if ((step > 0 && !it.label) || (step < 0 && S.i === 0)) return;
-  if (it.label && changed()) { if (!(await save())) return; }
-  else { it.carry = (it.carry || 0) + timer.secs(); if (!it.label) putDraft(it); }
+  if ((step > 0 && !it.label) || (step < 0 && S.i === 0) || !(await leave(it))) return;
   S.i += step;
+  showItem();
+});
+
+const continueOn = serial(async () => {  // C: after going back, on to the first unrated abstract (or round done)
+  if (S.screen !== "label" || S.i >= firstOpen() || !(await leave(S.items[S.i]))) return;
+  S.i = firstOpen();
   showItem();
 });
 
@@ -429,9 +460,11 @@ function openNote() { $("noteRow").hidden = false; $("note").focus(); }
 // Mouse
 for (const b of document.querySelectorAll(".rate[data-g]"))
   b.onclick = () => answer(b.dataset.g === "U" ? "U" : +b.dataset.g);
-for (const [id, fn] of [["flagBtn", toggleFlag], ["prevBtn", () => move(-1)], ["backBtn", () => move(-1)], ["nextBtn", load]])
+for (const [id, fn] of [["flagBtn", toggleFlag], ["prevBtn", () => move(-1)], ["contBtn", continueOn], ["backBtn", () => move(-1)],
+                        ["nextBtn", load]])
   $(id).onclick = (e) => { e.currentTarget.blur(); fn(); };
 $("noteBtn").onclick = openNote;
+$("pubmed").onclick = (e) => e.currentTarget.blur();  // opens in a new tab; keep the rating keys here
 $("note").oninput = () => { if (!S.items[S.i]?.label) putDraft(S.items[S.i]); };
 $("note").onchange = () => saveNote();
 $("nameForm").onsubmit = (e) => {
@@ -451,6 +484,7 @@ document.addEventListener("keydown", (e) => {
   }
   if (e.target.matches("input, textarea") || e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
   const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+  if ((k === "Enter" || k === " ") && e.target.matches("a, [popovertarget]")) return;  // PubMed link, synonyms note
   if (k === "r" || (k === "Escape" && document.body.classList.contains("rubricOpen"))) $("tRubric").click();
   else if (S.screen === "label") {
     if (k === "0" || k === "1" || k === "2") answer(+k);
@@ -459,6 +493,7 @@ document.addEventListener("keydown", (e) => {
     else if (k === "n") openNote();
     else if (k === "Backspace" || k === "ArrowLeft") move(-1);
     else if (k === "ArrowRight") move(1);
+    else if (k === "c") continueOn();
     else if (k !== "Enter" && k !== " ") return;  // Enter/Space: never click a focused button here
   } else if (S.screen === "done") {
     if (k === "Enter" || k === "ArrowRight") load();
