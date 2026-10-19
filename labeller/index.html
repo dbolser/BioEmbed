@@ -53,12 +53,12 @@
   .also { font-size: .9em; margin-top: .2rem; }
   .also summary { cursor: pointer; color: var(--muted); }
   .lbl { color: var(--muted); margin-right: .4rem; }
-  .def { cursor: help; }
   .chip { display: inline-block; margin: .15rem .35rem .15rem 0; padding: 0 .5em; line-height: 1.5;
           border: 1px solid var(--line); border-radius: 99px; background: var(--bg); }
   .info { width: 1.5em; height: 1.5em; padding: 0; border: 1px solid var(--line); border-radius: 99px; background: var(--bg);
           color: var(--muted); font-size: .8em; font-weight: 700; line-height: 1; vertical-align: .1em; }
-  #synSrc { max-width: min(26rem, calc(100vw - 2rem)); padding: .7rem 1rem; font-size: .85em; line-height: 1.5; color: var(--fg);
+  #defSrc p { margin: 0 0 .4rem; }
+  #synSrc, #defSrc { max-width: min(26rem, calc(100vw - 2rem)); padding: .7rem 1rem; font-size: .85em; line-height: 1.5; color: var(--fg);
             background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 6px 24px rgba(0,0,0,.25); }
 
   /* abstract */
@@ -71,7 +71,8 @@
   /* rubric: sticky beside the abstract, kept clear of the top bar and the button bar */
   #rubric { position: sticky; top: calc(var(--top-h) + 1rem); max-height: calc(100vh - var(--top-h) - var(--foot-h) - 2rem);
             overflow-y: auto; background: var(--panel); border-radius: 10px; padding: .8rem 1rem; font-size: .8em; line-height: 1.5; }
-  #rubric h2 { font-size: 1em; margin: 0 0 .4rem; }
+  #rubric h2, #rubric h3 { font-size: 1em; margin: 0 0 .4rem; }
+  #rubric h3 { margin-top: .8rem; }
   #rubric dl { margin: 0 0 .8rem; }
   #rubric .pick { display: grid; grid-template-columns: 1.4em 1fr; gap: .4rem; margin: 0 -.4rem .2rem; padding: .25rem .4rem;
                   border-radius: 6px; cursor: pointer; }  /* click a grade to rate */
@@ -149,17 +150,19 @@
       <aside id="rubric">
         <h2>Guide to rating</h2>
         <p><b>Goal: would a good gene–disease search show this paper?</b> 2 = yes, the paper we want. 1 = a near miss. 0 = no.</p>
+        <p>Grade from the abstract alone. Looking up disease terms is fine; looking up the paper isn't. The PubMed link appears after you rate.</p>
         <dl>
-          <div class="pick" data-g="2" title="Rate 2"><dt>2</dt><dd><b>Evidence.</b> The abstract reports evidence that this gene is involved in this disease (or a synonym, subtype, or the same phenotype in a model organism of the gene).</dd></div>
-          <div class="pick" data-g="1" title="Rate 1"><dt>1</dt><dd><b>Related or mention.</b> The abstract discusses both, but the link is not its evidence (a review mention, a candidate in a screen with no result, or a related disease).</dd></div>
+          <div class="pick" data-g="2" title="Rate 2"><dt>2</dt><dd><b>Evidence.</b> The abstract reports evidence that this gene (or a homolog) is involved in this disease, a synonym or a subtype, including in a model of the disease (e.g. human neurons in a dish, or a knockout mouse).</dd></div>
+          <div class="pick" data-g="1" title="Rate 1"><dt>1</dt><dd><b>Related or mention.</b> The abstract discusses both the gene and the disease, but either indirectly or in a related disease (for you to decide).</dd></div>
           <div class="pick" data-g="0" title="Rate 0"><dt>0</dt><dd><b>Unrelated.</b> An unrelated disease, the gene with no disease (basic research), or not this gene at all.</dd></div>
         </dl>
-        <p><b>Same disease, or related?</b> Another name, a subtype, or the disease described only by its signs: all count as this disease. A broader name counts only if the abstract shows the patients have this disease. Evidence in a related or broader disease is 1, not 0.</p>
-        <p>Grade from the abstract alone. Looking up disease terms is fine; looking up the paper isn't. The PubMed link appears after you rate.</p>
+        <p><b>Same disease, or related?</b> This disease by another name, a subtype of a broad disease, or the disease described only by its symptoms: all count as this disease. Don't count a broader disease as the same unless the study includes this disease (rate it 1 or 0).</p>
+        <h3>Shortcuts</h3>
         <p><kbd>U</kbd>&nbsp;unsure &nbsp; <kbd>F</kbd>&nbsp;flag &nbsp; <kbd>N</kbd>&nbsp;note &nbsp; <kbd>&larr;</kbd>&nbsp;back &nbsp; <kbd>&rarr;</kbd>&nbsp;forward &nbsp; <kbd>C</kbd>&nbsp;continue</p>
-        <p><span class="hl g">gene</span> &nbsp;<span class="hl d">disease</span></p>
+        <p>Key: <span class="hl g">gene</span> &nbsp;<span class="hl d">disease</span></p>
       </aside>
     </div>
+    <div id="defSrc" popover></div>
     <div id="synSrc" popover>From the Open Targets disease index (release 26.06, built on the EFO ontology): the names it lists as exact synonyms. The LLM judges saw the same list.</div>
   </section>
 
@@ -254,7 +257,7 @@ async function api(path, body) {
 function show(screen) {
   S.screen = screen;
   if (document.activeElement !== $("note")) document.activeElement?.blur();  // no stray Enter/Space clicks
-  $("synSrc").hidePopover();
+  $("synSrc").hidePopover(); $("defSrc").hidePopover();
   for (const [s, id] of [["name", "sName"], ["label", "sLabel"], ["done", "sDone"], ["wait", "sWait"], ["end", "sEnd"]])
     $(id).hidden = s !== screen;
   $("controls").hidden = screen !== "label";
@@ -296,14 +299,19 @@ function renderPair(r) {
     }
     return el("div", [el("span", tag, "tag"), body], "prow");
   };
-  const info = Object.assign(el("button", "i", "info"), { title: "Where the synonyms come from", ariaLabel: "Where the synonyms come from",
-                                                          onclick: (e) => e.currentTarget.blur() });
-  info.setAttribute("popovertarget", "synSrc");
+  const bubble = (target, what) => {
+    const b = Object.assign(el("button", "i", "info"), { title: what, ariaLabel: what, onclick: (e) => e.currentTarget.blur() });
+    b.setAttribute("popovertarget", target);
+    return b;
+  };
+  const info = bubble("synSrc", "Where the synonyms come from");
   $("pair").replaceChildren(
     line("Gene", r.gene.symbol, r.gene.name, "g", r.gene.aliases, "Also called"),
     line("Disease", r.disease.name, "", "d", r.disease.synonyms, "Synonyms", info));
-  const what = $("pair").querySelectorAll(".what")[1];  // hover the disease name for its definition
-  if (r.disease.description) Object.assign(what, { title: `${r.disease.description}\n\n(Definition from Open Targets 26.06 / EFO)`, className: `${what.className} def` });
+  if (r.disease.description) {  // the disease's definition, in a bubble beside its name
+    $("defSrc").replaceChildren(el("p", r.disease.description), el("p", "Definition from the Open Targets disease index (release 26.06, built on EFO).", "lbl"));
+    $("pair").querySelectorAll(".what")[1].after(" ", bubble("defSrc", "What this disease is"));
+  }
   $("pairMini").replaceChildren(el("span", r.gene.symbol, "hl g"), " × ", el("span", r.disease.name, "hl d"));
   $("pairMini").title = `${r.gene.symbol} (${r.gene.name}) × ${r.disease.name}`;
 }
