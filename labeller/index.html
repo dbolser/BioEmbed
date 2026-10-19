@@ -147,11 +147,13 @@
       <article><div id="pair"></div><h1 id="title"></h1><div id="abs"></div></article>
       <aside id="rubric">
         <h2>Guide to rating</h2>
+        <p><b>Goal: would a good gene–disease search show this paper?</b> 2 = yes, the paper we want. 1 = a near miss. 0 = no.</p>
         <dl>
           <div class="pick" data-g="2" title="Rate 2"><dt>2</dt><dd><b>Evidence.</b> The abstract reports evidence that this gene is involved in this disease (or a synonym, subtype, or the same phenotype in a model organism of the gene).</dd></div>
-          <div class="pick" data-g="1" title="Rate 1"><dt>1</dt><dd><b>Both, not evidence.</b> The abstract discusses both, but the link is not its evidence (a review mention, a candidate in a screen with no result, or a related disease).</dd></div>
-          <div class="pick" data-g="0" title="Rate 0"><dt>0</dt><dd><b>Otherwise.</b> Not 1 or 2.</dd></div>
+          <div class="pick" data-g="1" title="Rate 1"><dt>1</dt><dd><b>Related or mention.</b> The abstract discusses both, but the link is not its evidence (a review mention, a candidate in a screen with no result, or a related disease).</dd></div>
+          <div class="pick" data-g="0" title="Rate 0"><dt>0</dt><dd><b>Unrelated.</b> An unrelated disease, the gene with no disease (basic research), or not this gene at all.</dd></div>
         </dl>
+        <p><b>Same disease, or related?</b> Another name, a subtype, or the disease described only by its signs: all count as this disease. A broader name counts only if the abstract shows the patients have this disease. Evidence in a related or broader disease is 1, not 0.</p>
         <p>Grade from the abstract alone. Looking up disease terms is fine; looking up the paper isn't. The PubMed link appears after you rate.</p>
         <p><kbd>U</kbd>&nbsp;unsure &nbsp; <kbd>F</kbd>&nbsp;flag &nbsp; <kbd>N</kbd>&nbsp;note &nbsp; <kbd>&larr;</kbd>&nbsp;back &nbsp; <kbd>&rarr;</kbd>&nbsp;forward &nbsp; <kbd>C</kbd>&nbsp;continue</p>
         <p><span class="hl g">gene</span> &nbsp;<span class="hl d">disease</span></p>
@@ -182,8 +184,8 @@
 <footer id="controls" hidden>
   <div class="row">
     <button class="rate" data-g="2"><kbd>2</kbd>Evidence</button>
-    <button class="rate" data-g="1"><kbd>1</kbd>Both, not evidence</button>
-    <button class="rate" data-g="0"><kbd>0</kbd>Otherwise</button>
+    <button class="rate" data-g="1"><kbd>1</kbd>Related or mention</button>
+    <button class="rate" data-g="0"><kbd>0</kbd>Unrelated</button>
     <button class="rate" data-g="U"><kbd>U</kbd>Unsure</button>
     <span class="gap"></span>
     <button class="rate small" id="flagBtn" aria-pressed="false"><kbd>F</kbd>Flag problem</button>
@@ -200,7 +202,7 @@
 
 <script>
 const $ = (id) => document.getElementById(id);
-const NAMES = { 2: "2 Evidence", 1: "1 Both, not evidence", 0: "0 Otherwise", U: "Unsure" };
+const NAMES = { 2: "2 Evidence", 1: "1 Related or mention", 0: "0 Unrelated", U: "Unsure" };
 const CHEERS = ["Nice and steady.", "You're in a rhythm now.", "Great focus.", "Lovely careful work.",
                 "Brilliant persistence.", "Still going strong.", "Superb stamina."];
 const VISIT_CAP = 600;  // seconds: a longer visit to one abstract counts as 10 minutes (left idle)
