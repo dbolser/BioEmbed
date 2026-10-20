@@ -20,7 +20,7 @@ import Stemmer
 
 from semantic import CACHE_DIR, digest
 
-LLM_ENV = Path("/home/danbolser/Work/BioEmbed/llm/.env.or-google_gemini-3.1-flash-lite")
+LLM_ENV = Path(__file__).resolve().parent.parent / "llm" / ".env.or-google_gemini-3.1-flash-lite"
 NAMES = CACHE_DIR / "cluster_names.json"
 N_JOBS = int(os.environ.get("GENESEARCH_MAP_JOBS", "32"))
 K = 15  # neighbours (UMAP's default)
