@@ -1,0 +1,49 @@
+{
+  "dataset_revision": "local",
+  "task_name": "GOProteinPairCls",
+  "mteb_version": "2.11.6",
+  "scores": {
+    "test": [
+      {
+        "similarity_accuracy": 0.714,
+        "similarity_f1": 0.714519,
+        "similarity_precision": 0.603306,
+        "similarity_recall": 0.876,
+        "similarity_ap": 0.783753,
+        "cosine_accuracy": 0.722,
+        "cosine_f1": 0.717532,
+        "cosine_precision": 0.603825,
+        "cosine_recall": 0.884,
+        "cosine_ap": 0.800882,
+        "manhattan_accuracy": 0.72,
+        "manhattan_f1": 0.71885,
+        "manhattan_precision": 0.598404,
+        "manhattan_recall": 0.9,
+        "manhattan_ap": 0.800921,
+        "euclidean_accuracy": 0.72,
+        "euclidean_f1": 0.718447,
+        "euclidean_precision": 0.603261,
+        "euclidean_recall": 0.888,
+        "euclidean_ap": 0.801475,
+        "dot_accuracy": 0.714,
+        "dot_f1": 0.714519,
+        "dot_precision": 0.603306,
+        "dot_recall": 0.876,
+        "dot_ap": 0.783753,
+        "max_accuracy": 0.722,
+        "max_f1": 0.71885,
+        "max_precision": 0.603825,
+        "max_recall": 0.9,
+        "max_ap": 0.801475,
+        "main_score": 0.801475,
+        "hf_subset": "default",
+        "languages": [
+          "eng-Latn"
+        ]
+      }
+    ]
+  },
+  "evaluation_time": 105.16776013374329,
+  "kg_co2_emissions": null,
+  "date": null
+}

@@ -1,0 +1,85 @@
+# Confirmatory claims for scripts/claims.py (docs/PREREG.md, "The claims we test").
+# Copy to claims_config.yaml, replace each TODO- stem with the run picked on the practice set
+# (TODO- names are config errors), then check and run (the run is the one look at the test results):
+#   uv run python scripts/claims.py docs/paper/claims_config.yaml --dry-run
+#   uv run python scripts/claims.py docs/paper/claims_config.yaml
+# The claims must be the registered family C1, C2, C3a, C3b, C4-C9. A claim whose runs are missing
+# is 'not run': --dry-run lists it and the real run refuses. A claim a PREREG rule drops is written
+# 'dropped: <reason>' (C4). Each haystack arm run's top 10 must be pooled and graded first
+# (llm/judge_pool.py); the script stops if more than 0.1% of its top-10 pairs lack a grade.
+#
+# Arms (a vs b; effect = a - b):
+#   haystack  run file stems in <haystack>/runs/; a list of several = a fine-tune's seeds, scored
+#             per query by their mean. Test: signflip (graded nDCG@10).
+#   v2        an LLM dir in results/llm_v2/ or a model in results/v2_perquery.parquet.
+#             Test: mcnemar (hit@1, batches 1-4).
+#   suite     models in results/bio_scores.csv. Test: signflip_exact (12 tasks).
+# "Best" is always the pick on the practice set (PREREG change log 2026-10-16 22:00).
+
+sources:  # relative to the repo root
+  haystack: data/haystack/GeneDiseaseHaystack
+  v2_embedders: results/v2_perquery.parquet
+  v2_llms: results/llm_v2
+  suite: results/bio_scores.csv
+merge_gold: false  # true: count curator papers missing from the merged grades as grade 2
+
+claims:
+  C1:
+    question: Does a cheap first pass + a reranker beat the best single embedder?
+    data: haystack
+    test: signflip
+    # first pass: best practice curator-only recall@100 (raw); reranker: best practice graded nDCG@10
+    a: [TODO-ce-reranker-top100-of-first-pass__gene]
+    b: [TODO-best-embedder__gene]
+  C2:
+    question: Does the best embedder beat keyword search (BM25, tuned on practice)?
+    data: haystack
+    test: signflip
+    a: [TODO-best-embedder__gene]
+    b: [bm25-symbol_disease-k0.9-b0.75__gene]
+  C3a:
+    question: Does the best LLM, reading all 4 papers, beat the best embedder (tie, a)?
+    data: v2
+    test: mcnemar
+    a: google__gemini-3.1-flash-lite
+    b: google__embeddinggemma-300m
+  C3b:
+    question: Does the best LLM, reading all 4 papers, beat the best embedder (tie, b)?
+    data: v2
+    test: mcnemar
+    a: google__gemini-3.1-flash-lite
+    b: BMRetriever__BMRetriever-410M
+  C4:
+    question: Is an LLM's edge bigger on pairs where it can name the paper from memory?
+    dropped: Gemini 3.1 Flash-Lite remembers 9 test pairs (< 15); PREREG change log 2026-10-16
+  C5:
+    question: Does our gene-disease fine-tune beat the same model off the shelf?
+    data: haystack
+    test: signflip
+    a: [bioembed__bge-base-gd-s42__gene, bioembed__bge-base-gd-s43__gene, bioembed__bge-base-gd-s44__gene]
+    b: [BAAI__bge-base-en-v1.5__gene]
+  C6:
+    question: Does our fine-tune beat the best published PubMed-trained model of similar size?
+    data: haystack
+    test: signflip
+    a: [bioembed__bge-base-gd-s42__gene, bioembed__bge-base-gd-s43__gene, bioembed__bge-base-gd-s44__gene]
+    # best on practice of MedCPT, BiCA-base, MedEmbed-base, PubMedBERT
+    b: [TODO-best-pubmed-model-under-150M__gene]
+  C7:
+    question: Does the best published PubMed-trained model beat the best general model of similar size?
+    data: haystack
+    test: signflip
+    a: [TODO-best-pubmed-model-under-150M__gene]
+    b: [TODO-best-general-model-under-150M__gene]
+  C8:
+    question: Does our fine-tuned reranker beat the best off-the-shelf reranker?
+    data: haystack
+    test: signflip
+    a: [TODO-ce-bioembed__reranker-gd-s42-top100-of-first-pass__gene]  # list every seed run
+    b: [TODO-ce-best-off-the-shelf-reranker-top100-of-first-pass__gene]
+  C9:
+    question: Is Gemini 3.1 Pro better than Qwen3-Embedding-8B on the 12-task suite? (expect no)
+    data: suite
+    test: signflip_exact
+    a: google__gemini-3.1-pro-preview
+    b: Qwen__Qwen3-Embedding-8B
