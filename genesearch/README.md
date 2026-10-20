@@ -4,7 +4,8 @@ Type a gene, see its literature: PubMed abstracts tagged by PubTator3, Open Targ
 "and..." box that ranks the gene's papers by keywords, by meaning (AI embeddings), or both. A Map tab groups
 the current list into topics; Map Explorer puts the papers on axes you choose.
 
-1. Build the index once (~10-15 min, 61 GB in `index/`): `uv run python build_index.py`
+1. Build the index once (~10-15 min, 61 GB in `index/`; needs `data/gold/ot_curated_gene_disease_pmid.parquet`
+   from the gene-disease work): `cd genesearch && uv run python build_index.py`
 2. Run: `cd genesearch && uv run python app.py --port 8766 --host 0.0.0.0`, then open http://localhost:8766
 3. Type a symbol, alias, old symbol or name (`/` jumps to the box); pick from the list if several genes match.
 4. Optional "and..." words rank the gene's papers (e.g. ZCCHC8 + pulmonary fibrosis); empty = newest first.

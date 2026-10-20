@@ -293,7 +293,9 @@ async function searchGene(push = true) {
   const q = S.gene.trim(), my = ++geneNo;
   $("choices").innerHTML = ""; $("msg").innerHTML = "";
   if (!q) return;
-  const res = await getJSON("/api/resolve?q=" + encodeURIComponent(q));
+  let res;
+  try { res = await getJSON("/api/resolve?q=" + encodeURIComponent(q)); }
+  catch (e) { if (my === geneNo) { clearGene(); $("msg").innerHTML = `<p class="note">Error: ${esc(e.message)}</p>`; } return; }
   if (my !== geneNo) return;
   if (!res.matches.length) {
     clearGene(); $("msg").innerHTML = `<p>No gene found for <b>${esc(q)}</b>. Try a symbol (e.g. CFTR), an alias or part of the name.</p>`;
@@ -318,7 +320,9 @@ function clearGene() { G = null; M = null; $("card").innerHTML = ""; $("dis").in
 
 async function loadGene(g, also, push, picked = false, my = geneNo) {
   if (picked) { S.gene = g.symbol; $("gene").value = g.symbol; }
-  const gene = await getJSON("/api/gene/" + encodeURIComponent(g.hgnc_id));
+  let gene;
+  try { gene = await getJSON("/api/gene/" + encodeURIComponent(g.hgnc_id)); }
+  catch (e) { if (my === geneNo) { clearGene(); $("msg").innerHTML = `<p class="note">Error: ${esc(e.message)}</p>`; } return; }
   if (my !== geneNo) return;  // a newer lookup took over
   G = gene;
   for (const d of [...G.curated, ...G.epmc]) DN[d.disease_id] = d.disease;
@@ -447,8 +451,9 @@ document.addEventListener("click", (e) => {
 // ---- shared top of the results: tabs, active filters, how it works
 function filtersHTML() {
   const f = [];
+  const plain = (html) => Object.assign(document.createElement("div"), {innerHTML: html}).textContent;  // tags and entities out
   const chip = (label, key) => f.push(`<span class="fchip">${label}<button type="button" data-clear="${key}"
-      title="Remove this filter" aria-label="Remove filter: ${esc(label.replace(/<[^>]+>/g, ""))}">✕</button></span>`);
+      title="Remove this filter" aria-label="Remove filter: ${esc(plain(label))}">✕</button></span>`);
   for (const k of ["ot", "ep"]) if (S[k])
     chip(`${srcTag(k)} <b>${S[k] === "any" ? `any ${k === "ot" ? "curated" : "text-mined"} disease` : esc(dname(S[k]))}</b>`, k);
   if (S.q.trim() && !S.rank) chip(`Words: <b>“${esc(S.q.trim())}”</b>`, "q");  // meaning/hybrid rank, not filter
