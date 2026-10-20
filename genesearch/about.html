@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>About this search</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { --bg: #ffffff; --fg: #1d1d1f; --muted: #555; --line: #d8d8d8; --panel: #f4f5f7; --gene: #005a8c; }
+  body.cream { --bg: #fbf5e6; --panel: #f1e9d4; --line: #d9cfb6; }
+  html { font-size: 19px; }
+  body { margin: 0; background: var(--bg); color: var(--fg);
+    font: 1rem/1.65 "Atkinson Hyperlegible", Verdana, "DejaVu Sans", system-ui, sans-serif; }
+  .wrap { max-width: 60rem; margin: 0 auto; padding: 1rem 1.2rem 4rem; }
+  a { color: var(--gene); }
+  h1 { font-size: 1.7rem; margin: 1rem 0 .4rem; }
+  h2 { font-size: 1.3rem; margin: 2rem 0 .5rem; }
+  p, li { max-width: 70ch; }
+  table { border-collapse: collapse; width: 100%; margin: .6rem 0; }
+  th, td { text-align: left; vertical-align: top; padding: .45rem .6rem; border-top: 1px solid var(--line); }
+  th { background: var(--panel); }
+  td.n { white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .muted { color: var(--muted); }
+  ol li { margin: .45rem 0; }
+  code { font-size: .9rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <p><a href="/">← Back to the search</a></p>
+  <h1>About this search</h1>
+  <p>Type a gene, or click “Gene ⇄” to type a disease, and see the PubMed papers about it. Optional words rank
+    those papers by keywords, by meaning (semantic), or both. Everything runs on this computer from the data below, except the AI topic names.</p>
+
+  <h2>The data</h2>
+  <table>
+    <thead><tr><th>Source</th><th>What it gives the search</th><th>Size</th></tr></thead>
+    <tbody id="data"><tr><td colspan="3" class="muted">Loading…</td></tr></tbody>
+  </table>
+
+  <h2>How the map is made</h2>
+  <p>The Map tab groups the papers in the current list into topics and lays them out so that papers close in meaning
+    sit close together. Code: <code>litmap.py</code> (and <code>api_map</code> in <code>app.py</code>).</p>
+  <ol>
+    <li><b>Papers.</b> The current list’s papers that have an abstract, leaving out the facet boxes on the left: on the
+      map those grey out the papers they leave out, rather than making a new map. Above <span class="cap">20,000</span>, a fixed sample of
+      <span class="cap">20,000</span>: chosen by a hash of the PMID, so it is the same sample every time and overlaps across filters.</li>
+    <li><b>Embeddings.</b> Each paper’s 384-number MedEmbed-small vector of its title + abstract (unit length, so cosine
+      similarity is the dot product).</li>
+    <li><b>Neighbours.</b> Each paper’s <span class="k">15</span>-point neighbourhood (itself and its nearest papers, cosine),
+      found once and shared by both UMAP runs below.</li>
+    <li><b>UMAP to 12 dimensions</b> (<code>min_dist</code> 0), for clustering.</li>
+    <li><b>Topics: HDBSCAN on the 12-D points.</b> Run 16 ways: both cluster selection methods (“eom” and “leaf”) ×
+      8 minimum topic sizes (the number of papers ÷ 5, 8, 12, 20, 30, 45, 60, 80; at least 8), <code>min_samples</code> 5.
+      Results with more than <span class="topics">8</span> topics are skipped. In each, papers HDBSCAN leaves out join the topic
+      of their nearest topic paper (12-D), except those among the 10% of all papers it rates least typical (GLOSH
+      outlier score), which stay grey (“no clear topic”). The run kept is the one with the highest score: the effective number of topics (exp of the
+      entropy of the topic sizes) × the share of papers in a topic. Topics are numbered biggest first.</li>
+    <li><b>UMAP to 2 dimensions</b> (<code>min_dist</code> 0.1) from the same neighbours, for drawing. Topics come from the
+      12-D run, so a topic can look split or overlap another in 2-D.</li>
+    <li><b>Topic words.</b> Class-based TF-IDF (c-TF-IDF, as in BERTopic) over the single words and word pairs of the titles
+      and abstracts. Left out: English stop words, words every abstract uses (study, patients, results…), and the gene’s
+      symbols (for a disease, the words of its name and of its commonest PubTator3 wordings). A pair never spans
+      punctuation or a stop word. A term must be in at least max(3, papers ÷ 2,000) papers. Weight = the term’s share of
+      the topic’s terms × log(1 + mean terms per class ÷ the term’s count in all classes); grey papers count as a class
+      too. Six per topic, skipping forms of words already chosen.</li>
+    <li><b>Topic names.</b> <span id="llm">An AI model</span> gets each topic’s words and its 5 most typical titles (nearest the
+      topic’s 12-D centre) and gives each topic a 2–5 word name. Without it, the topic’s 3 most distinctive words (words
+      no other topic has come first).</li>
+    <li><b>Drill in.</b> The same steps on one topic’s papers only; the AI is told they all come from that topic.</li>
+    <li><b>Drawing.</b> One colour per topic; grey = no clear topic. Curated papers are drawn bigger, with a ring.
+      Maps are saved, so a list opens instantly the second time.</li>
+  </ol>
+</div>
+<script>
+const fmt = (n) => n == null ? "?" : n.toLocaleString("en-GB");
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
+const ext = (url, text) => `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(text)}</a>`;
+if (localStorage.getItem("cream")) document.body.classList.add("cream");
+fetch("/api/about").then((r) => r.json()).then((a) => {
+  const rows = [
+    [ext("https://pubmed.ncbi.nlm.nih.gov/", "PubMed") + " (NLM), 2026 annual baseline",
+     "Titles, abstracts, years and journals: the papers. Searched and ranked here.",
+     `${fmt(a.pubmed.n)} papers`],
+    [ext("https://www.ncbi.nlm.nih.gov/research/pubtator3/", "PubTator3") + ` (NCBI), release ${esc(a.pubtator.version)}`,
+     "Which papers mention which genes and diseases: text mining of all PubMed abstracts and open-access PubMed Central full texts, plus links with no text mention that PubTator3 carries over (NCBI’s gene2pubmed, GeneRIF and CTD; MeSH indexing). This makes a gene’s or disease’s list of papers, and gives the grey disease tags on each paper.",
+     `${fmt(a.pubtator.gene_links)} gene–paper links (human genes)<br>${fmt(a.pubtator.disease_links)} disease–paper links`],
+    [ext("https://www.genenames.org/", "HGNC") + `, ${esc(a.hgnc.version)}`,
+     "Approved human gene symbols, aliases, previous symbols, names and locations: the gene search.",
+     `${fmt(a.hgnc.n)} genes<br>${fmt(a.hgnc.n_with_papers)} with papers`],
+    [ext("https://platform.opentargets.org/", "Open Targets Platform") + ` ${esc(a.opentargets.version)}: curated evidence`,
+     "Gene–disease–paper links from Orphanet, Gene2Phenotype, Genomics England and UniProt: the OT boxes, OT chips and the curated papers (ringed on the map). Their papers are added to each gene’s and disease’s list.",
+     `${fmt(a.opentargets.curated_links)} links<br>${fmt(a.opentargets.curated_pairs)} gene–disease pairs<br>${fmt(a.opentargets.curated_papers)} papers`],
+    [`Open Targets ${esc(a.opentargets.version)}: Europe PMC evidence`,
+     "Text-mined gene–disease–paper links (Europe PMC): the ePMC boxes and chips.",
+     `${fmt(a.opentargets.epmc_links)} links`],
+    [`Open Targets ${esc(a.opentargets.version)}: diseases`,
+     `Disease names, synonyms and MeSH/OMIM cross-references: the disease search. Each Open Targets disease covers the PubTator3 ids it cross-references, plus any whose most used wording is its name. PubTator3 ids no Open Targets disease covers are searchable on their own (no OT or ePMC boxes).`,
+     `${fmt(a.diseases.n)} diseases<br>(${fmt(a.diseases.n_pubtator_only)} PubTator3 only)`],
+    [ext(`https://huggingface.co/${a.embeddings.model}`, "MedEmbed-small v0.1"),
+     `A ${a.embeddings.dim}-number embedding of each title + abstract, computed once on a GPU: semantic and hybrid ranking, the map and Map Explorer. Your words are embedded the same way, live.`,
+     a.embeddings.n ? `${fmt(a.embeddings.n)} papers` : "computed per gene, as needed"],
+    [a.topic_names ? ext(`https://openrouter.ai/${a.topic_names}`, a.topic_names) + " (via OpenRouter)" : "No AI topic names",
+     a.topic_names ? "Short names for the map’s topics. Sent: the gene or disease searched, and each topic’s size, top words and 5 most typical titles (on a drill-in, also the parent topic’s name)." : "The map’s topics are named by their most distinctive words.", ""],
+  ];
+  document.getElementById("data").innerHTML = rows.map(([s, w, n]) => `<tr><td>${s}</td><td>${w}</td><td class="n">${n}</td></tr>`).join("");
+  document.querySelectorAll(".cap").forEach((e) => e.textContent = fmt(a.map.cap));
+  document.querySelectorAll(".k").forEach((e) => e.textContent = a.map.neighbours);
+  document.querySelectorAll(".topics").forEach((e) => e.textContent = a.map.max_topics);
+  if (a.topic_names) document.getElementById("llm").textContent = `${a.topic_names} (an AI model)`;
+}).catch((e) => { document.getElementById("data").innerHTML = `<tr><td colspan="3">Could not load: ${esc(e.message)}</td></tr>`; });
+</script>
+</body>
+</html>
