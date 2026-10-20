@@ -288,16 +288,18 @@ const realMention = (m) => !(m === m.toLowerCase() && !/\d/.test(m) && m.toUpper
 const hl = (p) => highlighter([...p.gene_mentions.filter(realMention), G.symbol], p.term_words);
 
 // ---- gene search
+let geneNo = 0;  // bumps on every gene lookup; an older answer arriving late is dropped
 async function searchGene(push = true) {
-  const q = S.gene.trim();
+  const q = S.gene.trim(), my = ++geneNo;
   $("choices").innerHTML = ""; $("msg").innerHTML = "";
   if (!q) return;
   const res = await getJSON("/api/resolve?q=" + encodeURIComponent(q));
+  if (my !== geneNo) return;
   if (!res.matches.length) {
     clearGene(); $("msg").innerHTML = `<p>No gene found for <b>${esc(q)}</b>. Try a symbol (e.g. CFTR), an alias or part of the name.</p>`;
     return;
   }
-  if (res.matches.length === 1 && !res.partial) return loadGene(res.matches[0], res.also || [], push);
+  if (res.matches.length === 1 && !res.partial) return loadGene(res.matches[0], res.also || [], push, false, my);
   clearGene();
   $("choices").innerHTML = (res.partial
       ? `<h2>No exact match for “${esc(q)}”. Did you mean:</h2>
@@ -308,15 +310,17 @@ async function searchGene(push = true) {
     (res.n_more ? `<p class="muted">…and ${fmt(res.n_more)} more. Type more letters to narrow it down.</p>` : "");
   $("choices").querySelectorAll("button").forEach((b) => b.onclick = () => {
     $("choices").innerHTML = "";
-    loadGene(res.matches[+b.dataset.i], [], true, true);
+    loadGene(res.matches[+b.dataset.i], [], true, true, ++geneNo);
   });
 }
 
 function clearGene() { G = null; M = null; $("card").innerHTML = ""; $("dis").innerHTML = ""; setList(""); }
 
-async function loadGene(g, also, push, picked = false) {
+async function loadGene(g, also, push, picked = false, my = geneNo) {
   if (picked) { S.gene = g.symbol; $("gene").value = g.symbol; }
-  G = await getJSON("/api/gene/" + encodeURIComponent(g.hgnc_id));
+  const gene = await getJSON("/api/gene/" + encodeURIComponent(g.hgnc_id));
+  if (my !== geneNo) return;  // a newer lookup took over
+  G = gene;
   for (const d of [...G.curated, ...G.epmc]) DN[d.disease_id] = d.disease;
   const otherNames = [G.aliases.length ? `Also known as: ${esc(G.aliases.join(", "))}` : "",
                       G.prev.length ? `Previous symbols: ${esc(G.prev.join(", "))}` : ""].filter(Boolean).join(" · ");
