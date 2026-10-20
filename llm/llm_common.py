@@ -25,7 +25,8 @@ for p in (str(VENDOR_ROOT), str(HERE)):
     if p not in sys.path:
         sys.path.insert(0, p)
 
-RETRIEVAL_TASKS = ["GOPubMedRetrieval", "R2MEDBiologyPooled"]
+RETRIEVAL_TASKS = ["GOPubMedRetrieval", "R2MEDBiologyPooled",
+                   *(f"GeneDiseaseRetrieval_v2_{i}" for i in range(5))]
 
 
 def load_env(dry_run: bool = False) -> None:

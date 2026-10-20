@@ -1,0 +1,140 @@
+{
+  "dataset_revision": "local",
+  "task_name": "BioMeSHClassification",
+  "mteb_version": "2.11.6",
+  "scores": {
+    "test": [
+      {
+        "scores_per_experiment": [
+          {
+            "accuracy": 0.708,
+            "f1": 0.713105,
+            "f1_weighted": 0.704752,
+            "precision": 0.729067,
+            "precision_weighted": 0.740823,
+            "recall": 0.736679,
+            "recall_weighted": 0.708,
+            "ap": null,
+            "ap_weighted": null
+          },
+          {
+            "accuracy": 0.696,
+            "f1": 0.694951,
+            "f1_weighted": 0.682951,
+            "precision": 0.732827,
+            "precision_weighted": 0.765645,
+            "recall": 0.73438,
+            "recall_weighted": 0.696,
+            "ap": null,
+            "ap_weighted": null
+          },
+          {
+            "accuracy": 0.668,
+            "f1": 0.660854,
+            "f1_weighted": 0.643807,
+            "precision": 0.668587,
+            "precision_weighted": 0.668255,
+            "recall": 0.70676,
+            "recall_weighted": 0.668,
+            "ap": null,
+            "ap_weighted": null
+          },
+          {
+            "accuracy": 0.694,
+            "f1": 0.693502,
+            "f1_weighted": 0.67257,
+            "precision": 0.702874,
+            "precision_weighted": 0.693996,
+            "recall": 0.724224,
+            "recall_weighted": 0.694,
+            "ap": null,
+            "ap_weighted": null
+          },
+          {
+            "accuracy": 0.686,
+            "f1": 0.67861,
+            "f1_weighted": 0.667783,
+            "precision": 0.695727,
+            "precision_weighted": 0.702579,
+            "recall": 0.711585,
+            "recall_weighted": 0.686,
+            "ap": null,
+            "ap_weighted": null
+          },
+          {
+            "accuracy": 0.638,
+            "f1": 0.627448,
+            "f1_weighted": 0.624335,
+            "precision": 0.649333,
+            "precision_weighted": 0.675158,
+            "recall": 0.667559,
+            "recall_weighted": 0.638,
+            "ap": null,
+            "ap_weighted": null
+          },
+          {
+            "accuracy": 0.674,
+            "f1": 0.663215,
+            "f1_weighted": 0.659305,
+            "precision": 0.683375,
+            "precision_weighted": 0.683057,
+            "recall": 0.69023,
+            "recall_weighted": 0.674,
+            "ap": null,
+            "ap_weighted": null
+          },
+          {
+            "accuracy": 0.658,
+            "f1": 0.657827,
+            "f1_weighted": 0.640949,
+            "precision": 0.673583,
+            "precision_weighted": 0.673529,
+            "recall": 0.692324,
+            "recall_weighted": 0.658,
+            "ap": null,
+            "ap_weighted": null
+          },
+          {
+            "accuracy": 0.688,
+            "f1": 0.675824,
+            "f1_weighted": 0.665359,
+            "precision": 0.697764,
+            "precision_weighted": 0.696365,
+            "recall": 0.713976,
+            "recall_weighted": 0.688,
+            "ap": null,
+            "ap_weighted": null
+          },
+          {
+            "accuracy": 0.652,
+            "f1": 0.641027,
+            "f1_weighted": 0.625908,
+            "precision": 0.657461,
+            "precision_weighted": 0.673085,
+            "recall": 0.680006,
+            "recall_weighted": 0.652,
+            "ap": null,
+            "ap_weighted": null
+          }
+        ],
+        "accuracy": 0.6762,
+        "f1": 0.670636,
+        "f1_weighted": 0.658772,
+        "precision": 0.68906,
+        "precision_weighted": 0.697249,
+        "recall": 0.705772,
+        "recall_weighted": 0.6762,
+        "ap": NaN,
+        "ap_weighted": NaN,
+        "main_score": 0.6762,
+        "hf_subset": "default",
+        "languages": [
+          "eng-Latn"
+        ]
+      }
+    ]
+  },
+  "evaluation_time": 90.26446795463562,
+  "kg_co2_emissions": null,
+  "date": null
+}

@@ -5,15 +5,15 @@
   "scores": {
     "test": [
       {
-        "pearson": 0.609621,
-        "spearman": 0.591325,
-        "cosine_pearson": 0.609622,
-        "cosine_spearman": 0.591341,
-        "manhattan_pearson": 0.596484,
-        "manhattan_spearman": 0.582306,
-        "euclidean_pearson": 0.599516,
-        "euclidean_spearman": 0.585166,
-        "main_score": 0.591341,
+        "pearson": 0.570953,
+        "spearman": 0.556021,
+        "cosine_pearson": 0.579245,
+        "cosine_spearman": 0.56885,
+        "manhattan_pearson": 0.56438,
+        "manhattan_spearman": 0.556745,
+        "euclidean_pearson": 0.566833,
+        "euclidean_spearman": 0.558739,
+        "main_score": 0.56885,
         "hf_subset": "default",
         "languages": [
           "eng-Latn"
@@ -21,7 +21,7 @@
       }
     ]
   },
-  "evaluation_time": 3.3861382007598877,
+  "evaluation_time": 4.820647478103638,
   "kg_co2_emissions": null,
   "date": null
 }

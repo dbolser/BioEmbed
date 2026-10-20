@@ -1,0 +1,10 @@
+# hs-q1: practice haystack (gene track) for the dense candidates whose test runs exist already.
+# The practice runs of the models tested on hs-q2/hs-q3 run there, before their test runs.
+uv run python haystack.py --haystack GeneDiseaseHaystackDev --batch-size 1024 --models sentence-transformers/all-MiniLM-L6-v2
+uv run python haystack.py --haystack GeneDiseaseHaystackDev --batch-size 512 --models intfloat/multilingual-e5-small
+uv run python haystack.py --haystack GeneDiseaseHaystackDev --batch-size 512 --models BAAI/bge-small-en-v1.5
+uv run python haystack.py --haystack GeneDiseaseHaystackDev --batch-size 512 --models abhinand/MedEmbed-small-v0.1
+uv run python haystack.py --haystack GeneDiseaseHaystackDev --batch-size 512 --models BAAI/bge-base-en-v1.5
+uv run python haystack.py --haystack GeneDiseaseHaystackDev --batch-size 512 --models abhinand/MedEmbed-base-v0.1
+uv run python haystack.py --haystack GeneDiseaseHaystackDev --batch-size 512 --models NeuML/pubmedbert-base-embeddings
+uv run python haystack.py --haystack GeneDiseaseHaystackDev --batch-size 64 --models Qwen/Qwen3-Embedding-0.6B || uv run python haystack.py --haystack GeneDiseaseHaystackDev --batch-size 16 --models Qwen/Qwen3-Embedding-0.6B
