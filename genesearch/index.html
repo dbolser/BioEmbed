@@ -465,7 +465,8 @@ function filtersHTML() {
 function clearFilter(key) {
   if (key === "ot" || key === "all") S.ot = "";
   if (key === "ep" || key === "all") S.ep = "";
-  if (key === "q" || key === "all") { Object.assign(S, {q: "", match: "", sort: ""}); $("term").value = ""; }
+  // Words filter only with keyword ranking; with meaning or hybrid they rank, aren't a chip, and stay.
+  if (key === "q" || (key === "all" && !S.rank)) { Object.assign(S, {q: "", match: "", sort: ""}); $("term").value = ""; }
   if (key === "years" || key === "all") Object.assign(S, {ymin: "", ymax: ""});
   S.page = 1; S.topic = ""; renderDiseases(); show(true);
 }
