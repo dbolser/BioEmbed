@@ -66,7 +66,7 @@ run)
     timeout 60 gcloud compute ssh "$name" --zone "$ZONE" --command \
         "cd BioEmbed/eval && PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
          setsid nohup sh -c '~/.local/bin/uv run python haystack.py --batch-size ${BATCH:-128} \
-         --haystack $HS --candidates $CANDS --models $* && rm ~/job.txt' \
+         --haystack $HS --candidates $CANDS --models $*; echo exit \$?; rm -f ~/job.txt' \
          < /dev/null >> ~/haystack.log 2>&1 &" || true
     ;;
 babysit)

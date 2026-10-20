@@ -213,8 +213,9 @@ def main() -> None:
             FROM (
                 SELECT replace(record_id, 'PMID:', '') AS pmid,
                        coalesce(trim(title), '') AS title,
-                       trim(substr(text, position('{ABSTRACT_MARK}' IN text)
-                                         + {len(ABSTRACT_MARK)})) AS abstract,
+                       CASE WHEN position('{ABSTRACT_MARK}' IN text) > 0  -- (every record has it; guard anyway)
+                            THEN trim(substr(text, position('{ABSTRACT_MARK}' IN text) + {len(ABSTRACT_MARK)}))
+                            ELSE '' END AS abstract,
                        row_number() OVER (PARTITION BY record_id ORDER BY record_hash) AS rn
                 FROM read_parquet('{RECORDS}')
                 WHERE record_type = 'pubmed_abstract'

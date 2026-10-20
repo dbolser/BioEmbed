@@ -79,6 +79,9 @@ def doc_vectors(model, name: str, docs: pd.DataFrame, batch_size: int,
     """Encode docs in CHUNK-sized pieces, cached as float16 .npy files."""
     sha = hashlib.sha256("\n".join(docs.pmid).encode()).hexdigest()[:12]
     cache = haystack / "vectors" / slug(name) / sha
+    if name.startswith("bioembed/"):  # our fine-tunes: a retrain under the same name must not reuse old vectors
+        weights = REPO / "models" / f"bioembed-{name.split('/', 1)[1]}" / "model.safetensors"
+        cache = cache / hashlib.sha256(weights.read_bytes()).hexdigest()[:12]
     cache.mkdir(parents=True, exist_ok=True)
     parts = []
     for i in range(0, len(docs), CHUNK):
