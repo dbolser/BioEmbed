@@ -210,6 +210,9 @@ def main() -> None:
     if args.model in QWEN_MODELS:
         tag += "-" + hashlib.sha256(args.instruction.encode()).hexdigest()[:8]
     cache = haystack / "rerank_cache" / tag
+    if args.model.startswith("bioembed/"):  # our fine-tunes: a retrain under the same name must not reuse old scores
+        weights = REPO / "models" / f"bioembed-{args.model.split('/', 1)[1]}" / "model.safetensors"
+        cache = cache / hashlib.sha256(weights.read_bytes()).hexdigest()[:12]
     todo = (pending(top, cache)
             .merge(queries.rename(columns={"text": "query"}), on="qid")
             .merge(docs.rename(columns={"text": "doc"}), on="pmid"))

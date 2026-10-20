@@ -207,21 +207,28 @@ async def run_model(short: str, prompts: dict[tuple, str], concurrency: int, bud
     print(f"{model}: {len(set(paths.values())) - len(todo)} cached, {len(todo)} to query")
     client = AsyncOpenAI(api_key=env["token"], base_url=env["base_url"], max_retries=8)
     sem = asyncio.Semaphore(concurrency)
-    spent, failed, skipped = 0.0, [], 0
+    # Calls in flight count too: each reserves the dearest cost seen so far before it starts.
+    spent, reserved, dearest, failed, skipped = 0.0, 0.0, 0.0, [], 0
 
     async def one(path: Path, qid: str, request: dict) -> None:
-        nonlocal spent, skipped
+        nonlocal spent, reserved, dearest, skipped
         async with sem:
-            if spent > budget:
+            if spent + reserved + dearest > budget:
                 skipped += 1
                 return
+            hold = dearest
+            reserved += hold
             try:
                 resp = await client.chat.completions.create(**request)
             except Exception as e:  # noqa: BLE001 - left uncached, retried on rerun
                 failed.append((qid, repr(e)[:200]))
                 return
+            finally:
+                reserved -= hold
         raw = resp.model_dump()
-        spent += response_cost(model, raw.get("usage") or {})
+        cost = response_cost(model, raw.get("usage") or {})
+        spent += cost
+        dearest = max(dearest, cost)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps({"qid": qid, "request": request,
                                     "created": datetime.now(timezone.utc).isoformat(),
