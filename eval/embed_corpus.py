@@ -26,6 +26,7 @@ Output: --out (default genesearch/index/emb_medembed_small/): pmids.npy
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -116,6 +117,15 @@ def main() -> None:
     pf = pq.ParquetFile(args.corpus)
     n = min(pf.metadata.num_rows, args.limit or pf.metadata.num_rows)
     args.out.mkdir(parents=True, exist_ok=True)
+    # Shards are skipped by file name on resume, so a resume must use the same run settings.
+    run = {"model": args.model, "corpus": str(args.corpus.resolve()), "rows": n, "shard": args.shard}
+    if (cfg := args.out / "run.json").exists():
+        if (old := json.loads(cfg.read_text())) != run:
+            raise SystemExit(f"{args.out} holds a run with other settings: {old} (now {run}); use another --out")
+    elif any(args.out.glob("[0-9]*.npy")):
+        raise SystemExit(f"{args.out} has shards but no run.json: can't check they match; use another --out")
+    else:
+        cfg.write_text(json.dumps(run, indent=1))
     if not (args.out / "pmids.npy").exists():
         pmids = pf.read(columns=["pmid"]).column("pmid").to_numpy()[:n].astype(np.int64)
         np.save(args.out / "pmids.npy", pmids)

@@ -144,7 +144,7 @@ England, UniProt literature). Gold table: `data/gold/ot_curated_gene_disease_pmi
 BioScore.
 
 **GeneDiseaseRetrieval** (`scripts/build_tier_c_gene_disease.py`): 75 queries,
-300 docs, 1 gold + 3 hard negatives per query (same gene, unrelated disease).
+300 docs, 1 gold (2 for 3 queries: 78 qrels) + 3 hard negatives per query (same gene, unrelated disease).
 Silver guard: no doc in the corpus is linked to a query, by curators or Europe
 PMC text-mining, unless it is gold. First designs (2–3 golds, few hard
 negatives) were too easy: BM25 and small embedders hit 80–93% of the recall@1

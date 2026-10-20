@@ -103,6 +103,9 @@ class CachingClient:
         self.inner, self.extra_body, self.cache_dir, self.budget = inner, extra_body, cache_dir, budget
         self.api_key = inner.api_key  # the vendor reassigns this before each call
         self.spent = 0.0
+        # Requests run concurrently: each paid call first reserves the dearest cost seen so far, so
+        # calls in flight count against the budget too.
+        self.reserved, self.dearest, self.lock = 0.0, 0.0, asyncio.Lock()
         self.paths: dict[str, Path] = {}
         self.chat = SimpleNamespace(completions=SimpleNamespace(create=self._create))
 
@@ -116,11 +119,19 @@ class CachingClient:
         if path.exists():
             raw = json.loads(path.read_text())["response"]
         else:
-            if self.spent >= self.budget:
-                raise RuntimeError(f"budget ${self.budget} spent; rerun to resume from cache")
-            resp = await self.inner.chat.completions.create(**kw)
+            async with self.lock:
+                if self.spent + self.reserved + self.dearest >= self.budget:
+                    raise RuntimeError(f"budget ${self.budget} spent; rerun to resume from cache")
+                hold = self.dearest
+                self.reserved += hold
+            try:
+                resp = await self.inner.chat.completions.create(**kw)
+            finally:
+                self.reserved -= hold
             raw = resp.model_dump()
-            self.spent += (raw.get("usage") or {}).get("cost") or 0.0
+            cost = (raw.get("usage") or {}).get("cost") or 0.0
+            self.spent += cost
+            self.dearest = max(self.dearest, cost)
             request = {k: v for k, v in kw.items() if k != "messages"}
             request["query_message"] = kw["messages"][-1]["content"]
             path.parent.mkdir(parents=True, exist_ok=True)
