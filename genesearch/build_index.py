@@ -53,7 +53,8 @@ def abstracts(con):
         COPY (
           SELECT CAST(substr(record_id, 6) AS BIGINT) AS pmid,
                  title,
-                 substr(text, position(chr(10) || 'Abstract: ' IN text) + 11) AS abstract,
+                 CASE WHEN position(chr(10) || 'Abstract: ' IN text) > 0  -- no marker: no abstract (not the text from char 11)
+                      THEN substr(text, position(chr(10) || 'Abstract: ' IN text) + 11) END AS abstract,
                  try_cast(json_extract_string(metadata, '$.publication_year') AS SMALLINT) AS year,
                  json_extract_string(metadata, '$.journal') AS journal
           FROM (SELECT *, row_number() OVER (PARTITION BY record_id ORDER BY record_hash) AS rn

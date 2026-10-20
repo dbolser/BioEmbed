@@ -288,16 +288,20 @@ const realMention = (m) => !(m === m.toLowerCase() && !/\d/.test(m) && m.toUpper
 const hl = (p) => highlighter([...p.gene_mentions.filter(realMention), G.symbol], p.term_words);
 
 // ---- gene search
+let geneNo = 0;  // bumps on every gene lookup; an older answer arriving late is dropped
 async function searchGene(push = true) {
-  const q = S.gene.trim();
+  const q = S.gene.trim(), my = ++geneNo;
   $("choices").innerHTML = ""; $("msg").innerHTML = "";
-  if (!q) return;
-  const res = await getJSON("/api/resolve?q=" + encodeURIComponent(q));
+  if (!q) { clearGene(); return; }
+  let res;
+  try { res = await getJSON("/api/resolve?q=" + encodeURIComponent(q)); }
+  catch (e) { if (my === geneNo) { clearGene(); $("msg").innerHTML = `<p class="note">Error: ${esc(e.message)}</p>`; } return; }
+  if (my !== geneNo) return;
   if (!res.matches.length) {
     clearGene(); $("msg").innerHTML = `<p>No gene found for <b>${esc(q)}</b>. Try a symbol (e.g. CFTR), an alias or part of the name.</p>`;
     return;
   }
-  if (res.matches.length === 1 && !res.partial) return loadGene(res.matches[0], res.also || [], push);
+  if (res.matches.length === 1 && !res.partial) return loadGene(res.matches[0], res.also || [], push, false, my);
   clearGene();
   $("choices").innerHTML = (res.partial
       ? `<h2>No exact match for “${esc(q)}”. Did you mean:</h2>
@@ -308,15 +312,20 @@ async function searchGene(push = true) {
     (res.n_more ? `<p class="muted">…and ${fmt(res.n_more)} more. Type more letters to narrow it down.</p>` : "");
   $("choices").querySelectorAll("button").forEach((b) => b.onclick = () => {
     $("choices").innerHTML = "";
-    loadGene(res.matches[+b.dataset.i], [], true, true);
+    loadGene(res.matches[+b.dataset.i], [], true, true, ++geneNo);
   });
 }
 
-function clearGene() { G = null; M = null; $("card").innerHTML = ""; $("dis").innerHTML = ""; setList(""); }
+// reqNo++: also stops polls for the old gene's results
+function clearGene() { reqNo++; G = null; M = null; $("card").innerHTML = ""; $("dis").innerHTML = ""; setList(""); }
 
-async function loadGene(g, also, push, picked = false) {
+async function loadGene(g, also, push, picked = false, my = geneNo) {
   if (picked) { S.gene = g.symbol; $("gene").value = g.symbol; }
-  G = await getJSON("/api/gene/" + encodeURIComponent(g.hgnc_id));
+  let gene;
+  try { gene = await getJSON("/api/gene/" + encodeURIComponent(g.hgnc_id)); }
+  catch (e) { if (my === geneNo) { clearGene(); $("msg").innerHTML = `<p class="note">Error: ${esc(e.message)}</p>`; } return; }
+  if (my !== geneNo) return;  // a newer lookup took over
+  G = gene;
   for (const d of [...G.curated, ...G.epmc]) DN[d.disease_id] = d.disease;
   const otherNames = [G.aliases.length ? `Also known as: ${esc(G.aliases.join(", "))}` : "",
                       G.prev.length ? `Previous symbols: ${esc(G.prev.join(", "))}` : ""].filter(Boolean).join(" · ");
@@ -443,8 +452,9 @@ document.addEventListener("click", (e) => {
 // ---- shared top of the results: tabs, active filters, how it works
 function filtersHTML() {
   const f = [];
+  const plain = (html) => Object.assign(document.createElement("div"), {innerHTML: html}).textContent;  // tags and entities out
   const chip = (label, key) => f.push(`<span class="fchip">${label}<button type="button" data-clear="${key}"
-      title="Remove this filter" aria-label="Remove filter: ${esc(label.replace(/<[^>]+>/g, ""))}">✕</button></span>`);
+      title="Remove this filter" aria-label="Remove filter: ${esc(plain(label))}">✕</button></span>`);
   for (const k of ["ot", "ep"]) if (S[k])
     chip(`${srcTag(k)} <b>${S[k] === "any" ? `any ${k === "ot" ? "curated" : "text-mined"} disease` : esc(dname(S[k]))}</b>`, k);
   if (S.q.trim() && !S.rank) chip(`Words: <b>“${esc(S.q.trim())}”</b>`, "q");  // meaning/hybrid rank, not filter
@@ -456,7 +466,8 @@ function filtersHTML() {
 function clearFilter(key) {
   if (key === "ot" || key === "all") S.ot = "";
   if (key === "ep" || key === "all") S.ep = "";
-  if (key === "q" || key === "all") { Object.assign(S, {q: "", match: "", sort: ""}); $("term").value = ""; }
+  // Words filter only with keyword ranking; with meaning or hybrid they rank, aren't a chip, and stay.
+  if (key === "q" || (key === "all" && !S.rank)) { Object.assign(S, {q: "", match: "", sort: ""}); $("term").value = ""; }
   if (key === "years" || key === "all") Object.assign(S, {ymin: "", ymax: ""});
   S.page = 1; S.topic = ""; renderDiseases(); show(true);
 }
@@ -533,7 +544,10 @@ async function loadPapers(push = true) {
   let r;
   try {
     r = await poll("/api/papers?" + apiParams(), my, (html) => { setList(head() + html); wireTop(); });
-  } catch (e) { setList(head() + `<p class="note">Error: ${esc(e.message)}</p>`); wireTop(); return; }
+  } catch (e) {
+    if (my === reqNo) { setList(head() + `<p class="note">Error: ${esc(e.message)}</p>`); wireTop(); }  // (not a stale one)
+    return;
+  }
   if (!r) return;  // a newer request superseded this one
   addNames(r.names);
   const secs = ((performance.now() - t0) / 1000).toFixed(2);
@@ -673,6 +687,7 @@ async function loadMap(push = true) {
         poll("/api/map?" + params, my, (html) => { setList(head() + html); wireTop(); }),
         loadPlotly()]);
     } catch (e) {  // a drill-in link can outlive its map (topics renumbered): offer the way back up
+      if (my !== reqNo) return;  // (a stale request's error)
       setList(head() + `<p class="note">${S.topic && e.message.startsWith("404") ? "That topic is not on this map any more."
           : `Error: ${esc(e.message)}`}</p>
         ${S.topic ? `<p><button type="button" data-crumb="">Show the map of all the papers</button></p>` : ""}`);
@@ -1075,9 +1090,11 @@ function wirePlot(el) {  // once per plot element; the handlers read the current
     if (i >= 0 && !(q.data.name === "curated" && q.pointNumber === j)) Plotly.Fx.hover(el, [{curveNumber: hit, pointNumber: j}]);
   });
   el.on("plotly_unhover", () => { lastHoverC = 0; });
+  let clicks = 0;  // the newest click wins; a late answer for an older one, or after leaving the map, is dropped
   el.on("plotly_click", async (ev) => {
-    const j = curatedAt(ev.event), pmid = j >= 0 ? M.pmid[j] : ev.points[0].customdata[4];
+    const j = curatedAt(ev.event), pmid = j >= 0 ? M.pmid[j] : ev.points[0].customdata[4], my = ++clicks, req = reqNo;
     const p = await getJSON(`/api/paper?gene=${encodeURIComponent(G.hgnc_id)}&pmid=${pmid}&term=${encodeURIComponent(S.q)}`);
+    if (my !== clicks || req !== reqNo || !$("mappaper")) return;
     $("mappaper").innerHTML = `<ol class="papers">${paperHTML(p, hl(p))}</ol>`;
     $("mappaper").querySelector("details.abs")?.setAttribute("open", "");
     $("mappaper").scrollIntoView({behavior: "smooth", block: "nearest"});
