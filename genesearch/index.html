@@ -542,7 +542,10 @@ async function loadPapers(push = true) {
   let r;
   try {
     r = await poll("/api/papers?" + apiParams(), my, (html) => { setList(head() + html); wireTop(); });
-  } catch (e) { setList(head() + `<p class="note">Error: ${esc(e.message)}</p>`); wireTop(); return; }
+  } catch (e) {
+    if (my === reqNo) { setList(head() + `<p class="note">Error: ${esc(e.message)}</p>`); wireTop(); }  // (not a stale one)
+    return;
+  }
   if (!r) return;  // a newer request superseded this one
   addNames(r.names);
   const secs = ((performance.now() - t0) / 1000).toFixed(2);
@@ -682,6 +685,7 @@ async function loadMap(push = true) {
         poll("/api/map?" + params, my, (html) => { setList(head() + html); wireTop(); }),
         loadPlotly()]);
     } catch (e) {  // a drill-in link can outlive its map (topics renumbered): offer the way back up
+      if (my !== reqNo) return;  // (a stale request's error)
       setList(head() + `<p class="note">${S.topic && e.message.startsWith("404") ? "That topic is not on this map any more."
           : `Error: ${esc(e.message)}`}</p>
         ${S.topic ? `<p><button type="button" data-crumb="">Show the map of all the papers</button></p>` : ""}`);
@@ -1084,9 +1088,11 @@ function wirePlot(el) {  // once per plot element; the handlers read the current
     if (i >= 0 && !(q.data.name === "curated" && q.pointNumber === j)) Plotly.Fx.hover(el, [{curveNumber: hit, pointNumber: j}]);
   });
   el.on("plotly_unhover", () => { lastHoverC = 0; });
+  let clicks = 0;  // the newest click wins; a late answer for an older one, or after leaving the map, is dropped
   el.on("plotly_click", async (ev) => {
-    const j = curatedAt(ev.event), pmid = j >= 0 ? M.pmid[j] : ev.points[0].customdata[4];
+    const j = curatedAt(ev.event), pmid = j >= 0 ? M.pmid[j] : ev.points[0].customdata[4], my = ++clicks, req = reqNo;
     const p = await getJSON(`/api/paper?gene=${encodeURIComponent(G.hgnc_id)}&pmid=${pmid}&term=${encodeURIComponent(S.q)}`);
+    if (my !== clicks || req !== reqNo || !$("mappaper")) return;
     $("mappaper").innerHTML = `<ol class="papers">${paperHTML(p, hl(p))}</ol>`;
     $("mappaper").querySelector("details.abs")?.setAttribute("open", "");
     $("mappaper").scrollIntoView({behavior: "smooth", block: "nearest"});
