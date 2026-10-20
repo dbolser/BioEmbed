@@ -363,15 +363,17 @@ def named_pmids(subject: str) -> np.ndarray:
         return pm
     t = take(rows_for(pm), ["title", "abstract"])
     title, abstract = t["title"].fill_null("").combine_chunks(), t["abstract"].fill_null("").combine_chunks()
-    pairs = pd.DataFrame([(p, w) for p, m in tagged.items() for w in subject_words(s, m)], columns=["pmid", "word"])
-    pairs["i"] = np.searchsorted(pm, pairs.pmid.to_numpy())
     names = subject_names(s)
-    pairs = pairs[(pairs.i < len(pm)) & (pm[pairs.i.clip(0, len(pm) - 1)] == pairs.pmid) & ~pairs.word.isin(names)]
+    pattern = names_re(names)
+    named = matches(title, pattern) | matches(abstract, pattern)
+    unmatched = set(pm[~named].tolist())  # (only their mentions need a look: far fewer pairs for a big disease)
+    pairs = pd.DataFrame([(p, w) for p, m in tagged.items() if p in unmatched for w in subject_words(s, m)],
+                         columns=["pmid", "word"])
+    pairs = pairs[~pairs.word.isin(names)]
+    pairs["i"] = np.searchsorted(pm, pairs.pmid.to_numpy())
     code, words = pd.factorize(pairs.word)
     order = np.argsort(code, kind="stable")
     by_word = np.split(pairs.i.to_numpy()[order], np.cumsum(np.bincount(code, minlength=len(words)))[:-1])
-    pattern = names_re(names)
-    named = matches(title, pattern) | matches(abstract, pattern)
     groups = sorted(zip(words, by_word), key=lambda x: -len(x[1]))
     for n, (word, idx) in enumerate(groups):
         idx = idx[~named[idx]]
