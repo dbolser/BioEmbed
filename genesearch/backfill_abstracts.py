@@ -140,6 +140,7 @@ def merge():
     after = con.sql(f"SELECT count(*), count(DISTINCT pmid) FROM read_parquet('{IDX}/abstracts.parquet.tmp')").fetchall()[0]
     assert after[0] == after[1], "duplicate PMIDs after merge"
     (IDX / "abstracts.parquet.tmp").rename(IDX / "abstracts.parquet")
+    con.close()
     print(f"merge: {before:,} -> {after[0]:,} papers", flush=True)
     import build_index
     build_index.arrow(build_index.connect())  # its own memory limit: the arrow step needs it
@@ -150,7 +151,7 @@ def embed():
     import multiprocessing as mp
     import semantic
     full = IDX / "emb_medembed_small"
-    have = np.load(full / "pmids.npy", mmap_mode="r")
+    have = np.load(full / "pmids.npy")  # (not memory-mapped: the file is replaced below)
     shards = sorted(f for f in full.glob("[0-9]*.npy"))
     rows = sum(np.load(f, mmap_mode="r").shape[0] for f in shards)
     assert rows == len(have), f"{full}: {rows:,} vectors for {len(have):,} PMIDs"
