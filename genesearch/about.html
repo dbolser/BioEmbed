@@ -41,7 +41,7 @@
   <p>The Map tab groups the papers in the current list into topics and lays them out so that papers close in meaning
     sit close together. Code: <code>litmap.py</code> (and <code>api_map</code> in <code>app.py</code>).</p>
   <ol>
-    <li><b>Papers.</b> The current list’s papers that have an abstract, leaving out the facet boxes on the left: on the
+    <li><b>Papers.</b> The current list’s papers that are in the local PubMed copy (title, and the abstract when it has one), leaving out the facet boxes on the left: on the
       map those grey out the papers they leave out, rather than making a new map. Above <span class="cap">20,000</span>, a fixed sample of
       <span class="cap">20,000</span>: chosen by a hash of the PMID, so it is the same sample every time and overlaps across filters.</li>
     <li><b>Embeddings.</b> Each paper’s 384-number MedEmbed-small vector of its title + abstract (unit length, so cosine
@@ -97,7 +97,7 @@ fetch("/api/about").then((r) => r.json()).then((a) => {
      `Disease names, synonyms and MeSH/OMIM cross-references: the disease search. Each Open Targets disease covers the PubTator3 ids it cross-references, plus any whose most used wording is its name. PubTator3 ids no Open Targets disease covers are searchable on their own (no OT or ePMC boxes).`,
      `${fmt(a.diseases.n)} diseases<br>(${fmt(a.diseases.n_pubtator_only)} PubTator3 only)`],
     [ext(`https://huggingface.co/${a.embeddings.model}`, "MedEmbed-small v0.1"),
-     `A ${a.embeddings.dim}-number embedding of each title + abstract, computed once on a GPU: semantic and hybrid ranking, the map and Map Explorer. Your words are embedded the same way, live.`,
+     `A ${a.embeddings.dim}-number embedding of each title + abstract, computed ahead of time (on a GPU for the bulk of PubMed, on CPU for papers added since): semantic and hybrid ranking, the map and Map Explorer. Your words are embedded the same way, live.`,
      a.embeddings.n ? `${fmt(a.embeddings.n)} papers` : "computed per gene, as needed"],
     [a.topic_names ? ext(`https://openrouter.ai/${a.topic_names}`, a.topic_names) + " (via OpenRouter)" : "No AI topic names",
      a.topic_names ? "Short names for the map’s topics. Sent: the gene or disease searched, and each topic’s size, top words and 5 most typical titles (on a drill-in, also the parent topic’s name)." : "The map’s topics are named by their most distinctive words.", ""],
