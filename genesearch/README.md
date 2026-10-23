@@ -1,34 +1,43 @@
 # genesearch
 
-Type a gene, see its literature: PubMed abstracts tagged by PubTator3, Open Targets curated diseases, and an
-"and..." box that ranks the gene's papers by keywords, by meaning (AI embeddings), or both. A Map tab groups
-the current list into topics; Map Explorer puts the papers on axes you choose.
+Type a gene (or click "Gene ⇄" for a disease), see its literature: PubMed abstracts tagged by PubTator3, Open
+Targets curated diseases (genes, for a disease), and an "Optionally rank by" box that ranks the papers by keywords,
+by meaning (AI embeddings), or both. A Map tab groups the current list into topics; Map Explorer puts the papers on
+axes you choose. `/about` lists the data and how the map is made.
 
 1. Build the index once (~10-15 min, 61 GB in `index/`; needs `data/gold/ot_curated_gene_disease_pmid.parquet`
    from the gene-disease work): `cd genesearch && uv run python build_index.py`
 2. Run: `cd genesearch && uv run python app.py --port 8766 --host 0.0.0.0`, then open http://localhost:8766
 3. Type a symbol, alias, old symbol or name (`/` jumps to the box); pick from the list if several genes match.
-4. Optional "and..." words rank the gene's papers (e.g. ZCCHC8 + pulmonary fibrosis); empty = newest first.
-   **Rank by**: Keywords (BM25, only papers with the words), Meaning (every paper, closest first), or Both (hybrid).
-5. Disease boxes on the left: **OT** (Open Targets curated) and **ePMC** (Europe PMC text-mined). Click a disease to
-   filter (this clears the "and..." words), or "Any disease" for all of that box's papers; one in each box = papers
+   Disease search (click the box's label): Open Targets diseases by name, synonym or PubTator3 wording
+   (`diseases.parquet`, see `build_index.py diseases`), plus PubTator3 ids no Open Targets disease covers.
+4. Optional words rank the papers (e.g. ZCCHC8 + pulmonary fibrosis); empty = newest first. **Rank method**:
+   Semantic (the default; every paper, closest in meaning first), Keyword (BM25, only papers with the words), or
+   Hybrid (reciprocal rank fusion).
+5. Facet boxes on the left: **Named in the abstract** (only papers whose title or abstract names the gene or disease),
+   **OT** (Open Targets curated) and **ePMC** (Europe PMC text-mined). Click a disease (a gene, in disease search) to
+   filter (with keyword ranking this clears the words), or "Any" for all of that box's papers; one in each box = papers
    in both, and each box's counts then follow the other box's pick. Papers carry OT and ePMC chips that do the same.
    Active filters are listed above the results, each with a ✕. "How this search works" is under the (i).
-6. **Map** tab: the current list as a topic map. Play years steps through time; Shift over a dot picks out its
+6. **Map** tab: the current list as a topic map (without the facet boxes: picking or hovering over one greys out
+   the papers it leaves out; `/api/map_facets`). Play years steps through time; Shift over a dot picks out its
    topic, Esc clears; "Drill in" re-maps one topic's papers. **Map Explorer**: each axis is closeness in meaning to
    your words or to a topic's centre (cosine of the MedEmbed vectors). "Download CSV" saves the whole list. URLs are
-   shareable (`?gene=CFTR&q=sweat+chloride&rank=hybrid`, `&ot=any`, `&ep=<disease id>`, `&view=map&topic=3`,
+   shareable (`?gene=CFTR&q=sweat+chloride&rank=hybrid`, `?disease=cystic+fibrosis`, `&ot=any`, `&ep=<id>`, `&named=1`, `&view=map&topic=3`,
    `&view=explore&ax=cancer&ay=topic:2`).
 
 How it works
 
-- Papers: PubTator3 gene tags (NCBI text mining, precomputed) plus Open Targets curated links; the ePMC box
-  uses Open Targets' Europe PMC evidence, which can add papers PubTator did not tag.
+- Papers: PubTator3 gene tags (NCBI text mining, precomputed), Open Targets curated links, and Open Targets'
+  Europe PMC text-mined links (the ePMC box), which add papers PubTator did not tag. The list and the map hold
+  all three.
 - Keywords: BM25 computed live over the gene's papers (`app.py`). With several words, the count is papers
   containing *all* of them (a link shows any-word matches). No AI.
-- Meaning: `abhinand/MedEmbed-small-v0.1` (loaded as `eval/run_embedders.py` does: CLS pooling, normalised,
-  no query prompt). Query = the "and..." words; papers = `title\n\nabstract`; cosine similarity (`semantic.py`).
-  Hybrid = reciprocal-rank fusion, 1/(60 + keyword rank) + 1/(60 + meaning rank).
+- Semantic: `abhinand/MedEmbed-small-v0.1` (loaded as `eval/run_embedders.py` does: CLS pooling, normalised,
+  no query prompt). Query = the ranking words; papers = `title\n\nabstract`; cosine similarity (`semantic.py`).
+  Hybrid = reciprocal-rank fusion, 1/(60 + keyword rank) + 1/(60 + semantic rank).
+- Named in the abstract: the paper's PubTator3 mentions of the gene (or disease) plus its symbol (name), found
+  whole in the title or abstract, as the page highlights them (`named_pmids` in `app.py`).
 - Paper vectors: from `index/emb_medembed_small/` (whole PubMed: float16 `.npy` shards + `pmids.npy`,
   memory-mapped) once that exists and is complete. Until then they are computed on CPU for one gene's papers
   when first needed (~50-130 papers/s, shown as a progress bar), capped at the 30,000 best keyword matches,
@@ -39,4 +48,6 @@ How it works
   Flash-Lite via OpenRouter (key in `llm/.env.or-google_gemini-3.1-flash-lite`). Maps and names are cached in
   `index/cache/`.
 
-Papers with no abstract in the local PubMed copy are listed last with a small "no abstract" tag.
+Papers with no abstract carry a small "no abstract" tag; those not in the local PubMed copy at all are listed last.
+The copy ends at a date and holds only papers with an abstract: `backfill_abstracts.py` fetches the rest (title,
+abstract, year, journal) from PubMed, merges them in and embeds them on CPU as one more shard.

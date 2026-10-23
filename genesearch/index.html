@@ -20,12 +20,17 @@
   header { background: var(--panel); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 2; }
   header .wrap { padding-top: .8rem; padding-bottom: .8rem; }
   form { display: flex; flex-wrap: wrap; gap: .6rem; align-items: end; }
-  label { display: flex; flex-direction: column; font-size: .9rem; color: var(--muted); }
+  label, .field { display: flex; flex-direction: column; font-size: .9rem; color: var(--muted); }
   input, select, button {
     font: inherit; font-size: 1rem; padding: .35rem .6rem; border: 1px solid #888; border-radius: 6px;
     background: #fff; color: var(--fg);
   }
-  #gene { width: 12rem; } #term { width: 17rem; }
+  #subject { width: 14rem; } #term { width: 17rem; }
+  /* the first box's label flips the search between gene and disease */
+  .mode { border: none; background: none; padding: 0; font-size: .9rem; color: var(--gene); text-align: left;
+    text-decoration: underline dotted; text-underline-offset: 3px; }
+  .mode:hover { text-decoration-style: solid; }
+  .about { margin-left: auto; align-self: center; font-weight: bold; }
   button { cursor: pointer; background: #fff; }
   button.primary { background: var(--focus); color: #fff; border-color: var(--focus); }
   :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
@@ -36,7 +41,7 @@
   h1 .nm { font-weight: normal; }
   h2 { font-size: 1.2rem; margin: 1.6rem 0 .4rem; }
   a { color: var(--gene); }
-  .card p { margin: .25rem 0; max-width: 70ch; }
+  .card p { margin: .25rem 0; }
   .choices button { display: block; width: 100%; text-align: left; margin: .35rem 0; padding: .5rem .8rem; }
   /* disease facets on the left, results on the right */
   .cols { display: grid; grid-template-columns: minmax(14rem, 19rem) minmax(0, 1fr); gap: 1.6rem; align-items: start; }
@@ -54,9 +59,11 @@
   .dlist button:hover { border-color: var(--line); background: var(--bg); }
   .facet.ot .dlist button[aria-pressed=true] { border: 2px solid var(--cur); background: var(--bg); font-weight: bold; }
   .facet.ep .dlist button[aria-pressed=true] { border: 2px solid var(--ep); background: var(--bg); font-weight: bold; }
+  .facet.nm .dlist button[aria-pressed=true] { border: 2px solid var(--gene); background: var(--bg); font-weight: bold; }
   .dlist .any { font-style: italic; }
   .dlist button.zero { color: var(--muted); }
-  .dlist .n { white-space: nowrap; color: var(--muted); font-size: .9rem; }
+  .dlist .n { white-space: nowrap; color: var(--muted); font-size: .9rem; min-width: 3em; text-align: right; }
+  .stale .n { opacity: .35; }  /* counts from before the last click, while new ones load: rows don't move */
   details.more > summary { cursor: pointer; color: var(--gene); margin-top: .4rem; font-size: .95rem; }
   .bar { display: flex; flex-wrap: wrap; gap: .8rem 1.2rem; align-items: center; margin: .6rem 0; }
   .bar input[type=number] { width: 5.5rem; }
@@ -149,26 +156,25 @@
 <header>
   <div class="wrap">
     <form id="f" autocomplete="off">
-      <label>Gene
-        <input id="gene" placeholder="symbol, alias or name" aria-label="Gene">
+      <div class="field">  <!-- (not a label: a click on it would press the button) -->
+        <button type="button" id="mode" class="mode"></button>
+        <input id="subject">
+      </div>
+      <label>Optionally rank by
+        <input id="term" aria-label="Optionally rank by these words">
       </label>
-      <label>and&hellip; (optional)
-        <input id="term" placeholder="disease or any words" aria-label="And words">
-      </label>
-      <label>Rank by
-        <select id="rank" aria-label="Rank by">
-          <option value="">Keywords (BM25)</option>
-          <option value="meaning">Meaning (AI embeddings)</option>
-          <option value="hybrid">Both (hybrid)</option>
+      <label>Rank method
+        <select id="rank" aria-label="Rank method">
+          <option value="keyword">Keyword (BM25)</option>
+          <option value="">Semantic (AI embeddings)</option>
+          <option value="hybrid">Hybrid (reciprocal rank fusion)</option>
         </select>
       </label>
       <button class="primary" type="submit">Search</button>
       <button type="button" id="creamBtn" title="Toggle cream background">Cream</button>
+      <a class="about" href="/about">About</a>
     </form>
-    <div class="hint">Press <kbd>/</kbd> to jump to the gene box. Examples:
-      <a href="?gene=ZCCHC8&amp;q=pulmonary+fibrosis">ZCCHC8 + pulmonary fibrosis</a>,
-      <a href="?gene=CFTR&amp;q=sweat+chloride&amp;rank=hybrid">CFTR + sweat chloride (hybrid)</a>,
-      <a href="?gene=p53">p53</a>, <a href="?gene=BRCA">BRCA</a></div>
+    <div class="hint">Press <kbd>/</kbd> to jump to the search box. Examples: <span id="examples"></span></div>
   </div>
 </header>
 
@@ -177,7 +183,7 @@
   <div id="choices" class="choices"></div>
   <section id="card" class="card"></section>
   <div class="cols">
-    <aside id="dis" aria-label="Diseases linked to this gene"></aside>
+    <aside id="dis" aria-label="Filters"></aside>
     <section id="list"></section>
   </div>
 </div>
@@ -199,36 +205,48 @@ function setList(html) {  // replace the results; free the old map's WebGL conte
 }
 
 // ---- state <-> URL
-// gene, q, ot and ep (disease facets: "" = off, "any", or a disease id; ot = Open Targets curated,
-// ep = Europe PMC text-mined), ymin, ymax, sort, match ("" = all words, "any"), rank ("" = keywords,
-// "meaning", "hybrid"), view ("" = list, "map", "explore"), topic (map drill-in path, e.g. "3.2"),
-// ax and ay (Map Explorer axes: words, or "topic:N"), page
+// gene or disease (what the first box searched for; one of them, see MODE), q, ot and ep (facets:
+// "" = off, "any", or an id: diseases for a gene, Ensembl genes for a disease; ot = Open Targets
+// curated, ep = Europe PMC text-mined), named ("1" = only papers naming the gene or disease in the
+// title or abstract), ymin, ymax, sort, match ("" = all words, "any"), rank ("" = semantic, "keyword",
+// "hybrid"), view ("" = list, "map", "explore"), topic (map drill-in path, e.g. "3.2"), ax and ay
+// (Map Explorer axes: words, or "topic:N"), page
 let S = {};
-let G = null;    // current gene record from /api/gene
+let G = null;    // the current gene or disease, from /api/subject: id, kind ("gene", "disease"), label, ...
+let MODE = "gene";  // what the first box searches for
 let reqNo = 0;   // bumps on every new request; stale answers and polls are dropped
-const KEYS = ["gene", "q", "ot", "ep", "ymin", "ymax", "sort", "match", "rank", "view", "topic", "ax", "ay"];
-const DN = {};   // disease id -> name (from the gene's facets, paper chips and the server)
+const KEYS = ["gene", "disease", "q", "ot", "ep", "named", "ymin", "ymax", "sort", "match", "rank", "view", "topic", "ax", "ay"];
+const DN = {};   // facet id -> name (from the facets, paper chips and the server)
 const dname = (id) => DN[id] || id;
+const rank = () => S.rank || "semantic";
+const other = () => G?.kind === "disease" ? "gene" : "disease";  // what the facets list
 
 function readURL() {
   const p = new URLSearchParams(location.search);
   S = Object.fromEntries(KEYS.map((k) => [k, p.get(k) || ""]));
   S.page = +(p.get("page") || 1);
-  // Older links: src=curated|epmc + disease (+ dname), cur=1 (curated papers only)
+  // Older links: rank=meaning (now semantic, the default; so are old links with words and no rank,
+  // which meant keywords then); src=curated|epmc + disease (+ dname) for a gene's disease facet,
+  // cur=1 (curated papers only)
+  if (!["keyword", "hybrid"].includes(S.rank)) S.rank = "";
   const d = p.get("disease");
-  if (d && p.get("src")) S[p.get("src") === "curated" ? "ot" : "ep"] ||= d;
+  if (d && p.get("src")) { S[p.get("src") === "curated" ? "ot" : "ep"] ||= d; S.disease = ""; }
   if (d && p.get("dname")) DN[d] = p.get("dname");
   if (p.get("cur")) S.ot ||= "any";
+  MODE = S.disease ? "disease" : S.gene ? "gene" : history.state?.mode || "gene";
 }
 function writeURL(push = true) {
   const p = new URLSearchParams();
   for (const [k, v] of Object.entries(S)) if (v && !(k === "page" && v === 1)) p.set(k, v);
   const url = "?" + p.toString();
-  if (url !== location.search) (push ? history.pushState : history.replaceState).call(history, null, "", url);
+  // The mode goes in the history state: an empty search's URL ("?") doesn't say gene or disease
+  (push && url !== location.search ? history.pushState : history.replaceState).call(history, {mode: MODE}, "", url);
 }
-const apiParams = (extra = {}) => new URLSearchParams({gene: G.hgnc_id, term: S.q, ot: S.ot, ep: S.ep,
-  ymin: S.ymin || 0, ymax: S.ymax || 0, sort: S.sort, match: S.match || "all",
-  rank: S.rank || "keywords", page: S.page, ...extra});
+const apiParams = (extra = {}) => new URLSearchParams({subject: G.id, term: S.q, ot: S.ot, ep: S.ep,
+  named: S.named ? 1 : 0, ymin: S.ymin || 0, ymax: S.ymax || 0, sort: S.sort, match: S.match || "all",
+  rank: rank(), page: S.page, ...extra});
+// The map is of the list without its facets, which grey out papers on it instead
+const mapParams = () => apiParams({topic: S.topic, page: 1, sort: "", ot: "", ep: "", named: 0}).toString();
 
 async function getJSON(url) {
   const r = await fetch(url);
@@ -283,31 +301,62 @@ function highlighter(geneWords, termWords) {
   };
 }
 // PubTator sometimes tags plain words as the gene ("was" for WAS, "clock" for CLOCK): skip
-// lower-case, digit-free spellings of the symbol ("tp53", zebrafish, is kept).
-const realMention = (m) => !(m === m.toLowerCase() && !/\d/.test(m) && m.toUpperCase() === G.symbol);
-const hl = (p) => highlighter([...p.gene_mentions.filter(realMention), G.symbol], p.term_words);
+// lower-case, digit-free spellings of the symbol ("tp53", zebrafish, is kept). Plus G.names: the
+// symbol, aliases and previous symbols (a disease: name and synonyms). (app.py's named_pmids finds
+// the papers naming the gene or disease the same way.)
+const realMention = (m) => G.kind !== "gene" || !(m === m.toLowerCase() && !/\d/.test(m) && m.toUpperCase() === G.label.toUpperCase());
+const hl = (p) => highlighter([...p.mentions.filter(realMention), ...G.names], p.term_words);
 
-// ---- gene search
-let geneNo = 0;  // bumps on every gene lookup; an older answer arriving late is dropped
+// ---- gene or disease search
+// Clicking the first box's label flips what it searches for (and clears the search).
+const MODES = {gene: {label: "Gene", placeholder: "symbol, alias or name", termHint: "disease or any words", examples: `
+                 <a href="?gene=p53">p53</a>, <a href="?gene=BRCA">BRCA</a>,
+                 <a href="?gene=ZCCHC8&amp;q=pulmonary+fibrosis&amp;rank=keyword">ZCCHC8 + pulmonary fibrosis (Rank by Keyword)</a>,
+                 <a href="?gene=CFTR&amp;q=sweat+chloride&amp;rank=hybrid">CFTR + sweat chloride (Rank by Hybrid)</a>.`},
+               disease: {label: "Disease", placeholder: "name, e.g. cystic fibrosis", termHint: "gene or any words", examples: `
+                 <a href="?disease=cystic+fibrosis">cystic fibrosis</a>, <a href="?disease=Huntington+disease">Huntington disease</a>,
+                 <a href="?disease=idiopathic+pulmonary+fibrosis&amp;q=telomeres&amp;rank=keyword">idiopathic pulmonary fibrosis + telomeres (Rank by Keyword)</a>,
+                 <a href="?disease=Alzheimer+disease&amp;q=sleep&amp;rank=hybrid">Alzheimer disease + sleep (Rank by Hybrid)</a>.`}};
+function showMode() {
+  const m = MODES[MODE], to = MODE === "gene" ? "disease" : "gene";
+  $("mode").textContent = `${m.label} ⇄`;
+  $("mode").title = `Search by ${to} instead`;
+  $("mode").setAttribute("aria-label", `${m.label} search. Switch to ${to} search`);
+  $("subject").placeholder = m.placeholder;
+  $("subject").setAttribute("aria-label", m.label);
+  $("term").placeholder = m.termHint;
+  $("examples").innerHTML = m.examples;
+}
+$("mode").onclick = () => {
+  MODE = MODE === "gene" ? "disease" : "gene";
+  Object.assign(S, {gene: "", disease: "", ot: "", ep: "", named: "", ymin: "", ymax: "", sort: "", match: "", topic: "",
+                    ax: "", ay: "", page: 1});
+  $("subject").value = ""; $("choices").innerHTML = ""; $("msg").innerHTML = "";
+  showMode(); clearGene(); writeURL(true);
+  $("subject").focus();
+};
+
+let geneNo = 0;  // bumps on every lookup; an older answer arriving late is dropped
 async function searchGene(push = true) {
-  const q = S.gene.trim(), my = ++geneNo;
+  const q = S[MODE].trim(), my = ++geneNo, gene = MODE === "gene";
   $("choices").innerHTML = ""; $("msg").innerHTML = "";
   if (!q) { clearGene(); return; }
   let res;
-  try { res = await getJSON("/api/resolve?q=" + encodeURIComponent(q)); }
+  try { res = await getJSON(`/api/resolve?kind=${MODE}&q=` + encodeURIComponent(q)); }
   catch (e) { if (my === geneNo) { clearGene(); $("msg").innerHTML = `<p class="note">Error: ${esc(e.message)}</p>`; } return; }
   if (my !== geneNo) return;
   if (!res.matches.length) {
-    clearGene(); $("msg").innerHTML = `<p>No gene found for <b>${esc(q)}</b>. Try a symbol (e.g. CFTR), an alias or part of the name.</p>`;
+    clearGene(); $("msg").innerHTML = `<p>No ${MODE} found for <b>${esc(q)}</b>. ${gene
+      ? "Try a symbol (e.g. CFTR), an alias or part of the name." : "Try another name (e.g. cystic fibrosis) or part of one."}</p>`;
     return;
   }
   if (res.matches.length === 1 && !res.partial) return loadGene(res.matches[0], res.also || [], push, false, my);
   clearGene();
   $("choices").innerHTML = (res.partial
-      ? `<h2>No exact match for “${esc(q)}”. Did you mean:</h2>
-         <p class="hint">Only human (HGNC) genes are listed. For a mouse or rat gene, type the human symbol (e.g. TP53 for Trp53).</p>`
-      : `<h2>${fmt(res.matches.length)} genes match “${esc(q)}”. Pick one:</h2>`) +
-    res.matches.map((g, i) => `<button data-i="${i}"><b>${esc(g.symbol)}</b> &nbsp;${esc(g.name)}
+      ? `<h2>No exact match for “${esc(q)}”. Did you mean:</h2>` + (gene
+        ? `<p class="hint">Only human (HGNC) genes are listed. For a mouse or rat gene, type the human symbol (e.g. TP53 for Trp53).</p>` : "")
+      : `<h2>${fmt(res.matches.length)} ${MODE}s match “${esc(q)}”. Pick one:</h2>`) +
+    res.matches.map((g, i) => `<button data-i="${i}"><b>${esc(g.label)}</b> &nbsp;${gene ? esc(g.name) : `<span class="muted">${esc(g.id)}</span>`}
        <span class="muted">· ${esc(g.why)} · ${fmt(g.n_papers)} papers</span></button>`).join("") +
     (res.n_more ? `<p class="muted">…and ${fmt(res.n_more)} more. Type more letters to narrow it down.</p>` : "");
   $("choices").querySelectorAll("button").forEach((b) => b.onclick = () => {
@@ -316,95 +365,133 @@ async function searchGene(push = true) {
   });
 }
 
-// reqNo++: also stops polls for the old gene's results
-function clearGene() { reqNo++; G = null; M = null; $("card").innerHTML = ""; $("dis").innerHTML = ""; setList(""); }
+// reqNo++: also stops polls for the old gene's results; geneNo++: and a lookup still on its way
+function clearGene() { reqNo++; geneNo++; G = null; M = null; $("card").innerHTML = ""; $("dis").innerHTML = ""; setList(""); }
 
-async function loadGene(g, also, push, picked = false, my = geneNo) {
-  if (picked) { S.gene = g.symbol; $("gene").value = g.symbol; }
-  let gene;
-  try { gene = await getJSON("/api/gene/" + encodeURIComponent(g.hgnc_id)); }
-  catch (e) { if (my === geneNo) { clearGene(); $("msg").innerHTML = `<p class="note">Error: ${esc(e.message)}</p>`; } return; }
-  if (my !== geneNo) return;  // a newer lookup took over
-  G = gene;
-  for (const d of [...G.curated, ...G.epmc]) DN[d.disease_id] = d.disease;
+function pubtator(g) {  // PubTator3's own search for the gene (NCBI Gene id) or disease (its first PubTator id)
+  const id = g.kind === "gene" ? g.entrez && `@GENE_${g.entrez}` : g.pubtator[0] && `@DISEASE_${g.pubtator[0]}`;
+  return id ? ext(`https://www.ncbi.nlm.nih.gov/research/pubtator3/docsum?text=${encodeURIComponent(id)}`, "PubTator3") : "PubTator3";
+}
+function cardHTML() {
+  const counts = `<p><b>${fmt(G.n_tagged)}</b> papers tagged with this ${G.kind} by ${pubtator(G)}
+       · <b>${fmt(G.n_curated_papers)}</b> curated papers (Open Targets)${G.n_epmc_only
+       ? ` · <b>${fmt(G.n_epmc_only)}</b> more linked only by Europe PMC text mining · <b>${fmt(G.n_set)}</b> in all` : ""}</p>`;
+  if (G.kind === "disease") {
+    const syn = G.synonyms.slice(0, 10).join("; ") + (G.synonyms.length > 10 ? `; … (${G.synonyms.length - 10} more)` : "");  // (some hold commas)
+    // PubTator's MeSH and OMIM ids for it, and its Open Targets page (unless it is only PubTator's)
+    const ids = G.pubtator.map((id) => id.startsWith("MESH:") ? ext(`https://meshb.nlm.nih.gov/record/ui?ui=${id.slice(5)}`, `MeSH ${esc(id.slice(5))}`)
+      : id.startsWith("OMIM:") ? ext(`https://omim.org/entry/${id.slice(5)}`, `OMIM ${esc(id.slice(5))}`) : esc(id));
+    if (!G.pubtator.includes(G.id)) ids.unshift(ext(`https://platform.opentargets.org/disease/${G.id}`, esc(G.id)));
+    return `<h1>${esc(G.name)}</h1>
+      ${syn ? `<p>Also known as: ${esc(syn)}</p>` : ""}
+      <p class="muted">${ids.join(" · ")}</p>${counts}`;
+  }
   const otherNames = [G.aliases.length ? `Also known as: ${esc(G.aliases.join(", "))}` : "",
                       G.prev.length ? `Previous symbols: ${esc(G.prev.join(", "))}` : ""].filter(Boolean).join(" · ");
   // Location and locus group are HGNC's (NCBI Gene gives the same); each links to its source.
   const kind = !G.locus_group ? "" : G.entrez ? ext(`https://www.ncbi.nlm.nih.gov/gene/${G.entrez}`, `NCBI ${esc(G.locus_group)}`)
                                               : esc(G.locus_group);
-  $("card").innerHTML = `
-    <h1>${esc(G.symbol)} <span class="nm">${esc(G.name)}</span></h1>
+  return `<h1>${esc(G.symbol)} <span class="nm">${esc(G.name)}</span></h1>
     ${otherNames ? `<p>${otherNames}</p>` : ""}
     <p class="muted">${[esc(G.location || ""), kind,
       ext(`https://www.genenames.org/data/gene-symbol-report/#!/hgnc_id/${G.hgnc_id}`, esc(G.hgnc_id))].filter(Boolean).join(" · ")}</p>
-    <p><b>${fmt(G.n_tagged)}</b> papers tagged with this gene by PubTator3
-       · <b>${fmt(G.n_curated_papers)}</b> curated papers (Open Targets)</p>
-    ${also.length ? `<p class="muted">“${esc(S.gene)}” is also an alias or old symbol of:
-       ${also.map((a) => `<a href="?gene=${encodeURIComponent(a.symbol)}">${esc(a.symbol)}</a>`).join(", ")}</p>` : ""}`;
+    ${counts}`;
+}
+
+async function loadGene(g, also, push, picked = false, my = geneNo) {
+  // A pick from a list: a gene by its symbol, a disease by its id (names can be shared)
+  if (picked) S[MODE] = g.kind === "gene" ? g.symbol : g.id;
+  let gene;
+  try { gene = await getJSON("/api/subject/" + encodeURIComponent(g.id)); }
+  catch (e) { if (my === geneNo) { clearGene(); $("msg").innerHTML = `<p class="note">Error: ${esc(e.message)}</p>`; } return; }
+  if (my !== geneNo) return;  // a newer lookup took over
+  G = gene;
+  if (picked || G.kind === "disease") $("subject").value = G.label;  // (a disease's name, not its id or a synonym)
+  for (const d of [...G.curated, ...G.epmc]) DN[d.id] = d.name;
+  $("card").innerHTML = cardHTML() +
+    (also.length ? `<p class="muted">“${esc(S[MODE])}” is also ${G.kind === "gene" ? "an alias or old symbol" : "another name"} of:
+       ${also.map((a) => `<a href="?${MODE}=${encodeURIComponent(a.kind === "gene" ? a.symbol : a.id)}">${esc(a.label)}</a>`).join(", ")}</p>` : "");
   renderDiseases();
   await show(push);
 }
 
-// ---- disease facets: one box per source, the same look; a disease in each box = papers in both
+// ---- facets: one box per source, the same look. For a gene they list diseases, for a disease
+// genes (Open Targets links them both ways). Above them: only papers that name the gene or disease.
 const SRC = {ot: ["OT", "Open Targets curated"], ep: ["ePMC", "Europe PMC text-mined"]};
 const srcTag = (k) => `<span class="src ${k}" title="${SRC[k][1]}">${SRC[k][0]}</span>`;
 const SOURCE_NAMES = {gene2phenotype: "Gene2Phenotype", genomics_england: "Genomics England", orphanet: "Orphanet",
                       uniprot_literature: "UniProt"};
 const sources = (list) => list.map((s) => SOURCE_NAMES[s] || s).join(", ");
 
-const EPMC_TOP = 50;  // text-mined diseases listed per box
-// fc: counts within the other filters (rows = the diseases with papers there, most first), "wait"
-// while they load, or null when no filter is set (the gene's totals and lists).
-const BOX = {gene: "", rows: {}, total: {}, open: {}};  // per box: last rows drawn and whether "more" is open
+const EPMC_TOP = 50;  // text-mined items listed per box
+// fc: counts within the other filters (rows = the items with papers there, most first), "wait"
+// while they load, or null when no filter is set (the subject's totals and lists).
+const BOX = {gene: "", rows: {}, total: {}, all: {}, open: {}};  // per box: last rows drawn and whether "more" is open
 function facetHTML(k, fc) {
-  const ot = k === "ot", gene = ot ? G.curated : G.epmc;
-  let list = gene, nAll = ot ? G.n_curated_papers : G.n_epmc_papers, total = ot ? gene.length : G.n_epmc_diseases;
-  const counting = fc === "wait" && !BOX.rows[k];  // nothing drawn yet for this gene: no rows to keep
-  if (fc === "wait") {  // new counts on the way: the rows drawn last, without numbers
-    list = (BOX.rows[k] || []).map((d) => ({...d, n_papers: null})); nAll = null; total = BOX.total[k] ?? 0;
+  const ot = k === "ot", items = ot ? G.curated : G.epmc, Other = other()[0].toUpperCase() + other().slice(1);
+  let list = items, nAll = ot ? G.n_curated_papers : G.n_epmc_papers, total = ot ? items.length : G.n_epmc_items;
+  const counting = fc === "wait" && !BOX.rows[k], stale = fc === "wait";  // counting: nothing drawn yet for this subject
+  if (stale) {  // new counts on the way: the rows and counts drawn last, faded (rows that jumped would
+    list = BOX.rows[k] || []; nAll = BOX.all[k] ?? null; total = BOX.total[k] ?? 0;  // move under the mouse)
   }
   else if (fc) {
-    const at = Object.fromEntries(gene.map((d, i) => [d.disease_id, i]));
+    const at = Object.fromEntries(items.map((d, i) => [d.id, i]));
     const ids = Object.keys(fc[k]).filter((id) => id !== "any")
       .sort((a, b) => fc[k][b] - fc[k][a] || (at[a] ?? 1e9) - (at[b] ?? 1e9) || a.localeCompare(b));
     total = ids.length;
-    list = ids.slice(0, ot ? ids.length : EPMC_TOP).map((id) => ({disease_id: id, disease: dname(id), n_papers: fc[k][id],
-                                                                   sources: gene[at[id]]?.sources}));
+    list = ids.slice(0, ot ? ids.length : EPMC_TOP).map((id) => ({id, name: dname(id), n_papers: fc[k][id],
+                                                                   sources: items[at[id]]?.sources}));
     nAll = fc[k].any;
   }
-  if (fc !== "wait") [BOX.rows[k], BOX.total[k]] = [list, total];
+  if (!stale) [BOX.rows[k], BOX.total[k], BOX.all[k]] = [list, total, nAll];
   const row = (id, name, n, title) => `<li><button type="button" data-facet="${k}" data-id="${esc(id)}" data-name="${esc(name)}"
       aria-pressed="${S[k] === id}"${n === 0 ? ` class="zero"` : ""}${title ? ` title="${esc(title)}"` : ""}>
       <span${id === "any" ? ` class="any"` : ""}>${esc(name)}</span><span class="n">${n == null ? "" : fmt(n)}</span></button></li>`;
-  const rows = (ds) => ds.map((d) => row(d.disease_id, d.disease, d.n_papers, d.sources && `Curated by ${sources(d.sources)}`)).join("");
+  const rows = (ds) => ds.map((d) => row(d.id, d.name, d.n_papers, d.sources && `Curated by ${sources(d.sources)}`)).join("");
   const top = list.slice(0, 12), rest = list.slice(12);
-  // A disease picked from a paper may be outside the list: show it, picked, under "Any disease".
-  const off = S[k] && S[k] !== "any" && !list.some((d) => d.disease_id === S[k])
+  // An item picked from a paper may be outside the list: show it, picked, under "Any".
+  const off = S[k] && S[k] !== "any" && !list.some((d) => d.id === S[k])
     ? row(S[k], dname(S[k]), fc && fc !== "wait" ? fc[k][S[k]] ?? 0 : null) : "";
   const shown = total > list.length ? ` (top ${list.length} of ${fmt(total)})` : "";
-  const open = BOX.open[k] || rest.some((d) => d.disease_id === S[k]);
-  return `<section class="facet ${k}" aria-labelledby="fh-${k}">
-    <h2 id="fh-${k}">${srcTag(k)} ${ot ? "Curated diseases" : "Text-mined diseases"}</h2>
+  const open = BOX.open[k] || rest.some((d) => d.id === S[k]);
+  const otPage = G.kind === "gene" ? G.ensembl && `target/${G.ensembl}` : !G.pubtator.includes(G.id) && `disease/${G.id}`;
+  return `<section class="facet ${k}${stale ? " stale" : ""}" aria-labelledby="fh-${k}">
+    <h2 id="fh-${k}">${srcTag(k)} ${ot ? "Curated" : "Text-mined"} ${other()}s</h2>
     <p class="sub">${ot ? `Open Targets curators: Orphanet, Gene2Phenotype, Genomics England, UniProt.
-        ${G.ensembl ? ext(`https://platform.opentargets.org/target/${G.ensembl}`, "Open Targets page") : ""}`
+        ${otPage ? ext(`https://platform.opentargets.org/${otPage}`, "Open Targets page") : ""}`
       : "Europe PMC text mining, via Open Targets."}</p>
-    ${counting ? `<ul class="dlist">${row("any", "Any disease", null)}${off}</ul><p class="hint">Counting…</p>`
-      : list.length || off || nAll || S[k] ? `<ul class="dlist">${row("any", "Any disease", nAll)}${off}${rows(top)}</ul>
+    ${counting ? `<ul class="dlist">${row("any", `Any ${other()}`, null)}${off}</ul><p class="hint">Counting…</p>`
+      : list.length || off || nAll || S[k] ? `<ul class="dlist">${row("any", `Any ${other()}`, nAll)}${off}${rows(top)}</ul>
       ${rest.length ? `<details class="more" data-box="${k}"${open ? " open" : ""}>
         <summary>${rest.length} more${shown}</summary><ul class="dlist">${rows(rest)}</ul></details>` : ""}`
-      : `<p class="muted">None ${fc && gene.length ? "within your other filters" : `for ${esc(G.symbol)}`}.</p>`}
+      : `<p class="muted">None ${fc && items.length ? "within your other filters" : `for ${esc(G.label)}`}.</p>`}
+  </section>`;
+}
+// Only the papers whose title or abstract names the gene (its symbol, an alias or old symbol, or a
+// name PubTator3 found for it in that paper) or the disease (name, synonym, or PubTator3's word for
+// it there). n: how many, within the other filters (null while counting).
+function namedHTML(n, stale) {
+  const alias = G.kind === "gene" ? "an alias" : "a synonym";
+  return `<section class="facet nm${stale ? " stale" : ""}" aria-labelledby="fh-nm">
+    <h2 id="fh-nm">Named in the abstract</h2>
+    <p class="sub">PubTator3 also tags papers that name the ${G.kind} only in the full text, or link it by curation or MeSH.</p>
+    <ul class="dlist"><li><button type="button" data-named aria-pressed="${!!S.named}"
+        title="${S.named ? "Click to show all papers again." : `Show only papers naming ${esc(G.label)} (or ${alias}) in the title or abstract.`}">
+      <span>${esc(G.label)} in the title or abstract</span><span class="n">${n == null ? "" : fmt(n)}</span></button></li></ul>
   </section>`;
 }
 
 let FC = null;  // box counts within the other filters, for FC.key
-const keyWords = () => S.q.trim() && !S.rank ? S.q.trim() : "";  // keyword words filter the list; meaning words only rank it
-const facetKey = () => [G?.hgnc_id, S.ot, S.ep, keyWords(), S.match, S.ymin, S.ymax].join("|");
+const keyWords = () => S.q.trim() && rank() === "keyword" ? S.q.trim() : "";  // keyword words filter the list; others only rank it
+const facetKey = () => [G?.id, S.ot, S.ep, S.named, keyWords(), S.match, S.ymin, S.ymax].join("|");
 function renderDiseases() {
   if (!G) return;
-  const filtered = S.ot || S.ep || S.ymin || S.ymax || keyWords(), key = facetKey();
-  if (filtered && FC?.key !== key)
-    getJSON("/api/facets?" + new URLSearchParams({gene: G.hgnc_id, ot: S.ot, ep: S.ep, term: keyWords(), match: S.match || "all",
-                                                  ymin: S.ymin || 0, ymax: S.ymax || 0})).then((fc) => {
+  // Counts are fetched always (the named box's count comes only from there); the facet boxes use
+  // them once a filter is set, else the subject's totals.
+  const filtered = S.ot || S.ep || S.named || S.ymin || S.ymax || keyWords(), key = facetKey();
+  if (FC?.key !== key)
+    getJSON("/api/facets?" + new URLSearchParams({subject: G.id, ot: S.ot, ep: S.ep, named: S.named ? 1 : 0, term: keyWords(),
+                                                  match: S.match || "all", rank: rank(), ymin: S.ymin || 0, ymax: S.ymax || 0})).then((fc) => {
       if (FC?.key === key || facetKey() !== key) return;  // already drawn, or the filters moved on
       const named = Object.keys(fc.names).some((id) => DN[id] !== fc.names[id]);
       Object.assign(DN, fc.names);
@@ -413,32 +500,54 @@ function renderDiseases() {
       const bar = document.querySelector("#list .filters");  // a filter chip may still show a bare id
       if (named && bar) { bar.outerHTML = filtersHTML(); wireTop(); }
     }).catch(() => {});
-  const fc = !filtered ? null : FC?.key === key ? FC : "wait";
-  if (BOX.gene !== G.hgnc_id) Object.assign(BOX, {gene: G.hgnc_id, rows: {}, total: {}, open: {}});
-  const f = document.activeElement?.closest?.("#dis [data-facet]");  // keep keyboard focus on the row
-  $("dis").innerHTML = facetHTML("ot", fc) + facetHTML("ep", fc) +
-    `<p class="hint">Click a disease to show only its papers (clears the “and…” words). Pick one in each box = papers in both.
-      ${fc ? "Counts are within your other filters." : ""}</p>`;
-  if (f) $("dis").querySelector(`[data-facet="${f.dataset.facet}"][data-id="${CSS.escape(f.dataset.id)}"]`)?.focus();
+  const have = FC?.key === key, fc = !filtered ? null : have ? FC : "wait";
+  if (BOX.gene !== G.id) Object.assign(BOX, {gene: G.id, rows: {}, total: {}, all: {}, open: {}});
+  const f = document.activeElement?.closest?.("#dis [data-facet], #dis [data-named]");  // keep keyboard focus on the row
+  const what = isMap() ? `Hover over a ${other()} to grey out the other papers on the map; click to keep that.`
+    : `Click a ${other()} to show only its papers${keyWords() ? " (clears the keyword words)" : ""}.`;
+  const lastNamed = FC?.key.split("|")[0] === G.id ? FC.named : null;  // (while counting: the last count, faded)
+  $("dis").innerHTML = namedHTML(lastNamed, !have) + facetHTML("ot", fc) + facetHTML("ep", fc) +
+    `<p class="hint">${what} Pick one in each box = papers in both. ${fc ? "Counts are within your other filters." : ""}</p>`;
+  if (f) $("dis").querySelector(f.dataset.named != null ? "[data-named]"
+    : `[data-facet="${f.dataset.facet}"][data-id="${CSS.escape(f.dataset.id)}"]`)?.focus();
 }
-function addNames(names) {  // disease names from the server; redraw the boxes if one was missing or differs
+function addNames(names) {  // facet names from the server; redraw the boxes if one was missing or differs
   const fresh = Object.entries(names || {}).filter(([id, name]) => DN[id] !== name);
   for (const [id, name] of fresh) DN[id] = name;
   if (fresh.length) renderDiseases();
 }
 
-// A disease from a facet box or a paper's chip; clicking the one already picked turns it off.
-function pickDisease(k, id, name) {
+// An item from a facet box or a paper's chip; clicking the one already picked turns it off.
+function pickFacet(k, id, name) {
   if (name) DN[id] = name;
   const off = S[k] === id;
   S[k] = off ? "" : id;
-  // A disease replaces the "and…" words: both together usually leave nothing (the words are
-  // often the same disease, spelled differently).
-  if (!off && id !== "any") { Object.assign(S, {q: "", match: "", sort: ""}); $("term").value = ""; }
-  S.page = 1; S.topic = "";
-  renderDiseases(); show(true);
+  // An item replaces keyword words, which filter: both together usually leave nothing (the words
+  // are often the same disease, spelled differently). Semantic and hybrid words only rank: kept.
+  if (!off && id !== "any" && keyWords()) { Object.assign(S, {q: "", match: "", sort: ""}); $("term").value = ""; }
+  filtersChanged();
+  if (isMap()) return;  // (the map greys out the other papers where it is)
   const top = $("list").getBoundingClientRect().top;
   if (top < 0 || top > innerHeight * 0.6) $("list").scrollIntoView({behavior: "smooth", block: "start"});
+}
+// After a filter changes. The map is of the list without its facets: if it stays the same, it only
+// greys out the papers the facets leave out (zoom and drill-in kept); else a new list or map.
+function filtersChanged() {
+  S.page = 1;
+  renderDiseases();
+  const same = M && mapParams() === M.params;  // (a drill-in is kept unless the map changes)
+  if (!same) S.topic = "";
+  if (!(same && isMap())) return show(true);
+  writeURL(true);
+  $("how").innerHTML = howHTML();
+  updateFilterBar();
+  redraw();
+}
+function updateFilterBar() {
+  const bar = document.querySelector("#list .filters"), html = filtersHTML();
+  if (bar) bar.outerHTML = html;
+  else document.querySelector("#list .tabs")?.insertAdjacentHTML("afterend", html);
+  wireTop();
 }
 $("dis").addEventListener("click", (e) => {  // remember each box's "more" list as the user leaves it (open or shut)
   const d = e.target.closest("details.more > summary")?.parentElement;
@@ -446,69 +555,80 @@ $("dis").addEventListener("click", (e) => {  // remember each box's "more" list 
 });
 document.addEventListener("click", (e) => {
   const b = e.target.closest("[data-facet]");
-  if (b && G) pickDisease(b.dataset.facet, b.dataset.id, b.dataset.name);
+  if (b && G) pickFacet(b.dataset.facet, b.dataset.id, b.dataset.name);
+  if (e.target.closest("[data-named]") && G) { S.named = S.named ? "" : "1"; filtersChanged(); }
 });
+// In the map, hovering over a facet row greys out the papers it would leave out, for a moment.
+let hoverPick = null;  // e.g. {ot: "MONDO_0009061"} or {named: "1"}
+$("dis").addEventListener("mouseover", (e) => {
+  if (!isMap() || !M) return;
+  const b = e.target.closest("[data-facet], [data-named]");
+  const pick = !b ? null : b.dataset.named != null ? {named: "1"} : {[b.dataset.facet]: b.dataset.id};
+  if (JSON.stringify(pick) !== JSON.stringify(hoverPick)) { hoverPick = pick; redraw(); }
+});
+$("dis").addEventListener("mouseleave", () => { if (hoverPick) { hoverPick = null; if (isMap()) redraw(); } });
 
 // ---- shared top of the results: tabs, active filters, how it works
 function filtersHTML() {
-  const f = [];
+  const f = [], marked = [];  // marked: the facets, which in the map grey out the other papers (else they filter)
   const plain = (html) => Object.assign(document.createElement("div"), {innerHTML: html}).textContent;  // tags and entities out
-  const chip = (label, key) => f.push(`<span class="fchip">${label}<button type="button" data-clear="${key}"
+  const chip = (label, key) => (isMap() && ["ot", "ep", "named"].includes(key) ? marked : f).push(`<span class="fchip">${label}<button type="button" data-clear="${key}"
       title="Remove this filter" aria-label="Remove filter: ${esc(plain(label))}">✕</button></span>`);
   for (const k of ["ot", "ep"]) if (S[k])
-    chip(`${srcTag(k)} <b>${S[k] === "any" ? `any ${k === "ot" ? "curated" : "text-mined"} disease` : esc(dname(S[k]))}</b>`, k);
-  if (S.q.trim() && !S.rank) chip(`Words: <b>“${esc(S.q.trim())}”</b>`, "q");  // meaning/hybrid rank, not filter
+    chip(`${srcTag(k)} <b>${S[k] === "any" ? `any ${k === "ot" ? "curated" : "text-mined"} ${other()}` : esc(dname(S[k]))}</b>`, k);
+  if (S.named) chip(`<b>${esc(G.label)} named in the title or abstract</b>`, "named");
+  if (keyWords()) chip(`Words: <b>“${esc(S.q.trim())}”</b>`, "q");  // semantic/hybrid words rank, not filter
   if (S.ymin || S.ymax) chip(`Years: <b>${esc(S.ymin || "…")}–${esc(S.ymax || "…")}</b>`, "years");
-  if (!f.length) return "";
-  return `<div class="filters" role="region" aria-label="Active filters"><b>Showing only:</b> ${f.join("")}
-    <button type="button" class="clearall" data-clear="all">${f.length > 1 ? "Clear all filters" : "Clear filter"}</button></div>`;
+  const n = f.length + marked.length;
+  if (!n) return "";
+  return `<div class="filters" role="region" aria-label="Active filters">${f.length ? `<b>Showing only:</b> ${f.join("")}` : ""}
+    ${marked.length ? `<b>Highlighted (the rest grey):</b> ${marked.join("")}` : ""}
+    <button type="button" class="clearall" data-clear="all">${n > 1 ? "Clear all filters" : "Clear filter"}</button></div>`;
 }
 function clearFilter(key) {
   if (key === "ot" || key === "all") S.ot = "";
   if (key === "ep" || key === "all") S.ep = "";
-  // Words filter only with keyword ranking; with meaning or hybrid they rank, aren't a chip, and stay.
-  if (key === "q" || (key === "all" && !S.rank)) { Object.assign(S, {q: "", match: "", sort: ""}); $("term").value = ""; }
+  if (key === "named" || key === "all") S.named = "";
+  // Words filter only with keyword ranking; with semantic or hybrid they rank, aren't a chip, and stay.
+  if (key === "q" || (key === "all" && keyWords())) { Object.assign(S, {q: "", match: "", sort: ""}); $("term").value = ""; }
   if (key === "years" || key === "all") Object.assign(S, {ymin: "", ymax: ""});
-  S.page = 1; S.topic = ""; renderDiseases(); show(true);
+  filtersChanged();
 }
 
 const infoBtn = () => `<button type="button" class="info" popovertarget="how" title="How this search works"
   aria-label="How this search works">i</button>`;
 
-function howHTML(r) {
-  const term = S.q.trim(), sym = esc(G.symbol);
-  const ranked = !term ? (S.rank ? `Type words in “and…” to rank them by ${S.rank === "meaning" ? "meaning" : "keywords and meaning"}.` :
-                          "Newest first. Type words in “and…” to rank them.")
-    : !S.rank ? "Your words rank them by <b>keyword match</b> (BM25). This is <b>not</b> AI or semantic search: choose “Meaning” in <i>Rank by</i> for that."
-    : S.rank === "meaning" ? "Ranked by <b>meaning</b>: an AI model compares your words with each title and abstract, so a paper can match without using your exact words."
+function howHTML() {
+  const term = S.q.trim(), sym = esc(G.label), kind = G.kind;
+  const date = S.sort === "oldest" ? "Oldest first" : "Newest first";
+  const ranked = !term ? `${date}. Type words in “Optionally rank by” to rank them.`
+    : S.sort === "newest" || S.sort === "oldest" ? `${date}: choose “Best match” in <i>Sort</i> to rank them by your words.`
+    : rank() === "keyword" ? "Your words rank them by <b>keyword match</b> (BM25). This is <b>not</b> AI or semantic search: choose “Semantic” in <i>Rank method</i> for that."
+    : rank() === "semantic" ? "Ranked by <b>meaning</b> (semantic): an AI model compares your words with each title and abstract, so a paper can match without using your exact words."
     : "Ranked by <b>keyword match and meaning together</b> (hybrid).";
-  const src = r && r.sem_source === "full" ? "taken from a ready-made index of all PubMed abstracts"
-    : "worked out on this computer for this gene’s papers the first time you ask, then saved";
-  const linked = (who, k) => `${who} ${k === "ot" ? "linked" : "links"} to ${sym} and ${S[k] === "any" ? "a disease" : esc(dname(S[k]))}`;
-  const conds = [S.ot && linked("Open Targets curators", "ot"), S.ep && linked("Europe PMC text mining", "ep")].filter(Boolean);
-  const which = conds.length ? `the papers are those ${conds.join(", and that ")}.`
-    : `the papers are those PubTator3 (NCBI text mining, done in advance) tagged with ${sym}, plus Open Targets curated papers.`;
+  const linked = (who, k) => `${who} ${k === "ot" ? "linked" : "links"} to ${sym} and ${S[k] === "any" ? `a ${other()}` : esc(dname(S[k]))}`;
+  const conds = [S.ot && linked("Open Targets curators", "ot"), S.ep && linked("Europe PMC text mining", "ep"),
+                 S.named && `name ${sym} in the title or abstract`].filter(Boolean);
+  const which = S.ot || S.ep ? `the papers are those ${conds.join(", and that ")}.`
+    : `the papers are those PubTator3 (NCBI text mining) tagged with ${sym}, plus Open Targets curated papers${conds.length ? `, that ${conds[0]}` : ""}.`;
   return `<h2>How this search works <button type="button" popovertarget="how" popovertargetaction="hide">Close</button></h2>
     <p>Here ${which} ${ranked}</p>
     <ul>
-      <li><b>Which papers.</b> PubTator3 tags genes in all PubMed abstracts and in open-access PubMed Central full texts, ahead of time. Open Targets adds
-        curated gene–disease papers (Orphanet, Gene2Phenotype, Genomics England, UniProt). The disease boxes on the left use
-        Open Targets’ curated (OT) and Europe PMC text-mined (ePMC) gene–disease links; a disease in each box shows the papers in both.</li>
-      <li><b>Keywords (BM25).</b> Worked out live over this gene’s papers. Counts your words (and their forms, such as
-        fibrosis and fibroses) in each title and abstract. Rare words count more, long abstracts a bit less. By default
-        only papers with all your words are listed. No AI.</li>
-      <li><b>Meaning (AI embeddings).</b> The MedEmbed-small model turns each title + abstract, and your words, into
-        384 numbers that capture meaning. Papers are ranked by how close they are (cosine similarity), so every
-        paper is listed, closest first. The paper numbers are ${src}.</li>
-      <li><b>Both (hybrid).</b> Each paper scores 1/(60 + its keyword rank) + 1/(60 + its meaning rank)
-        (reciprocal rank fusion), so papers near the top of either list rise.</li>
-      <li><b>Map.</b> Places the papers by meaning: UMAP squeezes the 384 numbers to 12 for finding topics (HDBSCAN,
-        at most 8) and to 2 for drawing. Papers between topics join the nearest one; the least typical stay grey.
-        Topics are named by their most distinctive words, or by an AI when available. “Drill in” makes a new map of one topic’s papers.</li>
-      <li><b>Map Explorer.</b> Each axis is how close each paper is in meaning to your words (embedded by the same model),
-        or to a topic’s centre (the average of its papers’ 384 numbers): the cosine similarity, which is the paper’s
-        384 numbers projected onto that direction.</li>
-    </ul>`;
+      <li><b>Which papers.</b> PubTator3 tags ${kind}s in all PubMed abstracts and in open-access PubMed Central full texts. Open Targets adds
+        curated gene–disease papers (Orphanet, Gene2Phenotype, Genomics England, UniProt). The ${other()} boxes on the left use
+        Open Targets’ curated (OT) and Europe PMC text-mined (ePMC) gene–disease links.</li>
+      <li><b>Keyword ranking (BM25).</b> Counts your search words (and their forms, such as fibrosis and fibroses) in
+        each title and abstract for the ${kind}. Rare words count more, long abstracts a bit less. By default only papers
+        with all your words are listed.</li>
+      <li><b>Semantic ranking (AI embeddings).</b> The MedEmbed-small model was used to match each paper (title + abstract)
+        against your search words. Papers are ranked by how close they are (cosine similarity) to the search words.</li>
+      <li><b>Hybrid ranking (reciprocal rank fusion).</b> Each paper scores 1/(60 + its keyword rank) + 1/(60 + its semantic rank),
+        so papers near the top of either list rise.</li>
+      <li><b>Map.</b> Places the papers by meaning: UMAP squeezes the 384 number embedding to 12 dimensions for clustering
+        (HDBSCAN, at most 8) and then to 2 dimensions for visualization. Topics are named by their most distinctive words.
+        The “Drill in” button makes a new map of one topic’s papers.</li>
+    </ul>
+    <p>More: <a href="/about">About</a> (the data, and how the map is made).</p>`;
 }
 
 function tabsHTML() {
@@ -519,7 +639,7 @@ function tabsHTML() {
 function wireTop() {
   document.querySelectorAll("#list [data-clear]").forEach((b) => b.onclick = () => clearFilter(b.dataset.clear));
   document.querySelectorAll("#list [data-view]").forEach((b) => b.onclick = () => {
-    if (S.view !== b.dataset.view) { S.view = b.dataset.view; show(true); }
+    if (S.view !== b.dataset.view) { S.view = b.dataset.view; renderDiseases(); show(true); }  // (the boxes' hint differs)
   });
 }
 
@@ -527,10 +647,11 @@ function wireTop() {
 const isMap = () => S.view === "map" || S.view === "explore";
 function show(push = true) { playing = false; return isMap() ? loadMap(push) : loadPapers(push); }
 
-function scopeText(n) {
-  const conds = [S.ot && (S.ot === "any" ? "curated (any disease)" : `curated for ${esc(dname(S.ot))}`),
-                 S.ep && (S.ep === "any" ? "text-mined (any disease)" : `text-mined for ${esc(dname(S.ep))}`)].filter(Boolean);
-  return `paper${n === 1 ? "" : "s"} for ${esc(G.symbol)}${conds.length ? ", " + conds.join(" and ") : ""}`;
+function scopeText(n, facets = true) {  // facets: false for the map, which is of the list without them
+  const conds = !facets ? [] : [S.ot && (S.ot === "any" ? `curated (any ${other()})` : `curated for ${esc(dname(S.ot))}`),
+                 S.ep && (S.ep === "any" ? `text-mined (any ${other()})` : `text-mined for ${esc(dname(S.ep))}`),
+                 S.named && "naming it in the title or abstract"].filter(Boolean);
+  return `paper${n === 1 ? "" : "s"} for ${esc(G.label)}${conds.length ? ", " + conds.join(" and ") : ""}`;
 }
 
 async function loadPapers(push = true) {
@@ -540,7 +661,7 @@ async function loadPapers(push = true) {
   const st = document.querySelector("#list .status");
   if (st && document.querySelector("#list ol.papers")) st.innerHTML = `<b>Searching…</b>`;
   else { setList(head() + `<p class="status"><b>Searching…</b></p>`); wireTop(); }
-  $("how").innerHTML = howHTML(null);
+  $("how").innerHTML = howHTML();
   let r;
   try {
     r = await poll("/api/papers?" + apiParams(), my, (html) => { setList(head() + html); wireTop(); });
@@ -555,9 +676,9 @@ async function loadPapers(push = true) {
   const toggle = (to, label) => ` · <button type="button" class="linkish" data-match="${to}">${label}</button>`;
   let what;
   if (!term) what = `<b>${fmt(r.n_matched)}</b> ${scope}`;
-  else if (S.rank) {
-    what = `<b>${fmt(r.n_matched)}</b> ${scope}, ${S.rank === "meaning" ? `closest in meaning to “${esc(term)}” first`
-                                                                       : `best for “${esc(term)}” by keywords and meaning first`}`
+  else if (rank() !== "keyword") {
+    what = `<b>${fmt(r.n_matched)}</b> ${scope}, ${rank() === "semantic" ? `closest in meaning to “${esc(term)}” first`
+                                                                        : `best for “${esc(term)}” by keywords and meaning first`}`
       + ` · ${fmt(r.n_all)} ${r.n_all === 1 ? "contains" : "contain"} all the words`;
   }
   else if (!r.n_matched) what = !r.n_scope ? `No ${scopeAll} here` : r.n_scope === 1 ? `The 1 ${scopeAll} does not contain “${esc(term)}”`
@@ -569,12 +690,12 @@ async function loadPapers(push = true) {
     : r.n_all ? `<b>${fmt(r.n_matched)}</b> of ${fmt(r.n_scope)} ${scopeAll} contain any of the words “${esc(term)}”` +
         toggle("", `show only the ${fmt(r.n_all)} with all words`)
     : `No paper has all the words “${esc(term)}”. Showing the <b>${fmt(r.n_matched)}</b> of ${fmt(r.n_scope)} ${scopeAll} with any of them`;
-  const capped = r.sem_capped ? `<p class="note">Meaning ranking covers the ${fmt(r.sem_capped.n)} best keyword matches of
+  const capped = r.sem_capped ? `<p class="note">Semantic ranking covers the ${fmt(r.sem_capped.n)} best keyword matches of
       ${fmt(r.sem_capped.of)} papers; the rest follow, newest first. (A ready-made AI index of all PubMed is being built;
       once it is there, every paper is ranked.)</p>` : "";
   const sortName = {relevance: "best match first", newest: "newest first", oldest: "oldest first"}[r.sort];
   const csv = "/api/papers.csv?" + apiParams();
-  $("how").innerHTML = howHTML(r);
+  $("how").innerHTML = howHTML();
   setList(head() + `
     <p class="status">${what} · ${sortName} · ${secs} s ${infoBtn()}</p>
     ${capped}
@@ -586,7 +707,7 @@ async function loadPapers(push = true) {
         <option value="newest">Newest first</option><option value="oldest">Oldest first</option></select></label>
       <a href="${csv}" download>Download CSV (all ${fmt(r.n_matched)}${r.n_matched > 50000 ? `, about ${fmt(Math.round(r.n_matched / 2000))} MB` : ""})</a>
     </div>
-    ${r.n_matched ? "" : `<p class="note">No papers here. ${S.ot || S.ep || term || S.ymin || S.ymax ? "Remove a filter above." : ""}</p>`}
+    ${r.n_matched ? "" : `<p class="note">No papers here. ${S.ot || S.ep || S.named || keyWords() || S.ymin || S.ymax ? "Remove a filter above." : ""}</p>`}
     <ol class="papers">${r.papers.map((p) => paperHTML(p, hl(p))).join("")}</ol>
     ${pager(r)}`);
   wireTop();
@@ -600,24 +721,25 @@ async function loadPapers(push = true) {
 }
 
 function scoreText(p) {
-  if (S.rank === "meaning" && p.sim != null) return `meaning match ${p.sim.toFixed(2)}`;
-  if (S.rank === "hybrid" && (p.kw_rank || p.sem_rank))
-    return `${p.kw_rank ? `keyword rank ${fmt(p.kw_rank)}` : "no keyword match"} · ${p.sem_rank ? `meaning rank ${fmt(p.sem_rank)}` : "no meaning score"}`;
+  if (rank() === "semantic" && p.sim != null) return `semantic match ${p.sim.toFixed(2)}`;
+  if (rank() === "hybrid" && (p.kw_rank || p.sem_rank))
+    return `${p.kw_rank ? `keyword rank ${fmt(p.kw_rank)}` : "no keyword match"} · ${p.sem_rank ? `semantic rank ${fmt(p.sem_rank)}` : "no semantic score"}`;
   return p.bm25 != null ? `keyword score ${p.bm25}` : "";
 }
 
 const EP_SHOWN = 6;  // text-mined chips shown per paper before "+N more"
 function paperHTML(p, h) {
   const url = `https://pubmed.ncbi.nlm.nih.gov/${p.pmid}/`;
-  const title = p.title ? h(p.title) : `<a href="${url}" target="_blank" rel="noopener">PMID ${p.pmid}</a><span class="tag">no abstract</span>`;
+  const tag = p.abstract ? "" : '<span class="tag">no abstract</span>';
+  const title = p.title ? h(p.title) + tag : `<a href="${url}" target="_blank" rel="noopener">PMID ${p.pmid}</a>${tag}`;
   const abs = p.abstract ? h(p.abstract) : "";
   const named = (title + abs).includes('<mark class="g">');
   const meta = [p.journal && esc(p.journal), p.year, p.title && `<a href="${url}" target="_blank" rel="noopener">PMID ${p.pmid}</a>`,
                 S.q.trim() && scoreText(p)].filter(Boolean).join(" · ");
-  const link = (k, d, why) => `<button type="button" class="dchip ${k}" data-facet="${k}" data-id="${esc(d.disease_id)}"
-      data-name="${esc(d.disease)}" aria-pressed="${S[k] === d.disease_id}" title="${esc(`${why} ${S[k] === d.disease_id
-        ? "Click to show all papers again." : `Click to show only these papers for ${G.symbol} + ${d.disease}.`}`)}">${srcTag(k)}${esc(d.disease)}</button>`;
-  const first = (ds, k) => [...ds.filter((d) => S[k] === d.disease_id), ...ds.filter((d) => S[k] !== d.disease_id)];  // the picked one
+  const link = (k, d, why) => `<button type="button" class="dchip ${k}" data-facet="${k}" data-id="${esc(d.id)}"
+      data-name="${esc(d.name)}" aria-pressed="${S[k] === d.id}" title="${esc(`${why} ${S[k] === d.id
+        ? "Click to show all papers again." : `Click to show only these papers for ${G.label} + ${d.name}.`}`)}">${srcTag(k)}${esc(d.name)}</button>`;
+  const first = (ds, k) => [...ds.filter((d) => S[k] === d.id), ...ds.filter((d) => S[k] !== d.id)];  // the picked one
   const ot = first(p.curated, "ot").map((c) => link("ot", c, `Open Targets curated (${sources(c.sources)}).`));
   const ep = first(p.epmc, "ep").map((d) => link("ep", d, "Europe PMC text-mined link."));
   const links = [...ot, ...ep.slice(0, EP_SHOWN)].join("") + (ep.length > EP_SHOWN
@@ -632,7 +754,7 @@ function paperHTML(p, h) {
     ${meta ? `<div class="meta">${meta}</div>` : ""}
     ${links ? `<div>${links}</div>` : ""}
     ${chips ? `<div>${chips}</div>` : ""}
-    ${p.title && !named ? `<div class="hint">${esc(G.symbol)} is not named in the title or abstract (tagged in the full text, or linked by curation).</div>` : ""}
+    ${p.title && !named ? `<div class="hint">${esc(G.label)} is not named in the title or abstract (tagged in the full text, or linked by curation or MeSH).</div>` : ""}
     ${abs ? `<details class="abs"><summary>Abstract</summary><p class="abstract">${abs}</p></details>` : ""}
   </li>`;
 }
@@ -677,9 +799,9 @@ async function loadMap(push = true) {
   playing = false;
   const my = ++reqNo, t0 = performance.now();
   const head = () => tabsHTML() + filtersHTML();
-  const params = apiParams({topic: S.topic, page: 1, sort: ""}).toString();
-  $("how").innerHTML = howHTML(null);
-  let r = M && M.params === params ? M : null;  // switching between Map and Map Explorer: same map
+  const params = mapParams();
+  $("how").innerHTML = howHTML();
+  let r = M && M.params === params ? M : null;  // switching between Map and Map Explorer, or a facet: same map
   if (!r) {
     setList(head() + `<p class="status"><b>Making the map…</b></p>`); wireTop();
     try {
@@ -697,8 +819,7 @@ async function loadMap(push = true) {
     Object.assign(r, {params, secs: ((performance.now() - t0) / 1000).toFixed(1)});
   }
   if (my !== reqNo) return;
-  addNames(r.names);
-  $("how").innerHTML = howHTML(null);
+  $("how").innerHTML = howHTML();
   if (M !== r) {  // a different map
     // Topic axes name this map's topics: drop them when you move to another map, but not on
     // Back/Forward (push false), where the URL's axes go with the URL's map.
@@ -725,15 +846,16 @@ async function loadMap(push = true) {
   const sample = !r.sampled ? ""
     : path.length ? ` These are the topic’s papers in a fixed sample of ${fmt(r.n_shown)} of the ${fmt(r.n_text)} papers.`
     : ` A fixed sample of ${fmt(n)} of the ${fmt(r.n_text)} papers (more would be slow); the same sample each time.`;
-  const left = !path.length && r.n_list - r.n_text ? ` ${plural(r.n_list - r.n_text, "paper")} with no abstract left out.` : "";
+  const left = !path.length && r.n_list - r.n_text ? ` ${plural(r.n_list - r.n_text, "paper")} not in the local PubMed copy left out.` : "";
   const [y0, y1] = yearSpan();
   if (explore && !(S.ax && S.ay)) EX = null;  // (Back to a page with no axes: no axes)
   setList(head() + `
-    <p class="status">${explore ? "Map Explorer" : "Map"} of <b>${fmt(n)}</b> ${scopeText(n)}${within}:
-      ${r.clusters.length ? `<b>${r.clusters.length}</b> ` : "no clear "}${path.length ? "sub-topics" : "topics"} · ${fmt(noise)} in no clear topic (grey) · ${r.secs} s ${infoBtn()}</p>
+    <p class="status">${explore ? "Map Explorer" : "Map"} of <b>${fmt(n)}</b>${!path.length && n < r.n_list ? ` (out of ${fmt(r.n_list)})` : ""} ${scopeText(n, false)}${within}:
+      ${r.clusters.length ? `<b>${r.clusters.length}</b> ` : "no clear "}${path.length ? "sub-topics" : "topics"} · ${fmt(noise)} in no clear topic (grey)<span id="maskNote"></span> · ${r.secs} s ${infoBtn()}</p>
     ${crumbs}
     <p class="hint" style="max-width:75ch">Dot = paper; close dots are close in meaning. Ring = curated paper. Click a dot to read it.
-      Hold <kbd>Shift</kbd> over a dot to pick out its topic; <kbd>Esc</kbd> clears.${sample}${left}
+      Hold <kbd>Shift</kbd> over a dot to pick out its topic; <kbd>Esc</kbd> clears. Hover over a box on the left to grey out
+      the papers it leaves out; click to keep that.${sample}${left}
       ${r.named_by === "llm" ? "Topic names: AI (Gemini Flash-Lite)." : "Topic names: each topic’s most distinctive words."}</p>
     ${explore ? axesHTML(r) : ""}
     <div class="bar">
@@ -776,8 +898,36 @@ async function loadMap(push = true) {
     syncYear();
   }
   if (explore) wireAxes();
+  loadMapFacets(r);
   if (explore && S.ax && S.ay) await loadAxes(false);
   else drawMap();
+}
+
+// ---- facets on the map: which papers each facet row links (positions in M.pmid), loaded once per
+// map; picked (S) or hovered over (hoverPick), the papers they leave out are greyed out.
+function loadMapFacets(r) {
+  if (r.facets || r.facetsLoading || !r.key) return;
+  r.facetsLoading = true;
+  getJSON("/api/map_facets?" + new URLSearchParams({subject: G.id, key: r.key})).then((f) => {
+    r.facets = f;
+    addNames(f.names);
+    if (M === r && isMap()) { updateFilterBar(); redraw(); }
+  }).catch(() => { r.facetsLoading = false; });
+}
+function facetMask() {  // 1 = kept by the picked (and hovered) facets; null = none picked (or not loaded yet)
+  const F = M?.facets, st = {...S, ...hoverPick}, parts = [];
+  if (!F) return null;
+  for (const k of ["ot", "ep"]) if (st[k]) parts.push(st[k] === "any" ? Object.values(F[k]).flat() : F[k][st[k]] || []);
+  if (st.named) parts.push(F.named);
+  if (!parts.length) return null;
+  const on = new Uint8Array(M.pmid.length);
+  parts.forEach((idx, j) => { for (const i of idx) if (on[i] === j) on[i] = j + 1; });  // in every part
+  return on.map((v) => +(v === parts.length));
+}
+let drawing = null, drawAgain = false;
+function redraw() {  // drawMap, at most one at a time (hovering down the facet rows asks for many)
+  if (drawing) { drawAgain = true; return; }
+  drawing = drawMap().finally(() => { drawing = null; if (drawAgain) { drawAgain = false; redraw(); } });
 }
 
 function wireCrumbs() {
@@ -869,7 +1019,7 @@ async function loadAxes(animate) {
   if (EX && EX.id === id) { note.textContent = EX.note; return drawMap(); }
   let r;
   try {
-    r = await poll("/api/axes?" + new URLSearchParams({gene: G.hgnc_id, key: M.key, a: ax, b: ay}), my,
+    r = await poll("/api/axes?" + new URLSearchParams({subject: G.id, key: M.key, a: ax, b: ay}), my,
                    (html) => { if (mine()) note.innerHTML = html; });
   } catch (e) { if (mine()) { note.textContent = `Error: ${e.message}`; drawMap(); } return; }
   if (!r || !mine()) return;
@@ -925,6 +1075,7 @@ function placeLabels() {
   const X = (v) => xa._offset + xa.l2p(v), Y = (v) => ya._offset + ya.l2p(v);
   const inside = (b) => b.x0 >= xa._offset && b.x1 <= xa._offset + xa._length && b.y0 >= ya._offset && b.y1 <= ya._offset + ya._length;
   const focus = hoverFocus || mapFocus, explore = pos() !== M;
+  const faded = facetMask() ? 0.55 : 1;  // facets picked: fade the names so the few highlighted dots show through
   // Keep off every curated paper of the shown topics, also those not yet out while playing years
   // (so names don't hop about from year to year).
   const rad = drawn.big / 2 + 3, dots = [];
@@ -955,7 +1106,7 @@ function placeLabels() {
     if (explore && covers(spot) > 2) { hidden += shownYet; continue; }  // (only short moves there: rather leave it off)
     placed.push(spot);
     if (shownYet) out.push({x: cx, y: cy, text: pesc(text), showarrow: !!(spot.dx || spot.dy), ax: spot.dx, ay: spot.dy, arrowhead: 0,
-      arrowwidth: 1.5, arrowcolor: "#555", font: {size: fs, color: INK, family: FONT},
+      arrowwidth: 1.5, arrowcolor: "#555", font: {size: fs, color: INK, family: FONT}, opacity: faded,
       bgcolor: "rgba(255,255,255,0.9)", bordercolor: mapColour === "topic" ? topicColour(c.id) : "#888", borderwidth: 2, borderpad: 3});
   }
   drawn.annotations = out;
@@ -996,9 +1147,12 @@ function drawMap() {
   r.hover ??= r.pmid.map((p, i) => [wrap(pesc(r.title[i] || `PMID ${p}`)), r.year[i] || "no year",
     r.c[i] > 0 ? `${r.c[i]}. ${pesc(r.clusters.find((c) => c.id === r.c[i])?.name)}` : "no clear topic", r.curated[i] ? " · curated" : "", p, i]);
   const base = n > 10000 ? 4 : n > 3000 ? 5.5 : 7, size = Math.min(18, base * zoomK), big = Math.min(28, Math.max(11, base * 2) * zoomK);
-  const focus = hoverFocus || mapFocus, yr = mapYear;
+  const focus = hoverFocus || mapFocus, yr = mapYear, sel = facetMask();
   const later = (i) => yr != null && !(r.year[i] > 0 && r.year[i] <= yr);  // not published yet (playing years)
-  const dim = (i) => focus && r.c[i] !== focus;
+  const dim = (i) => focus && r.c[i] !== focus || sel && !sel[i];  // not the picked topic, or left out by the facets
+  const note = $("maskNote");
+  if (note) note.textContent = sel ? ` · ${fmt(sel.reduce((a, v) => a + v, 0))} highlighted by the facets`
+    : (S.ot || S.ep || S.named) && !r.facets ? " · highlighting…" : "";
   const fresh = (i) => yr != null && r.year[i] === yr;
   const idx = (keep) => { const out = []; for (let i = 0; i < n; i++) if (keep(i)) out.push(i); return out; };
   // Most papers are recent: spread the year colours over the 10th to 98th percentile of years.
@@ -1093,7 +1247,7 @@ function wirePlot(el) {  // once per plot element; the handlers read the current
   let clicks = 0;  // the newest click wins; a late answer for an older one, or after leaving the map, is dropped
   el.on("plotly_click", async (ev) => {
     const j = curatedAt(ev.event), pmid = j >= 0 ? M.pmid[j] : ev.points[0].customdata[4], my = ++clicks, req = reqNo;
-    const p = await getJSON(`/api/paper?gene=${encodeURIComponent(G.hgnc_id)}&pmid=${pmid}&term=${encodeURIComponent(S.q)}`);
+    const p = await getJSON(`/api/paper?subject=${encodeURIComponent(G.id)}&pmid=${pmid}&term=${encodeURIComponent(S.q)}`);
     if (my !== clicks || req !== reqNo || !$("mappaper")) return;
     $("mappaper").innerHTML = `<ol class="papers">${paperHTML(p, hl(p))}</ol>`;
     $("mappaper").querySelector("details.abs")?.setAttribute("open", "");
@@ -1108,11 +1262,11 @@ new ResizeObserver(([e]) => document.documentElement.style.scrollPaddingTop = `$
 $("f").onsubmit = (e) => {
   e.preventDefault();
   document.activeElement?.blur();
-  const gene = $("gene").value.trim(), q = $("term").value.trim();
-  const sameGene = G && gene.toUpperCase() === S.gene.toUpperCase();
-  S = {...S, gene, q, rank: $("rank").value, page: 1, sort: "", match: "", topic: ""};
-  if (sameGene) { renderDiseases(); show(); }
-  else { Object.assign(S, {ot: "", ep: "", ymin: "", ymax: ""}); searchGene(); }
+  const text = $("subject").value.trim(), q = $("term").value.trim();
+  const same = G && G.kind === MODE && [S[MODE], G.label].some((t) => t.toUpperCase() === text.toUpperCase());
+  S = {...S, gene: "", disease: "", [MODE]: same ? S[MODE] : text, q, rank: $("rank").value, page: 1, sort: "", match: "", topic: ""};
+  if (same) { renderDiseases(); show(); }
+  else { Object.assign(S, {ot: "", ep: "", named: "", ymin: "", ymax: ""}); searchGene(); }
 };
 $("rank").onchange = () => {  // keyword ranking lists only papers with the words; the others list all
   S.rank = $("rank").value; S.page = 1; S.sort = ""; S.topic = "";
@@ -1121,7 +1275,7 @@ $("rank").onchange = () => {  // keyword ranking lists only papers with the word
 const typing = () => !!document.activeElement?.matches("textarea, input:not([type=range])");
 document.addEventListener("keydown", (e) => {
   if (e.key === "/" && !typing()) {
-    e.preventDefault(); $("gene").focus(); $("gene").select();
+    e.preventDefault(); $("subject").focus(); $("subject").select();
   }
   if (!isMap() || !M) return;
   if (e.key === "Escape" && !document.querySelector("#how:popover-open")) {  // Esc: drop the picked topic, else stop playing
@@ -1145,8 +1299,9 @@ if (localStorage.getItem("cream")) document.body.classList.add("cream");
 
 async function fromURL() {
   readURL();
-  $("gene").value = S.gene; $("term").value = S.q; $("rank").value = S.rank;
-  if (S.gene) await searchGene(false); else { clearGene(); $("gene").focus(); }
+  showMode();
+  $("subject").value = S[MODE]; $("term").value = S.q; $("rank").value = S.rank;
+  if (S[MODE]) await searchGene(false); else { clearGene(); $("subject").focus(); }
 }
 window.addEventListener("popstate", fromURL);
 fromURL();
