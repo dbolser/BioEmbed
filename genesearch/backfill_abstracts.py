@@ -47,41 +47,69 @@ def missing() -> np.ndarray:
         ORDER BY pmid""").fetchnumpy()["pmid"].astype(np.int64)
 
 
+def _text(el) -> str | None:
+    return ("".join(el.itertext()).strip() or None) if el is not None else None
+
+
 def parse(xml: bytes) -> list[dict]:
+    """Journal articles and book chapters (GeneReviews etc.) in one efetch reply. Raises on a reply
+    that is not a PubmedArticleSet (E-utilities report errors as well-formed XML)."""
+    root = ET.fromstring(xml)
+    if root.tag != "PubmedArticleSet":
+        raise ValueError(f"unexpected reply <{root.tag}>: {(_text(root) or '')[:200]}")
+    if (err := root.find(".//ERROR")) is not None:
+        raise ValueError(f"E-utilities error: {_text(err)}")
     out = []
-    for a in ET.fromstring(xml).iter("PubmedArticle"):
-        m = a.find("MedlineCitation")
-        art = m.find("Article")
-        t = art.find("ArticleTitle")
+    for a in root:
+        if a.tag == "PubmedArticle":
+            m = a.find("MedlineCitation")
+            art = m.find("Article")
+            pmid, title, abstract = m.findtext("PMID"), art.find("ArticleTitle"), art.find("Abstract")
+            date, source = art.find("Journal/JournalIssue/PubDate"), art.findtext("Journal/Title")
+        elif a.tag == "PubmedBookArticle":
+            d = a.find("BookDocument")
+            pmid, abstract = d.findtext("PMID"), d.find("Abstract")
+            title = d.find("ArticleTitle") if d.find("ArticleTitle") is not None else d.find("Book/BookTitle")
+            date, source = d.find("Book/PubDate"), _text(d.find("Book/BookTitle"))
+        else:
+            continue
         parts = []
-        for s in art.iterfind("Abstract/AbstractText"):
-            text = "".join(s.itertext()).strip()
-            label = s.get("Label")
+        for sec in abstract.iterfind("AbstractText") if abstract is not None else []:
+            text = _text(sec)
+            label = sec.get("Label")
             if text:
                 parts.append(f"{label}: {text}" if label else text)
-        date = art.find("Journal/JournalIssue/PubDate")
         y = (date.findtext("Year") or date.findtext("MedlineDate") or "")[:4] if date is not None else ""
-        out.append({"pmid": int(m.findtext("PMID")), "title": "".join(t.itertext()).strip() or None if t is not None else None,
+        out.append({"pmid": int(pmid), "title": _text(title),
                     "abstract": "\n".join(parts) or None,  # sections one per line, as the local copy
-                    "year": int(y) if y.isdigit() else None,
-                    "journal": art.findtext("Journal/Title")})
+                    "year": int(y) if y.isdigit() else None, "journal": source})
     return out
 
 
 _last, _tick = 0.0, threading.Lock()
 
 
-def throttle():  # at most RATE requests start per second, across threads
+def throttle():  # at most RATE requests start per second, across threads (the lock is held while waiting)
     global _last
     with _tick:
-        now = time.time()
-        wait = _last + 1 / RATE - now
+        wait = _last + 1 / RATE - time.monotonic()
         if wait > 0:
             time.sleep(wait)
-        _last = max(now, _last + 1 / RATE)
+        _last = time.monotonic()
 
 
 def efetch(pmids: np.ndarray) -> list[dict]:
+    """The PubMed records of these PMIDs, one per PMID asked for (a record under another PMID, e.g.
+    a replaced one, is dropped). Those PubMed does not return are asked for once more, on their own,
+    before they count as unknown."""
+    want = set(pmids.tolist())
+    rows = {r["pmid"]: r for r in _efetch(pmids) if r["pmid"] in want}
+    if len(rows) < len(want):
+        rows.update({r["pmid"]: r for r in _efetch(np.array(sorted(want - rows.keys()))) if r["pmid"] in want})
+    return list(rows.values())
+
+
+def _efetch(pmids: np.ndarray) -> list[dict]:
     body = {"db": "pubmed", "retmode": "xml", "id": ",".join(map(str, pmids))}
     if KEY:
         body["api_key"] = KEY
@@ -91,15 +119,26 @@ def efetch(pmids: np.ndarray) -> list[dict]:
         try:
             with urllib.request.urlopen(urllib.request.Request(EUTILS, data=data), timeout=120) as r:
                 return parse(r.read())
-        except Exception as e:  # 429, 5xx, timeouts, truncated XML: wait and retry
+        except Exception as e:  # 429, 5xx, timeouts, truncated XML, error replies: wait and retry
             print(f"  retry {attempt + 1}: {e}", flush=True)
             time.sleep(5 * 2 ** attempt)
     raise RuntimeError(f"efetch failed for PMIDs {pmids[0]}..{pmids[-1]}")
 
 
 def fetch():
+    # The PMIDs asked for are fixed in todo.npy when the backfill starts: batch files are named by
+    # their place in that list, so a rerun (or a rerun after merge, when few are missing) resumes
+    # the same batches. A fresh backfill = delete index/backfill/.
     BF.mkdir(exist_ok=True)
-    todo = missing()
+    if (manifest := BF / "todo.npy").exists():
+        todo = np.load(manifest)
+        if n_new := len(np.setdiff1d(missing(), todo)):
+            print(f"fetch: {n_new:,} PMIDs missing now were not in this backfill: delete {BF} to start over", flush=True)
+    elif any(BF.glob("*.parquet")):
+        raise SystemExit(f"{BF} has batches but no todo.npy: delete it to start over")
+    else:
+        todo = missing()
+        np.save(manifest, todo)
     n = len(todo)
     print(f"fetch: {n:,} PMIDs missing from abstracts.parquet, {-(-n // BATCH):,} requests at {RATE}/s", flush=True)
     t0 = time.time()
@@ -147,13 +186,31 @@ def merge():
     print("merge: abstracts.arrow rebuilt", flush=True)
 
 
+def shard_rows(full: Path) -> int:
+    return sum(np.load(f, mmap_mode="r").shape[0] for f in full.glob("[0-9]*.npy"))
+
+
+def recover(full: Path):
+    """A publish stopped between embed's two renames (shard in place, pmids.npy.tmp not yet) is
+    finished; any other leftover .tmp is dropped and that work redone."""
+    if (tmp := full / "pmids.npy.tmp").exists():
+        if shard_rows(full) == len(np.load(tmp)):
+            tmp.rename(full / "pmids.npy")
+            print("embed: finished an interrupted publish of pmids.npy", flush=True)
+        else:
+            tmp.unlink()
+    for f in full.glob("[0-9]*.npy.tmp"):
+        f.unlink()
+
+
 def embed():
     import multiprocessing as mp
     import semantic
     full = IDX / "emb_medembed_small"
+    recover(full)
     have = np.load(full / "pmids.npy")  # (not memory-mapped: the file is replaced below)
-    shards = sorted(f for f in full.glob("[0-9]*.npy"))
-    rows = sum(np.load(f, mmap_mode="r").shape[0] for f in shards)
+    shards = sorted(full.glob("[0-9]*.npy"))
+    rows = shard_rows(full)
     assert rows == len(have), f"{full}: {rows:,} vectors for {len(have):,} PMIDs"
     tbl = duckdb.sql(f"""SELECT pmid, title, abstract FROM '{IDX}/abstracts.parquet'
                          WHERE pmid IN (SELECT pmid FROM '{BF}/*.parquet') ORDER BY pmid""").to_arrow_table()
