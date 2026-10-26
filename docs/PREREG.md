@@ -284,3 +284,7 @@ bge-base-gaf − bge-base +0.015 (p = 0.11, 7/12).
   unless the study includes this disease"; "Grade from the abstract alone to
   keep the comparison fair. Looking up disease info is fine"); new labellers
   first step through the guide one piece at a time.
+- 2026-10-20 14:24 (labelling app; Dan's request): each abstract now shows its
+  publication year after the title (from the IUK-IPF PubMed records). The
+  judges did not see the year. Labels made before this: dan 71, alex bladon 50,
+  helena 10.

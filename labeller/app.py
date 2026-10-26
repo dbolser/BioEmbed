@@ -5,7 +5,8 @@ Export: uv run python app.py --export      # -> export/labels.csv and export/lab
 
 Blindness: the browser never receives item_id, round_id, stratum or is_repeat, only opaque
 handles that differ between a first look and a repeat. It does get each item's pmid, for a PubMed
-link under the abstract, with a reminder to grade from the abstract alone (as the judges did).
+link under the abstract, with a reminder to grade from the abstract alone (as the judges did), and
+its publication year, shown after the title (the judges did not see it).
 
 Labellers: those named in --full (default: dan) get every round, with repeats. Anyone else gets a
 block of --block rounds (default 5), shown whole with no repeats, and may ask for another block
@@ -32,6 +33,7 @@ from contextlib import closing, contextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+import duckdb
 import pandas as pd
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
@@ -39,6 +41,7 @@ from pydantic import BaseModel, Field
 
 HERE = Path(__file__).resolve().parent
 OT_DISEASES = Path("/outsee5/home/danbolser/Work/IUK-IPF/data/sources/opentargets/26.06/disease/disease.parquet")
+RECORDS = Path("/outsee5/home/danbolser/Work/IUK-IPF/data/embeddings-catalogue/records")
 REQUIRED = ["item_id", "round_id", "gene_symbol", "gene_name", "gene_aliases", "disease_name",
             "disease_synonyms", "pmid", "title", "abstract", "stratum", "is_repeat"]
 
@@ -198,8 +201,21 @@ def highlight(title: str, abstract: str, ms) -> dict:
 
 # --- items and scheduling -------------------------------------------------------------------
 
+def pub_years(records: Path, pmids) -> dict[str, int]:
+    """pmid -> publication year, from the IUK-IPF catalogue's PubMed records."""
+    with duckdb.connect() as con:
+        return dict(con.execute(f"""
+            SELECT substr(record_id, 6) AS pmid,
+                   max(try_cast(json_extract_string(metadata, '$.publication_year') AS INTEGER)) AS year
+            FROM '{records}/*.parquet'
+            WHERE record_type = 'pubmed_abstract' AND record_id IN (SELECT 'PMID:' || unnest(?::VARCHAR[]))
+            GROUP BY ALL HAVING year > 0
+        """, [sorted(pmids)]).fetchall())
+
+
 class Items:
-    def __init__(self, path: Path, gap: int, hours: float, diseases: Path | None = None, block: int = 5):
+    def __init__(self, path: Path, gap: int, hours: float, diseases: Path | None = None, block: int = 5,
+                 records: Path | None = None):
         df = pd.read_parquet(path)
         if missing := sorted(set(REQUIRED) - set(df.columns)):
             raise SystemExit(f"{path}: missing columns {missing}")
@@ -213,6 +229,7 @@ class Items:
         if diseases and diseases.exists():
             d = pd.read_parquet(diseases, columns=["id", "description"]).dropna()
             about = dict(zip(d.id, d.description))
+        years = pub_years(records, set(df.pmid)) if records and records.exists() else {}
         self.items, self.rounds = {}, {}
         for rid, g in df.groupby("round_id", sort=False):
             if g[["gene_symbol", "disease_name"]].drop_duplicates().shape[0] != 1:
@@ -225,7 +242,7 @@ class Items:
             self.rounds[rid] = {"gene": gene, "disease": disease,
                                 "ids": sorted(g.item_id), "repeat": sorted(g.item_id[g.is_repeat])}
             for it in g.itertuples():
-                self.items[it.item_id] = {"round_id": rid, "pmid": it.pmid,
+                self.items[it.item_id] = {"round_id": rid, "pmid": it.pmid, "year": years.get(it.pmid),
                                           **highlight(it.title, it.abstract, ms)}
         self.round_by_handle = {handle(rid, k): (rid, k) for rid, r in self.rounds.items()
                                 for k in ([0, 1] if r["repeat"] else [0])}
@@ -373,7 +390,7 @@ def create_app(items: Items, db_path: Path, full: set[str] = frozenset({"dan"}))
                 "key": handle(rid, k), "number": len(pr["done"]) + 1, "gene": r["gene"], "disease": r["disease"],
                 "items": [{"key": handle(i, p), "title": items.items[i]["title"],
                            "abstract": items.items[i]["abstract"], "label": shown(pr["labs"].get((i, p))),
-                           "pmid": items.items[i]["pmid"]}
+                           "pmid": items.items[i]["pmid"], "year": items.items[i]["year"]}
                           for i, p in pr["parts"][pr["current"]]]}
         elif pr["next_at"]:
             out["waiting"] = {"next_at": pr["next_at"].isoformat(timespec="seconds")}
@@ -437,6 +454,7 @@ def main():
     ap.add_argument("--items", default=os.environ.get("LABELLER_ITEMS"), help="items parquet (or $LABELLER_ITEMS)")
     ap.add_argument("--db", type=Path, default=HERE / "labels.sqlite")
     ap.add_argument("--diseases", type=Path, default=OT_DISEASES, help="Open Targets disease index, for the definitions shown on hover (skipped if missing)")
+    ap.add_argument("--records", type=Path, default=RECORDS, help="IUK-IPF catalogue records, for the year shown after each title (skipped if missing)")
     ap.add_argument("--full", nargs="*", default=["dan"], help="labellers who get every round, with repeats")
     ap.add_argument("--block", type=int, default=5, help="rounds per block for everyone else")
     ap.add_argument("--host", default="127.0.0.1")
@@ -451,7 +469,7 @@ def main():
     if not a.items:
         ap.error("--items (or $LABELLER_ITEMS) is required")
     import uvicorn
-    uvicorn.run(create_app(Items(Path(a.items), a.repeat_gap, a.repeat_hours, a.diseases, a.block), a.db,
+    uvicorn.run(create_app(Items(Path(a.items), a.repeat_gap, a.repeat_hours, a.diseases, a.block, a.records), a.db,
                            {n.strip().lower() for n in a.full}),
                 host=a.host, port=a.port, log_level="warning")
 
