@@ -8,10 +8,13 @@ Outputs (all sorted for fast lookup):
   genes.parquet          HGNC lookup table + n_papers
   curated.parquet        Open Targets curated gene-disease-PMID links (copy of the gold file)
   epmc.parquet           Open Targets Europe PMC text-mined gene-disease-PMID links (sorted by ensembl)
+  diseases.parquet       the diseases the disease search finds: Open Targets diseases, each with the PubTator
+                         ids it covers, plus PubTator ids no Open Targets disease covers (sorted by disease_id)
   abstracts.arrow        uncompressed Arrow IPC copy of abstracts + per-paper disease tags, memory-mapped
                          by the app for random access by row (parquet row groups can't do that fast)
 
 Usage: uv run python build_index.py [step ...]   (default: all steps)
+After the abstracts step, run backfill_abstracts.py merge to put back the papers it fetched from PubMed.
 """
 
 import sys
@@ -150,6 +153,48 @@ def opentargets(con):
         TO '{OUT}/epmc.parquet' ({PQ})""")
 
 
+def diseases(con):
+    # An Open Targets disease covers the PubTator ids it cross-references (MeSH/OMIM), plus those
+    # whose most used mention is its name: PubTator tags breast cancer as MESH:D001943 'Breast
+    # Neoplasms', which OT's 'breast cancer' does not xref. (Matching on OT synonyms too links
+    # wrongly: 'adrenal cortex carcinoma' -> adenoid cystic carcinoma.) PubTator ids that no OT
+    # disease covers are diseases of their own, named by their most used mention of two words or
+    # more ('adhd' -> 'attention deficit hyperactivity disorder'). A disease's papers: its PubTator ids',
+    # its curated links' and its Europe PMC links' (paper_set in app.py). Lookup words: the name, OT exact
+    # synonyms, and each covered id's mentions used at least 5% of the time ('cf', 't2d').
+    con.sql(f"""
+        COPY (
+          WITH c AS (SELECT disease_id, mention, count(*) AS n
+                     FROM (SELECT disease_id, lower(unnest(string_split(mentions, '|'))) AS mention
+                           FROM '{OUT}/disease_pmids.parquet' WHERE mentions <> '') GROUP BY ALL),
+          tot AS (SELECT disease_id, arg_max(mention, n) AS top, sum(n) AS n FROM c GROUP BY 1),
+          pt AS (SELECT disease_id, name, n_papers FROM '{OUT}/disease_names.parquet' WHERE n_papers IS NOT NULL),
+          ot AS (SELECT id, name, exactSynonyms, dbXRefs FROM '{OT}/disease/*.parquet'),
+          links AS (SELECT DISTINCT id, x AS pt FROM (SELECT id, unnest(dbXRefs) AS x FROM ot) JOIN pt ON pt.disease_id = x
+                    UNION
+                    SELECT ot.id, tot.disease_id FROM ot JOIN tot ON tot.top = lower(ot.name) AND length(tot.top) >= 4),
+          words AS (SELECT c.disease_id, list(c.mention ORDER BY c.n DESC) AS mentions
+                    FROM c JOIN tot USING (disease_id) WHERE c.n >= 0.05 * tot.n AND length(c.mention) >= 2 GROUP BY 1),
+          papers AS (SELECT id, count(DISTINCT pmid) AS n_papers
+                     FROM (SELECT links.id, dp.pmid FROM links JOIN '{OUT}/disease_pmids.parquet' dp ON dp.disease_id = links.pt
+                           UNION ALL SELECT disease_id, pmid FROM '{OUT}/curated.parquet'
+                           UNION ALL SELECT disease_id, pmid FROM '{OUT}/epmc.parquet') GROUP BY 1),
+          own AS (SELECT ot.id AS disease_id, ot.name,
+                         list_filter(list_distinct(coalesce(ot.exactSynonyms, [])), s -> lower(s) <> lower(ot.name)) AS synonyms,
+                         coalesce((SELECT list_distinct(flatten(list(w.mentions))) FROM links l JOIN words w ON w.disease_id = l.pt
+                                   WHERE l.id = ot.id), []) AS mentions,
+                         coalesce((SELECT list(l.pt ORDER BY l.pt) FROM links l WHERE l.id = ot.id), []) AS pubtator,
+                         papers.n_papers
+                  FROM ot JOIN papers ON papers.id = ot.id)
+          SELECT * FROM own
+          UNION ALL
+          SELECT pt.disease_id, coalesce(list_filter(words.mentions, m -> m LIKE '% %')[1], pt.name),
+                 [], coalesce(words.mentions, []), [pt.disease_id], pt.n_papers
+          FROM pt LEFT JOIN words USING (disease_id) WHERE pt.disease_id NOT IN (SELECT pt FROM links)
+          ORDER BY disease_id
+        ) TO '{OUT}/diseases.parquet' (FORMAT parquet, COMPRESSION zstd)""")
+
+
 def arrow(con):
     # Same rows/order as abstracts.parquet, plus the PubTator disease tags per paper, as an
     # uncompressed Arrow IPC file the app memory-maps: fetching N scattered papers touches
@@ -169,7 +214,8 @@ def arrow(con):
 
 
 STEPS = {"abstracts": abstracts, "gene_pmids": gene_pmids, "disease_pmids": disease_pmids,
-         "disease_names": disease_names, "genes": genes, "opentargets": opentargets, "arrow": arrow}
+         "disease_names": disease_names, "genes": genes, "opentargets": opentargets, "diseases": diseases,
+         "arrow": arrow}
 
 
 def main():
