@@ -159,7 +159,8 @@ def diseases(con):
     # Neoplasms', which OT's 'breast cancer' does not xref. (Matching on OT synonyms too links
     # wrongly: 'adrenal cortex carcinoma' -> adenoid cystic carcinoma.) PubTator ids that no OT
     # disease covers are diseases of their own, named by their most used mention of two words or
-    # more ('adhd' -> 'attention deficit hyperactivity disorder'). Lookup words: the name, OT exact
+    # more ('adhd' -> 'attention deficit hyperactivity disorder'). A disease's papers: its PubTator ids',
+    # its curated links' and its Europe PMC links' (paper_set in app.py). Lookup words: the name, OT exact
     # synonyms, and each covered id's mentions used at least 5% of the time ('cf', 't2d').
     con.sql(f"""
         COPY (
@@ -176,7 +177,8 @@ def diseases(con):
                     FROM c JOIN tot USING (disease_id) WHERE c.n >= 0.05 * tot.n AND length(c.mention) >= 2 GROUP BY 1),
           papers AS (SELECT id, count(DISTINCT pmid) AS n_papers
                      FROM (SELECT links.id, dp.pmid FROM links JOIN '{OUT}/disease_pmids.parquet' dp ON dp.disease_id = links.pt
-                           UNION ALL SELECT disease_id, pmid FROM '{OUT}/curated.parquet') GROUP BY 1),
+                           UNION ALL SELECT disease_id, pmid FROM '{OUT}/curated.parquet'
+                           UNION ALL SELECT disease_id, pmid FROM '{OUT}/epmc.parquet') GROUP BY 1),
           own AS (SELECT ot.id AS disease_id, ot.name,
                          list_filter(list_distinct(coalesce(ot.exactSynonyms, [])), s -> lower(s) <> lower(ot.name)) AS synonyms,
                          coalesce((SELECT list_distinct(flatten(list(w.mentions))) FROM links l JOIN words w ON w.disease_id = l.pt
