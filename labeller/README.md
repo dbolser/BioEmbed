@@ -19,5 +19,5 @@ shared symbols, disease names), since aliases drive the gene highlighting.
 
 Several labellers: `--full dan` (default) get every round with repeats; anyone else gets a block of
 `--block 5` rounds, whole, no repeats, overlapping their neighbours' blocks by a round, and can ask
-for another block when done (`blocks` table). Every abstract shows its PMID and a PubMed link, with
+for another block when done (`blocks` table). Every abstract shows its PMID, a PubMed link and its publication year (`--records`), with
 a reminder to grade from the abstract alone.

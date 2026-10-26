@@ -64,6 +64,7 @@
 
   /* abstract */
   #title { font-size: 1.1em; line-height: 1.45; margin: .2rem 0 1rem; }
+  #title .year { color: var(--muted); font-weight: 400; }
   #abs p { margin: 0 0 1em; }
   .hl { border-radius: 3px; padding: 0 .08em; text-underline-offset: .22em; text-decoration-thickness: 2px; text-decoration-line: underline; }
   .g  { background: var(--gene-bg); text-decoration-line: none; }
@@ -389,7 +390,7 @@ function showItem() {
   if (S.i >= S.items.length) return showDone();
   const it = S.items[S.i], lab = it.label, d = lab || getDraft(it) || {};
   show("label");
-  $("title").replaceChildren(...segs(it.title));
+  $("title").replaceChildren(...segs(it.title), ...(it.year ? [" ", el("span", `(${it.year})`, "year")] : []));
   $("abs").replaceChildren(...(it.abstract.length ? it.abstract.map((p) => el("p", segs(p)))
                                                    : [el("p", el("em", "(No abstract)"))]));
   for (const b of document.querySelectorAll(".rate[data-g], .pick")) {
