@@ -66,6 +66,8 @@ def parse(xml: bytes) -> list[dict]:
             m = a.find("MedlineCitation")
             art = m.find("Article")
             pmid, title, abstract = m.findtext("PMID"), art.find("ArticleTitle"), art.find("Abstract")
+            if abstract is None:  # some records carry only a publisher's or other English abstract
+                abstract = next((o for o in m.iterfind("OtherAbstract") if o.get("Language", "eng") == "eng"), None)
             date, source = art.find("Journal/JournalIssue/PubDate"), art.findtext("Journal/Title")
         elif a.tag == "PubmedBookArticle":
             d = a.find("BookDocument")
@@ -142,6 +144,8 @@ def fetch():
         np.save(manifest, todo)
     n = len(todo)
     print(f"fetch: {n:,} PMIDs missing from abstracts.parquet, {-(-n // BATCH):,} requests at {RATE}/s", flush=True)
+    if not n:
+        return
     t0 = time.time()
 
     def one(b: int) -> int:
@@ -164,7 +168,16 @@ def fetch():
           f"years {stats[3]}-{stats[4]}; {n - stats[0]:,} PMIDs unknown to PubMed")
 
 
+def batches() -> bool:
+    if any(BF.glob("[0-9]*.parquet")):
+        return True
+    print(f"nothing fetched in {BF}: nothing to do", flush=True)
+    return False
+
+
 def merge():
+    if not batches():
+        return
     con = duckdb.connect(config={"threads": 64, "memory_limit": "300GB", "temp_directory": str(IDX / ".tmp"),
                                  "preserve_insertion_order": True})
     (IDX / ".tmp").mkdir(exist_ok=True)
@@ -205,6 +218,8 @@ def recover(full: Path):
 
 
 def embed():
+    if not batches():
+        return
     import multiprocessing as mp
     import semantic
     full = IDX / "emb_medembed_small"
