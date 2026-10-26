@@ -1,4 +1,4 @@
-"""Backfill papers the index refers to (PubTator gene tags, Open Targets links) but that are not in
+"""Backfill papers the index refers to (PubTator gene and disease tags, Open Targets links) but that are not in
 abstracts.parquet: the local PubMed copy ends at a date, and only holds papers with an abstract.
 Fetched from PubMed E-utilities (title, abstract, year, journal; title-only when there is no abstract).
 
@@ -40,6 +40,7 @@ SCHEMA = pa.schema([("pmid", pa.int64()), ("title", pa.string()), ("abstract", p
 def missing() -> np.ndarray:
     return duckdb.sql(f"""
         WITH want AS (SELECT DISTINCT pmid FROM '{IDX}/gene_pmids.parquet'
+                      UNION SELECT DISTINCT pmid FROM '{IDX}/disease_pmids.parquet'
                       UNION SELECT DISTINCT pmid FROM '{IDX}/epmc.parquet'
                       UNION SELECT DISTINCT pmid FROM '{IDX}/curated.parquet')
         SELECT pmid FROM want
