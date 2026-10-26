@@ -39,14 +39,14 @@ effect effects role potential novel new report reported present review clinical 
 def warm_up():
     """Compile the numba code (neighbour search, both UMAPs) once at start-up; the first map would
     otherwise wait ~30 s for it."""
-    build(np.random.default_rng(0).standard_normal((300, 384)).astype(np.float32), None, None, "", set(), None)
+    build(np.random.default_rng(0).standard_normal((300, 384)).astype(np.float32), None, None, "", "", set(), None)
 
 
-def build(vecs: np.ndarray, texts: list[str] | None, titles: list[str] | None, symbol: str, skip_words: set[str],
-          job, within: str = "") -> dict:
+def build(vecs: np.ndarray, texts: list[str] | None, titles: list[str] | None, about: str, avoid: str,
+          skip_words: set[str], job, within: str = "") -> dict:
     """Coordinates, cluster per paper (-1 = no cluster) and the clusters, biggest first.
-    Without texts (warm-up) it stops after the layout. within = the topic all these papers come
-    from (a drill-in), for naming."""
+    Without texts (warm-up) it stops after the layout. about, avoid, within: for naming (see
+    llm_names); skip_words: left out of the topic terms (the gene's symbols, the disease's words)."""
     from umap import UMAP
     from umap.umap_ import nearest_neighbors
 
@@ -86,7 +86,7 @@ def build(vecs: np.ndarray, texts: list[str] | None, titles: list[str] | None, s
                          "x": float(np.median(xy[m, 0])), "y": float(np.median(xy[m, 1])),
                          "examples": [titles[i] for i in near if titles[i]]})
     phase("terms")
-    named = name_clusters(symbol, clusters, within)
+    named = name_clusters(about, avoid, clusters, within)
     phase("names")
     return {"x": np.round(xy[:, 0], 3).tolist(), "y": np.round(xy[:, 1], 3).tolist(), "c": labels.tolist(),
             "clusters": clusters, "named_by": "llm" if named else "terms", "timings_s": took}
@@ -134,11 +134,11 @@ def topics(u12: np.ndarray, most: int = MAX_TOPICS, outliers: float = 0.1) -> np
     return best
 
 
-def name_clusters(symbol: str, clusters: list[dict], within: str = "") -> bool:
+def name_clusters(about: str, avoid: str, clusters: list[dict], within: str = "") -> bool:
     """Set each cluster's name: the LLM's if it answers (True), else its top 3 terms, taking first
     the terms no other cluster has ('cystic fibrosis' is a top term of most CFTR topics, so it
     doesn't tell them apart)."""
-    names = llm_names(symbol, clusters, within)
+    names = llm_names(about, avoid, clusters, within)
     shared = Counter(t for cl in clusters for t in set(cl["terms"]))
     for cl in clusters:
         terms = sorted(cl["terms"], key=lambda t: shared[t] > 1)  # stable: own terms first, in rank order
@@ -215,20 +215,21 @@ def _llm_config() -> dict | None:
     return cfg if cfg.get("token") else None
 
 
-def llm_names(symbol: str, clusters: list[dict], within: str = "") -> dict[str, str]:
-    """{cluster id: short name} from the LLM, or {} (no key, no answer, or nothing to name)."""
+def llm_names(about: str, avoid: str, clusters: list[dict], within: str = "") -> dict[str, str]:
+    """{cluster id: short name} from the LLM, or {} (no key, no answer, or nothing to name).
+    about: what the papers are about ('the human gene CFTR'); avoid: what the names must leave out
+    ('the gene symbol'); within: the topic they all come from (a drill-in)."""
     global _llm_down_until
     cfg = _llm_config()
     if not cfg or not clusters or time.time() < _llm_down_until:
         return {}
     blocks = [f"Cluster {c['id']} ({c['n']} papers)\nTerms: {', '.join(c['terms'])}\nExample titles:\n" +
               "\n".join(f"- {t[:160]}" for t in c["examples"][:5]) for c in clusters]
-    about = f"the human gene {symbol}" + (f", all from its topic \"{within}\", so name what sets each "
-                                           "cluster apart within it" if within else "")
+    about += (f", all from its topic \"{within}\", so name what sets each cluster apart within it" if within else "")
     prompt = (f"These are topic clusters from a map of PubMed papers about {about}. For each "
               "cluster you get its most distinctive terms and some typical titles. Give each cluster a short, "
               "plain-English name of 2 to 5 words that a biologist would recognise, naming its topic (for example "
-              "a disease, a process, a method, a tissue or an organism). Do not put the gene symbol in the names, "
+              f"a disease, a process, a method, a tissue or an organism). Do not put {avoid} in the names, "
               "and make the names different from each other. Answer with only a JSON object mapping each cluster "
               'number to its name, like {"1": "Alzheimer disease risk", "2": "Lipoprotein metabolism"}.\n\n'
               + "\n\n".join(blocks))
