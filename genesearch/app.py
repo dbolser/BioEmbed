@@ -37,6 +37,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, Response
 
 import build_index
+import landscape
 import litmap
 import semantic
 from semantic import Pending
@@ -49,6 +50,7 @@ RRF_K = 60  # reciprocal-rank fusion constant for hybrid ranking
 SEM_CAP = 30_000  # most papers given semantic ranking while vectors are computed here on CPU
 MAP_CAP = 20_000  # most papers on a map (a fixed sample beyond that)
 MAP_VERSION = 7  # bump to recompute cached maps
+LAND_CAP = 50_000  # most papers drawn on the PubMedBERT map (a fixed sample beyond that)
 EPMC_TOP = 50  # text-mined facets listed per subject
 
 STEMMER = Stemmer.Stemmer("english")
@@ -790,6 +792,48 @@ def api_map_facets(subject: str, key: str):
            "named": np.flatnonzero(np.isin(pm, named_pmids(subject))).tolist()}
     out["names"] = {f: facet_name(f) for k in ("ot", "ep") for f in out[k]}
     return out
+
+
+@app.get("/api/landscape")
+def api_landscape(subject: str, term: str = "", ot: str = "", ep: str = "", ymin: int = 0, ymax: int = 0,
+                  match: str = "all", rank: str = "semantic", named: int = 0):
+    """The PubMedBERT map tab: the current list (facets and all, as the list shows it) placed on the
+    published PubMedBERT landscape (landscape.py), with its field (from the journal) per paper.
+    Papers newer than the landscape (2024) or not in it are counted, not drawn."""
+    land = landscape.load()
+    if land is None:
+        raise HTTPException(503, "The PubMedBERT map is not built: run landscape.py.")
+    df, _ = scope(subject, term, ot, ep, ymin, ymax, match, rank, bool(named))
+    df = df.sort_values("pmid")
+    on, at = land.lookup(df.pmid.to_numpy())
+    df = df[on].assign(lrow=at)
+    about = {"n_list": len(on), "n_on": len(df), "sampled": len(df) > LAND_CAP}
+    if len(df) > LAND_CAP:  # pseudo-random by PMID, as the Map tab samples
+        pm = df.pmid.to_numpy()
+        df = df.iloc[np.sort(np.argsort((pm * 2654435761) % 2**32, kind="stable")[:LAND_CAP])]
+    rows, at = df.row.to_numpy(), df.lrow.to_numpy()
+    title = np.full(len(df), None, object)
+    if (have := rows >= 0).any():
+        title[have] = take(rows[have], ["title"]).column("title").to_pylist()
+    xy = land.xy[at]
+    return {**about, "pmid": df.pmid.tolist(), "x": np.round(xy[:, 0], 3).tolist(), "y": np.round(xy[:, 1], 3).tolist(),
+            "f": land.field[at].tolist(), "year": df.year.fillna(0).astype(int).tolist(), "title": title.tolist(),
+            "curated": np.isin(df.pmid.to_numpy(), curated_pmids(subject)).astype(int).tolist()}
+
+
+@app.get("/api/landscape_meta")
+def api_landscape_meta():
+    """The landscape's fields (name, colour, centre, human-gene papers) and extent, for drawing."""
+    land = landscape.load()
+    if land is None:
+        raise HTTPException(503, "The PubMedBERT map is not built: run landscape.py.")
+    return land.meta
+
+
+@app.get("/landscape.png")
+def landscape_png():
+    """The landscape's human-gene papers, drawn once (landscape.py); the page puts it behind the dots."""
+    return FileResponse(landscape.OUT / "background.png", headers={"Cache-Control": "public, max-age=604800"})
 
 
 MIN_MAP = 20  # fewest papers for a map
