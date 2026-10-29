@@ -25,6 +25,11 @@ axes you choose. `/about` lists the data and how the map is made.
    your words or to a topic's centre (cosine of the MedEmbed vectors). "Download CSV" saves the whole list. URLs are
    shareable (`?gene=CFTR&q=sweat+chloride&rank=hybrid`, `?disease=cystic+fibrosis`, `&ot=any`, `&ep=<id>`, `&named=1`, `&view=map&topic=3`,
    `&view=explore&ax=cancer&ay=topic:2`).
+7. **PubMedBERT map** tab (`&view=landscape`): the current list (facets applied) on the published map of PubMed by
+   González-Márquez et al. (Patterns 2024): PubMedBERT embeddings of 23.4M abstracts, t-SNE to 2-D, fields from the
+   journal. Behind the dots: its 6.26M human-gene papers (PubTator3 tags of HGNC genes) in their field colours. The map
+   ends in early 2024; newer papers are counted, not drawn. At most 50,000 dots (a fixed sample beyond that). Build
+   once (~2 min) with `uv run python landscape.py`, from `/data/public/PubMedLandscape/2024_v2/` (see its README).
 
 How it works
 

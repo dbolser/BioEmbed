@@ -209,7 +209,7 @@ function setList(html) {  // replace the results; free the old map's WebGL conte
 // "" = off, "any", or an id: diseases for a gene, Ensembl genes for a disease; ot = Open Targets
 // curated, ep = Europe PMC text-mined), named ("1" = only papers naming the gene or disease in the
 // title or abstract), ymin, ymax, sort, match ("" = all words, "any"), rank ("" = semantic, "keyword",
-// "hybrid"), view ("" = list, "map", "explore"), topic (map drill-in path, e.g. "3.2"), ax and ay
+// "hybrid"), view ("" = list, "map", "explore", "landscape": the PubMedBERT map), topic (map drill-in path, e.g. "3.2"), ax and ay
 // (Map Explorer axes: words, or "topic:N"), page
 let S = {};
 let G = null;    // the current gene or disease, from /api/subject: id, kind ("gene", "disease"), label, ...
@@ -627,13 +627,16 @@ function howHTML() {
       <li><b>Map.</b> Places the papers by meaning: UMAP squeezes the 384 number embedding to 12 dimensions for clustering
         (HDBSCAN, at most 8) and then to 2 dimensions for visualization. Topics are named by their most distinctive words.
         The “Drill in” button makes a new map of one topic’s papers.</li>
+      <li><b>PubMedBERT map.</b> The same papers on a published map of all PubMed (González-Márquez et al., 2024): PubMedBERT
+        embeddings of 23 million abstracts, squeezed to 2 dimensions with t-SNE. Its positions and fields (from the journal)
+        are theirs; it ends in early 2024, so newer papers are not on it.</li>
     </ul>
     <p>More: <a href="/about">About</a> (the data, and how the map is made).</p>`;
 }
 
 function tabsHTML() {
   const t = (v, label) => `<button type="button" role="tab" data-view="${v}" aria-selected="${S.view === v}">${label}</button>`;
-  return `<div class="tabs" role="tablist">${t("", "List")}${t("map", "Map")}${t("explore", "Map Explorer")}</div>`;
+  return `<div class="tabs" role="tablist">${t("", "List")}${t("map", "Map")}${t("explore", "Map Explorer")}${t("landscape", "PubMedBERT map")}</div>`;
 }
 
 function wireTop() {
@@ -645,7 +648,7 @@ function wireTop() {
 
 // ---- results: list or map
 const isMap = () => S.view === "map" || S.view === "explore";
-function show(push = true) { playing = false; return isMap() ? loadMap(push) : loadPapers(push); }
+function show(push = true) { playing = false; return isMap() ? loadMap(push) : S.view === "landscape" ? loadLand(push) : loadPapers(push); }
 
 function scopeText(n, facets = true) {  // facets: false for the map, which is of the list without them
   const conds = !facets ? [] : [S.ot && (S.ot === "any" ? `curated (any ${other()})` : `curated for ${esc(dname(S.ot))}`),
@@ -1254,6 +1257,165 @@ function wirePlot(el) {  // once per plot element; the handlers read the current
     $("mappaper").scrollIntoView({behavior: "smooth", block: "nearest"});
   });
 }
+
+// ---- PubMedBERT map: the list's papers placed on the published PubMedBERT landscape of PubMed
+// (landscape.py), over a picture of its human-gene papers coloured by field.
+const LAND_INK = "#16324f", LAND_BG_OPACITY = 0.6;
+const LAND_YEARS = [[0, "#b7d3f6"], [0.5, "#3987e5"], [1, "#0d366b"]];
+let L = null, LM = null, landColour = "plain", landFocus = -1, landZoom = 1, landAnn = [];
+const fieldName = (f) => f === 0 ? "no field" : LM.fields[f].name;
+
+async function loadLand(push = true) {
+  writeURL(push);
+  const my = ++reqNo, t0 = performance.now();
+  const head = () => tabsHTML() + filtersHTML();
+  const params = apiParams({page: 1, sort: ""}).toString();
+  $("how").innerHTML = howHTML();
+  if (!(L && L.params === params)) {
+    setList(head() + `<p class="status"><b>Placing the papers…</b></p>`); wireTop();
+    let r;
+    try {
+      [r, LM] = await Promise.all([getJSON("/api/landscape?" + params), LM || getJSON("/api/landscape_meta"), loadPlotly()]);
+    } catch (e) { if (my === reqNo) { setList(head() + `<p class="note">Error: ${esc(e.message)}</p>`); wireTop(); } return; }
+    if (my !== reqNo) return;
+    L = Object.assign(r, {params, secs: ((performance.now() - t0) / 1000).toFixed(1)});
+    landFocus = -1;
+  }
+  const n = L.pmid.length, off = L.n_list - L.n_on;
+  const counts = new Map();
+  for (const f of L.f) counts.set(f, (counts.get(f) || 0) + 1);
+  const fields = [...counts].filter(([f]) => f > 0).sort((a, b) => b[1] - a[1]);
+  const sw = (f) => `<span class="sw" style="background:${LM.fields[f].colour}"></span>`;
+  const item = (f, c, label) => `<li><button type="button" data-field="${f}" class="${landFocus === f ? "on" : ""}">${sw(f)}
+      <span><b>${esc(label)}</b> <span class="muted">· ${plural(c, "paper")}</span></span></button></li>`;
+  setList(head() + `
+    <p class="status">PubMedBERT map of <b>${fmt(n)}</b>${L.sampled ? ` (a fixed sample of the ${fmt(L.n_on)})` : ""} ${scopeText(n)}
+      · ${off ? `${plural(off, "paper")} not on it (newer than early 2024, or not in its data) · ` : ""}${L.secs} s ${infoBtn()}</p>
+    <p class="hint" style="max-width:75ch">Dot = paper, placed where the published PubMedBERT map of 23 million PubMed abstracts
+      puts it (${ext("https://pmc.ncbi.nlm.nih.gov/articles/PMC11240179/", "González-Márquez et al., Patterns 2024")}); close dots are close in meaning.
+      Behind them: the ${fmt(LM.n_human)} papers about human genes, coloured by field (the journal’s; grey = no field).
+      Ring = curated paper. Click a dot to read it; scroll to zoom; <kbd>Esc</kbd> clears a picked field.</p>
+    <div class="bar">
+      <span>Colour by <span class="seg" role="group" aria-label="Colour by">
+        <button type="button" data-lcolour="plain" aria-pressed="${landColour === "plain"}">One colour</button>
+        <button type="button" data-lcolour="field" aria-pressed="${landColour === "field"}">Field</button>
+        <button type="button" data-lcolour="year" aria-pressed="${landColour === "year"}">Year</button></span></span>
+    </div>
+    <div id="plot" role="img" aria-label="PubMedBERT map: ${fmt(n)} papers over the human-gene literature. The field list below gives the same information."></div>
+    <div id="mappaper"></div>
+    <h2>Fields <span class="muted" style="font-weight:normal">(from the journal; click one to pick it out on the map)</span></h2>
+    <ol class="topics">${fields.map(([f, c]) => item(f, c, LM.fields[f].name)).join("")}
+      ${counts.get(0) ? item(0, counts.get(0), "No field (journal not labelled)") : ""}</ol>`);
+  wireTop();
+  document.querySelectorAll("[data-lcolour]").forEach((b) => b.onclick = () => {
+    landColour = b.dataset.lcolour;
+    document.querySelectorAll("[data-lcolour]").forEach((x) => x.setAttribute("aria-pressed", x === b));
+    drawLand();
+  });
+  document.querySelectorAll("[data-field]").forEach((b) => b.onclick = () => {
+    setLandFocus(landFocus === +b.dataset.field ? -1 : +b.dataset.field);
+    $("plot").scrollIntoView({behavior: "smooth", block: "nearest"});
+  });
+  landZoom = 1;
+  return drawLand();
+}
+
+function setLandFocus(f) {
+  landFocus = f;
+  document.querySelectorAll("[data-field]").forEach((x) => x.classList.toggle("on", +x.dataset.field === f));
+  drawLand();
+}
+
+function drawLand() {
+  const el = $("plot");
+  if (!el || !L || !window.Plotly) return Promise.resolve();
+  const n = L.pmid.length, E = LM.extent;
+  L.hover ??= L.pmid.map((p, i) => [wrap(pesc(L.title[i] || `PMID ${p}`)), L.year[i] || "no year",
+    pesc(fieldName(L.f[i])), L.curated[i] ? " · curated" : "", p]);
+  // Dots grow as you zoom in, less so when there are many (else a big gene's dots carpet the map).
+  const base = n > 10000 ? 4 : n > 3000 ? 5.5 : 7, size = Math.min(n > 10000 ? 7 : 18, base * landZoom), big = Math.min(28, Math.max(11, base * 2) * landZoom);
+  const dim = (i) => landFocus >= 0 && L.f[i] !== landFocus;
+  const idx = (keep) => { const out = []; for (let i = 0; i < n; i++) if (keep(i)) out.push(i); return out; };
+  const years = L.year.filter((y) => y > 0).sort((a, b) => a - b);
+  const y0 = years[Math.floor(years.length * 0.1)] ?? 0, y1 = years[Math.floor(years.length * 0.98)] ?? 0;
+  const colourOf = (ids) => landColour === "year"
+    ? {color: ids.map((i) => L.year[i] || y0), colorscale: LAND_YEARS, cmin: y0, cmax: Math.max(y1, y0 + 1)}
+    : landColour === "field" ? {color: ids.map((i) => L.f[i] === 0 ? "#9a9994" : LM.fields[L.f[i]].colour)}
+    : {color: LAND_INK};
+  const trace = (ids, marker, extra = {}) => ({
+    type: "scattergl", mode: "markers", x: ids.map((i) => L.x[i]), y: ids.map((i) => L.y[i]),
+    customdata: ids.map((i) => L.hover[i]), marker,
+    hovertemplate: "<b>%{customdata[0]}</b><br>%{customdata[1]} · %{customdata[2]}%{customdata[3]}<extra></extra>", ...extra,
+  });
+  const traces = [], add = (ids, marker, extra) => { if (ids.length) traces.push(trace(ids, marker, extra)); };
+  add(idx(dim), {size: size * 0.8, color: "#5f5e5a", opacity: 0.45});
+  const rest = idx((i) => !dim(i) && !L.curated[i]);
+  add(rest, {size, opacity: 0.85, line: {width: 0.6, color: "#fff"}, ...colourOf(rest),
+    ...(landColour === "year" ? {showscale: true, colorbar: {title: {text: "Year"}, thickness: 14}} : {})});
+  const cur = idx((i) => !dim(i) && L.curated[i]);
+  add(cur, {size: big, opacity: 1, line: {width: 2, color: INK}, ...colourOf(cur)}, {name: "curated"});
+  const keep = el._land && el.layout?.xaxis?.range;
+  const layout = {
+    showlegend: false, hovermode: "closest", dragmode: "pan", uirevision: L.params,
+    margin: {l: 10, r: landColour === "year" ? 90 : 10, t: 10, b: 10},
+    paper_bgcolor: "rgba(0,0,0,0)", plot_bgcolor: "rgba(0,0,0,0)",
+    xaxis: {visible: false, range: [...(keep ? el.layout.xaxis.range : E.x)]},
+    yaxis: {visible: false, range: [...(keep ? el.layout.yaxis.range : E.y)], scaleanchor: "x"},
+    images: [{source: `/landscape.png?v=${LM.version}`, xref: "x", yref: "y", x: E.x[0], y: E.y[1],
+              sizex: E.x[1] - E.x[0], sizey: E.y[1] - E.y[0], sizing: "stretch", layer: "below", opacity: LAND_BG_OPACITY}],
+    annotations: landAnn,
+    hoverlabel: {font: {size: 16, family: FONT, color: INK}, bgcolor: "#fff", bordercolor: "#888"},
+  };
+  return Plotly.react(el, traces, layout, {responsive: true, displaylogo: false, scrollZoom: true, doubleClick: "reset",
+                                           modeBarButtonsToRemove: ["select2d", "lasso2d", "autoScale2d"]})
+    .then(() => { wireLand(el); placeLandLabels(); });
+}
+
+// Field names at the centre of their human-gene papers, biggest field first; a name that would
+// overlap one already placed is left out until you zoom in (all are in the list below).
+function placeLandLabels() {
+  const el = $("plot"), fl = el?._fullLayout;
+  if (!fl?.xaxis?.l2p || !LM) return;
+  const xa = fl.xaxis, ya = fl.yaxis, fs = 15, h = fs * 1.6, placed = [], out = [];
+  const fields = LM.fields.filter((f) => f.id > 0 && f.x != null && (landFocus < 0 ? f.n >= 1000 : f.id === landFocus))
+    .sort((a, b) => b.n - a.n);
+  for (const f of fields) {
+    const px = xa._offset + xa.l2p(f.x), py = ya._offset + ya.l2p(f.y), w = textWidth(f.name, fs) + 16;
+    const b = {x0: px - w / 2, x1: px + w / 2, y0: py - h / 2, y1: py + h / 2};
+    if (b.x0 < xa._offset || b.x1 > xa._offset + xa._length || b.y0 < ya._offset || b.y1 > ya._offset + ya._length) continue;
+    if (placed.some((o) => b.x0 < o.x1 && o.x0 < b.x1 && b.y0 < o.y1 && o.y0 < b.y1)) continue;
+    placed.push(b);
+    out.push({x: f.x, y: f.y, text: pesc(f.name), showarrow: false, font: {size: fs, color: INK, family: FONT},
+      bgcolor: "rgba(255,255,255,0.85)", bordercolor: f.colour, borderwidth: 2, borderpad: 3, opacity: 0.9});
+  }
+  landAnn = out;
+  Plotly.relayout(el, {annotations: out});
+}
+
+function wireLand(el) {  // once per plot element
+  if (el._land) return;
+  el._land = true;
+  let resizing = 0;
+  el.on("plotly_relayout", (e) => {  // zoom/pan: re-place the names; zoom: resize the dots
+    if ("annotations" in e) return;
+    const E = LM.extent, r = el.layout.xaxis.range;
+    const k = Math.min(4, Math.max(1, Math.sqrt((E.x[1] - E.x[0]) / Math.abs(r[1] - r[0]))));
+    placeLandLabels();
+    if (Math.abs(k - landZoom) > 0.05) { landZoom = k; clearTimeout(resizing); resizing = setTimeout(drawLand, 120); }
+  });
+  let clicks = 0;
+  el.on("plotly_click", async (ev) => {
+    const pmid = ev.points[0].customdata[4], my = ++clicks, req = reqNo;
+    const p = await getJSON(`/api/paper?subject=${encodeURIComponent(G.id)}&pmid=${pmid}&term=${encodeURIComponent(S.q)}`);
+    if (my !== clicks || req !== reqNo || !$("mappaper")) return;
+    $("mappaper").innerHTML = `<ol class="papers">${paperHTML(p, hl(p))}</ol>`;
+    $("mappaper").querySelector("details.abs")?.setAttribute("open", "");
+    $("mappaper").scrollIntoView({behavior: "smooth", block: "nearest"});
+  });
+}
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && S.view === "landscape" && landFocus >= 0 && !document.querySelector("#how:popover-open")) setLandFocus(-1);
+});
 
 // ---- wiring
 // Scrolling to the results must not hide their top under the sticky header.
