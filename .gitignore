@@ -28,3 +28,4 @@ models/
 
 # datasets map/filter caches
 data/tasks/**/cache-*.arrow
+.env.gcp
