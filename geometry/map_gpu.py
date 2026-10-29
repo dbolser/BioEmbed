@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 import time
 from pathlib import Path
 
@@ -49,7 +50,12 @@ def main() -> None:
     out.mkdir(parents=True, exist_ok=True)
     X = np.load(args.data / "X.npy", mmap_mode="r")
     n = min(len(X), args.limit or len(X))
-    (out / "run.json").write_text(json.dumps({**vars(args), "data": str(args.data), "out": str(out), "rows": n}, indent=1, default=str))
+    run = json.loads(json.dumps({**vars(args), "data": str(args.data), "out": str(out), "rows": n}, default=str))
+    if (out / "run.json").exists() and (old := json.loads((out / "run.json").read_text())) != run:
+        # The outputs below are reused if present, so they must come from the same settings.
+        diff = {k: (old.get(k), v) for k, v in run.items() if old.get(k) != v}
+        sys.exit(f"{out} holds a run with other settings {diff}; use another --out or delete it")
+    (out / "run.json").write_text(json.dumps(run, indent=1))
     print(f"{n:,} x {X.shape[1]} vectors -> {out}", flush=True)
 
     def umap(dims: int, min_dist: float, name: str) -> np.ndarray:
