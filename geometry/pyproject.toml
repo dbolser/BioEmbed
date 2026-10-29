@@ -1,0 +1,13 @@
+[project]
+name = "bioembed-geometry-gpu"
+version = "0.1.0"
+description = "GPU env (RAPIDS cuML) for map_gpu.py and umap_sweep.py; the CPU scripts here use the repo root env"
+requires-python = ">=3.12"
+dependencies = ["cuml-cu12>=25.10", "numpy", "pyarrow", "pandas", "scipy"]
+
+[[tool.uv.index]]
+name = "nvidia"
+url = "https://pypi.nvidia.com"
+
+[tool.uv]
+package = false
