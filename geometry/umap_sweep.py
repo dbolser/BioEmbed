@@ -104,8 +104,12 @@ def main() -> None:
     out.mkdir(exist_ok=True)
     res = out / "results.csv"
     done = {r["name"] for r in csv.DictReader(res.open())} if res.exists() else set()
-    write = lambda row: (res.exists() or res.write_text(",".join(FIELDS) + "\n"),
-                         res.open("a").write(",".join(str(row.get(f, "")) for f in FIELDS) + "\n"))
+
+    def write(row: dict) -> None:
+        if not res.exists():
+            res.write_text(",".join(FIELDS) + "\n")
+        with res.open("a") as fh:
+            fh.write(",".join(str(row.get(f, "")) for f in FIELDS) + "\n")
 
     X = np.load(args.data / "X.npy").astype(np.float32)
     n = len(X)

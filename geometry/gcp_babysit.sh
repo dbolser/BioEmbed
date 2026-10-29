@@ -19,7 +19,8 @@ while true; do
     n=$(printf "%s" "$out" | grep -c .)
     if [ "$n" -gt "$seen" ]; then printf "%s\n" "$out" | tail -n +$((seen + 1)) | cut -c1-260; seen=$n; fi
     printf "%s" "$out" | grep -q "^exit" && break
-    if ! ssh 'pgrep -f "[u]map_sweep.py" >/dev/null'; then
+    # (Only a clear NO relaunches: a failed or timed-out ssh must not start a second sweep.)
+    if [ "$(ssh 'pgrep -f "[u]map_sweep.py" >/dev/null && echo YES || echo NO')" = NO ]; then
         echo "$(date -u +%H:%MZ) relaunching sweep"
         ssh 'cd ~/geometry && (setsid nohup sh -c "~/.local/bin/uv run python umap_sweep.py --data ~/medembed_small --grid all; echo exit \$?" < /dev/null >> ~/sweep.log 2>&1 &)' || true
     fi
