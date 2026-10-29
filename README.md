@@ -82,6 +82,9 @@ Open Targets curator gold, not part of the 12-task BioScore
   (`count_tokens_bio.py`), aggregation (`aggregate_bio.py`), Pareto plot
   (`pareto_bio.py`).
 - `vendor/embedders-dilemma` — the paper's public repo (clone; gitignored).
+- `geometry/` — side project: how much structure the human-gene literature keeps when its
+  embeddings are squeezed to a few dimensions for clustering and maps (intrinsic dimension,
+  UMAP sweep, t-SNE comparison). Write-up in `geometry/README.md`.
 - `results/` — our result JSONs, merged CSVs, figures; `claims.md`/`claims.csv`
   from `scripts/claims.py`.
 
