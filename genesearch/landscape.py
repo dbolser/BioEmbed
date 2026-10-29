@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import json
 import time
-from functools import cache
 from pathlib import Path
 
 import duckdb
@@ -124,10 +123,15 @@ class Landscape:
         return on, i[on]
 
 
-@cache
+_loaded: Landscape | None = None
+
+
 def load() -> Landscape | None:
-    """The built landscape, or None if build() has not been run."""
-    return Landscape() if (OUT / "meta.json").exists() else None
+    """The built landscape, or None if build() has not been run (checked again on each call until it is)."""
+    global _loaded
+    if _loaded is None and (OUT / "meta.json").exists():  # (build() writes meta.json last)
+        _loaded = Landscape()
+    return _loaded
 
 
 if __name__ == "__main__":
