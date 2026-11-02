@@ -48,6 +48,25 @@ among the papers. It can be read off the neighbour distances:
 This says a squeeze to somewhere around 6 to 24 dimensions can keep most of the local structure, and that
 2-D cannot.
 
+**Does density change it?** A worry: with millions of papers, does the data get harder to squeeze? `density.py`
+takes 40,000 other query papers and searches for their neighbours in random subsets of the papers, from 1% to
+all of them (`eval/density.json`):
+
+| Papers searched | TwoNN | Levina-Bickel 10 / 20 / 50 | Distance to 1st / 50th neighbour |
+|---|---|---|---|
+| 78k (1%) | 19.4 | 18.4 / 20.6 / 22.7 | 0.54 / 0.65 |
+| 233k (3%) | 18.4 | 17.2 / 19.1 / 21.0 | 0.50 / 0.62 |
+| 776k (10%) | 17.1 | 16.0 / 17.7 / 19.4 | 0.47 / 0.59 |
+| 2.3M (30%) | 15.7 | 15.0 / 16.6 / 18.2 | 0.44 / 0.56 |
+| 7.76M (all) | 14.0 | 13.7 / 15.5 / 17.0 | 0.40 / 0.53 |
+
+- 40,000 queries give the same 14.0 as 20,000 (bootstrap spread ±0.1), so the query count was never the issue.
+- **The dimension falls as density rises**, about 1.5 for every 3x more papers, and has not levelled off. Close
+  up, the papers look simpler; the true local dimension is probably below 14. More papers make the squeeze
+  easier, not harder.
+- **Neighbourhoods are shallow.** A paper's 1st neighbour is at cosine about 0.92, its 50th at about 0.86: the
+  1st and 50th are nearly equally close. That leaves little contrast for a neighbour graph to work with.
+
 ## How a squeeze is scored
 
 For each squeezed space, the same 20,000 query papers get their 15 (or 50) nearest neighbours again, now in
@@ -129,8 +148,51 @@ Table: `data/geometry/medembed_small/sweep/tsne_check.csv`.
 - **The two models see different things.** MedEmbed's neighbours share genes more (61% against 49%);
   PubMedBERT's share journal fields more (58% against 53%). That difference is the first data point on
   "the geometry of biological knowledge" across models.
-- **Caveat.** This compares two maps made from different vectors. The fair test is t-SNE on our MedEmbed
-  vectors (openTSNE on CPU, as they did, or cuML's TSNE on GPU), scored with `umap_sweep.py`'s scores.
+- **Caveat.** This compares two maps made from different vectors. The fair test follows.
+
+**The fair test: t-SNE on our vectors.** `tsne_full.py` runs openTSNE (defaults: perplexity 30, PCA start) on all
+7.76M MedEmbed vectors, about 2 hours on 96 CPU threads, and scores it like the UMAP sweep:
+
+| Map (all 7.76M papers) | Kept 15 nbrs | Share a gene | Same field | Global shape |
+|---|---|---|---|---|
+| original 384-D | 100% | 61% | 53% | 1.00 |
+| UMAP k=15, 2-D | 6% | 31% | 37% | 0.24 |
+| **t-SNE 2-D** | **16%** | **48%** | **48%** | **0.37** |
+| UMAP k=15, 12-D | 25% | 54% | 49% | 0.36 |
+
+![t-SNE of all 7.76M human-gene papers, coloured by journal field](figures/tsne_full.jpg)
+
+t-SNE's 2-D map keeps nearly three times UMAP's 2-D neighbours and almost all of 12-D UMAP's gene and field
+signal, and it looks like the published map: fields in regions, fine clumps inside them, no central blob. Its
+fit was still improving when it stopped (750 iterations), so more would likely score a little higher.
+
+## Does UMAP behave as density rises? The gallery
+
+The parameter gallery of [UMAP-Parameter-Sweep](https://github.com/dbolser/UMAP-Parameter-Sweep)
+(n_neighbors x min_dist), repeated on random subsets of 8k, 78k and 776k papers (0.1%, 1%, 10%: the same
+subsets as `density.py`), with t-SNE at perplexity 10, 30 and 100 alongside. UMAP is given exact neighbours, so
+only its layout differs between settings. Every map is scored inside its subset on 5,000 queries
+(`gallery.py`; `data/geometry/medembed_small/gallery/`). The "ceiling" is the share of the true 384-D
+neighbours that share a gene, which grows with density.
+
+| Papers | Ceiling | Best UMAP (5 neighbours, min_dist ≤ 0.01) | t-SNE (perplexity 30) |
+|---|---|---|---|
+| 8k | 25% | 17% (68% of ceiling) | 19% (76%) |
+| 78k | 39% | 20% (51%) | 32% (82%) |
+| 776k | 53% | 29% (55%) | 43% (81%) |
+
+![The gallery at 776k papers: rows UMAP n_neighbors then t-SNE, columns min_dist](figures/gallery_10pct.jpg)
+
+- **t-SNE keeps about 80% of the gene signal at every density; 2-D UMAP falls from two thirds to about half.**
+  Kept neighbours tell the same story: t-SNE 23 to 32% at every density, UMAP (k ≥ 5) falling with density, to
+  about 8% at 776k with 15 neighbours.
+- **min_dist below 0.01 makes no difference**; from 0.1 up it hurts every score and turns the map into an
+  even disc. Our runs already used 0.
+- **Fewer neighbours are better locally** (5 is best). More give a tidier picture with worse neighbours. With
+  2 neighbours UMAP draws noise: an even disc.
+- **Not a cuML quirk.** `umaplearn_check.py` re-runs four settings at 78k with umap-learn, the reference
+  UMAP: 5 neighbours 24% share a gene, 15 neighbours 21%, against cuML's 20% and about 17%. A little better,
+  still far below t-SNE's 32%. cuML's own t-SNE scored near chance on a small test and is not used.
 
 So: cluster in 12-D UMAP, draw in 2-D t-SNE.
 
@@ -159,6 +221,10 @@ So: cluster in 12-D UMAP, draw in 2-D t-SNE.
 | `umap_sweep.py` | GPU, this dir's env | the sweep above; resumes after a preemption |
 | `gcp_babysit.sh VM ZONE [SEEN]` | here | restarts a preempted Spot VM, relaunches the sweep, prints each finished row |
 | `tsne_check.py` | here, root env (~10 min) | the t-SNE comparison |
+| `density.py` | here, root env (~20 min) | intrinsic dimension against density |
+| `tsne_full.py` | here, root env + `--with openTSNE --with annoy` (~2 h) | t-SNE of all 7.76M papers, scored |
+| `gallery.py --umap` / `--tsne` / `--draw` | GPU, this dir's env / here + openTSNE / here | the density gallery |
+| `umaplearn_check.py` | here, root env + `--with umap-learn` (~7 min) | the gallery's cuML check |
 
 GPU runs used GCP Spot `g2-standard-16` VMs with one L4 (project `agentic-ai-iuk-ipf`, image family
 `common-cu129-ubuntu-2204-nvidia-580`): `uv sync` in a copy of this directory installs cuML. The sweep took
