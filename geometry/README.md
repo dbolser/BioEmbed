@@ -5,7 +5,7 @@ from one embedding model to another? The first steps, below, use one model (MedE
 about human genes, and ask a narrower question first: **when we squeeze the embeddings down to a few
 dimensions to cluster and draw them, how much of their structure survives?**
 
-Started 2026-10-28. Status: dimension reduction tuned; clustering not yet tuned.
+Started 2026-10-28. Status: dimension reduction, drawing and clustering tuned (2026-11-02); one model so far.
 
 ## The papers and their vectors
 
@@ -47,6 +47,25 @@ among the papers. It can be read off the neighbour distances:
 
 This says a squeeze to somewhere around 6 to 24 dimensions can keep most of the local structure, and that
 2-D cannot.
+
+**Does density change it?** A worry: with millions of papers, does the data get harder to squeeze? `density.py`
+takes 40,000 other query papers and searches for their neighbours in random subsets of the papers, from 1% to
+all of them (`eval/density.json`):
+
+| Papers searched | TwoNN | Levina-Bickel 10 / 20 / 50 | Distance to 1st / 50th neighbour |
+|---|---|---|---|
+| 78k (1%) | 19.4 | 18.4 / 20.6 / 22.7 | 0.54 / 0.65 |
+| 233k (3%) | 18.4 | 17.2 / 19.1 / 21.0 | 0.50 / 0.62 |
+| 776k (10%) | 17.1 | 16.0 / 17.7 / 19.4 | 0.47 / 0.59 |
+| 2.3M (30%) | 15.7 | 15.0 / 16.6 / 18.2 | 0.44 / 0.56 |
+| 7.76M (all) | 14.0 | 13.7 / 15.5 / 17.0 | 0.40 / 0.53 |
+
+- 40,000 queries give the same 14.0 as 20,000 (bootstrap spread ±0.1), so the query count was never the issue.
+- **The dimension falls as density rises**, about 1.5 for every 3x more papers, and has not levelled off. Close
+  up, the papers look simpler; the true local dimension is probably below 14. More papers make the squeeze
+  easier, not harder.
+- **Neighbourhoods are shallow.** A paper's 1st neighbour is at cosine about 0.92, its 50th at about 0.86: the
+  1st and 50th are nearly equally close. That leaves little contrast for a neighbour graph to work with.
 
 ## How a squeeze is scored
 
@@ -129,19 +148,121 @@ Table: `data/geometry/medembed_small/sweep/tsne_check.csv`.
 - **The two models see different things.** MedEmbed's neighbours share genes more (61% against 49%);
   PubMedBERT's share journal fields more (58% against 53%). That difference is the first data point on
   "the geometry of biological knowledge" across models.
-- **Caveat.** This compares two maps made from different vectors. The fair test is t-SNE on our MedEmbed
-  vectors (openTSNE on CPU, as they did, or cuML's TSNE on GPU), scored with `umap_sweep.py`'s scores.
+- **Caveat.** This compares two maps made from different vectors. The fair test follows.
+
+**The fair test: t-SNE on our vectors.** `tsne_full.py` runs openTSNE (defaults: perplexity 30, PCA start) on all
+7.76M MedEmbed vectors, about 2 hours on 96 CPU threads, and scores it like the UMAP sweep:
+
+| Map (all 7.76M papers) | Kept 15 nbrs | Share a gene | Same field | Global shape |
+|---|---|---|---|---|
+| original 384-D | 100% | 61% | 53% | 1.00 |
+| UMAP k=15, 2-D | 6% | 31% | 37% | 0.24 |
+| **t-SNE 2-D** | **16%** | **48%** | **48%** | **0.37** |
+| UMAP k=15, 12-D | 25% | 54% | 49% | 0.36 |
+
+![t-SNE of all 7.76M human-gene papers, coloured by journal field](figures/tsne_full.jpg)
+
+t-SNE's 2-D map keeps nearly three times UMAP's 2-D neighbours and almost all of 12-D UMAP's gene and field
+signal, and it looks like the published map: fields in regions, fine clumps inside them, no central blob. Its
+fit was still improving when it stopped (750 iterations), so more would likely score a little higher.
+
+## Does UMAP behave as density rises? The gallery
+
+The parameter gallery of [UMAP-Parameter-Sweep](https://github.com/dbolser/UMAP-Parameter-Sweep)
+(n_neighbors x min_dist), repeated on random subsets of 8k, 78k and 776k papers (0.1%, 1%, 10%: the same
+subsets as `density.py`), with t-SNE at perplexity 10, 30 and 100 alongside. UMAP is given exact neighbours, so
+only its layout differs between settings. Every map is scored inside its subset on 5,000 queries
+(`gallery.py`; `data/geometry/medembed_small/gallery/`). The "ceiling" is the share of the true 384-D
+neighbours that share a gene, which grows with density.
+
+| Papers | Ceiling | Best UMAP (5 neighbours, min_dist ≤ 0.01) | t-SNE (perplexity 30) |
+|---|---|---|---|
+| 8k | 25% | 17% (68% of ceiling) | 19% (76%) |
+| 78k | 39% | 20% (51%) | 32% (82%) |
+| 776k | 53% | 29% (55%) | 43% (81%) |
+
+![The gallery at 776k papers: rows UMAP n_neighbors then t-SNE, columns min_dist](figures/gallery_10pct.jpg)
+
+- **t-SNE keeps about 80% of the gene signal at every density; 2-D UMAP falls from two thirds to about half.**
+  Kept neighbours tell the same story: t-SNE 23 to 32% at every density, UMAP (k ≥ 5) falling with density, to
+  about 8% at 776k with 15 neighbours.
+- **min_dist below 0.01 makes no difference**; from 0.1 up it hurts every score and turns the map into an
+  even disc. Our runs already used 0.
+- **Fewer neighbours are better locally** (5 is best). More give a tidier picture with worse neighbours. With
+  2 neighbours UMAP draws noise: an even disc.
+- **Not a cuML quirk.** `umaplearn_check.py` re-runs four settings at 78k with umap-learn, the reference
+  UMAP: 5 neighbours 24% share a gene, 15 neighbours 21%, against cuML's 20% and about 17%. A little better,
+  still far below t-SNE's 32%. cuML's own t-SNE scored near chance on a small test and is not used.
 
 So: cluster in 12-D UMAP, draw in 2-D t-SNE.
 
-## Clustering: notes for the next step
+## Clustering
 
-- Cluster on the 12-D (or 6-D) k=15 UMAP; draw separately. Score clusters with the same gene and field
-  measures (do papers in a cluster share genes more than chance?), so the cluster sweep has an objective
-  too.
-- HDBSCAN took 85 minutes on 7.76M papers in 12-D on an L4 (leaf selection). Try excess-of-mass selection
-  and much bigger minimum cluster sizes; sweep on a 1M sample first.
-- **Cosine in HDBSCAN.** cuML's HDBSCAN only takes Euclidean distance (cuML DBSCAN also takes cosine). On
+HDBSCAN (cuML) on the 12-D UMAP (k=15), swept on a 1M-paper sample that holds the 20,000 queries
+(`cluster_sweep.py`; `data/geometry/medembed_small/clusters/results.csv`). Each fit takes 1.5 minutes
+(7.5 with min_samples 1). Scores:
+
+| Score | Meaning |
+|---|---|
+| Noise | share of papers HDBSCAN leaves unclustered |
+| Together | of a query's true 15 neighbours that are in the fitted papers, the share in its cluster; noise counts as a miss (queries with no such neighbours are skipped) |
+| Gene lift | how much more often two papers in one cluster share a gene than two random papers (same-cluster pairs: a random clustered paper, then a random other paper of its cluster, so a cluster weighs by its size) |
+| Field lift, field purity | the same for journal field; of clustered papers that have a field, the share in their cluster's commonest field |
+
+| Selection, min cluster size, min samples | Clusters | Noise | Together | Gene lift | Field lift | Field purity |
+|---|---|---|---|---|---|---|
+| eom, 50, 10 | 2,742 | 50% | 42% | 13.9 | 5.5 | 51% |
+| eom, 200, 10 | 717 | 49% | 44% | 11.3 | 5.0 | 46% |
+| eom, 1000, 10 | 148 | 49% | 44% | 6.4 | 4.3 | 41% |
+| eom, 5000, 10 | 2 | 0% | 99% | 1.2 | 1.0 | 14% |
+| leaf, 50, 10 | 3,193 | 59% | 33% | 16.6 | 5.8 | 53% |
+| leaf, 200, 10 | 850 | 58% | 35% | 14.3 | 5.2 | 49% |
+| leaf, 1000, 10 | 181 | 60% | 34% | 8.9 | 4.6 | 44% |
+| leaf, 5000, 10 | 36 | 60% | 35% | 5.2 | 3.8 | 36% |
+| eom, 50, 1 | 4,230 | 40% | 46% | 14.3 | 5.9 | 53% |
+| eom, 200, 1 | 805 | 42% | 48% | 10.3 | 5.0 | 46% |
+| eom, 1000, 1 | 157 | 46% | 46% | 6.7 | 4.3 | 40% |
+| eom, 50, 3 | 3,349 | 46% | 44% | 14.9 | 5.7 | 52% |
+| eom, 200, 3 | 780 | 47% | 45% | 10.3 | 5.2 | 46% |
+| eom, 1000, 3 | 159 | 50% | 44% | 6.9 | 4.3 | 41% |
+
+- **Every setting leaves 40 to 60% of papers as noise.** Leaf selection gives purer clusters with more
+  noise; fewer min samples less noise. Excess-of-mass with big minimum sizes collapses to 2 clusters.
+- **Cluster size trades purity for breadth**: gene lift falls from about 15 to about 7 as clusters grow
+  from about 300 papers (sample) to about 6,000.
+- **What is clustered is clean**: 92 to 97% of a clustered paper's clustered neighbours are in its cluster.
+
+**Every paper into a cluster.** `cluster_sweep.py --assign` fits on the sample, then gives each of the
+7.76M papers the majority cluster of its 15 nearest clustered sample papers in 12-D (3 minutes in all):
+
+| Setting (all 7.76M papers) | Clusters | Together | Gene lift | Field lift | Field purity |
+|---|---|---|---|---|---|
+| eom, 200, 3 | 780 | 80% | 7.6 | 4.4 | 44% |
+| eom, 50, 3 | 3,349 | 74% | 10.4 | 5.2 | 48% |
+
+Voting keeps most of the purity (gene lift 10.3 to 7.6 for 780 clusters) and puts 80% of each paper's true
+neighbours in its cluster. `draw_clusters.py` names each cluster by its most typical genes and draws it on
+the t-SNE map (`clusters/<name>_summary.csv`, `.png`):
+
+The 20,000 queries were in the HDBSCAN sample, which could flatter "Together". `assign_check.py` re-scores on
+20,000 papers outside the sample, whose labels all come from the vote: 80.2% (780 clusters) and 73.9%
+(3,349), the same as above.
+
+![780 clusters from 12-D UMAP drawn on the 2-D t-SNE map](figures/clusters_780.jpg)
+
+- **Two separate methods agree.** Clusters found in 12-D UMAP land as coherent patches on the 2-D t-SNE map,
+  which never saw them.
+- **The clusters read as topics**: bone (BMP2 RUNX2 BGLAP), COVID-19 (ACE2 TMPRSS2), breast cancer (ERBB2
+  ESR1 PGR), prostate cancer (KLK3 FOLH1), stem cells (POU5F1 SOX2 NANOG), glutamate receptors (GRIA1 GRIN2B),
+  lipoproteins (APOB APOA1 LPL), renin-angiotensin (REN AGT ACE), drug metabolism (CYP3A4 CYP2B6).
+- **Caveat: gene tagging.** PubTator3 tags some bare abbreviations as genes. In `gene2pubtator3`, PC
+  (pyruvate carboxylase) is mostly the bare text "PC" (1,709 of the first ~2,000 mentions), likewise CS
+  (citrate synthase) and CP (ceruloplasmin). The "AP2B1 OXT PC" cluster is psychology (depression trials,
+  "PC-PTSD" for primary care). So these mislabel clusters, and some "human-gene papers" mention no gene at all.
+  The clustering itself never sees genes. GPT and TF are mostly real (alanine aminotransferase, transferrin).
+  Cleaning this is in `TODO.md`.
+
+**Cosine in HDBSCAN.** cuML's HDBSCAN only takes Euclidean distance (cuML DBSCAN also takes cosine). On
   unit-length vectors this matters less than it seems: Euclidean distance squared = 2 - 2 x cosine, so the
   two put every pair of papers in the same order. HDBSCAN's tree depends only on that order, so on
   unit-length vectors Euclidean HDBSCAN builds the same tree as cosine HDBSCAN; only cluster "stability",
@@ -159,6 +280,13 @@ So: cluster in 12-D UMAP, draw in 2-D t-SNE.
 | `umap_sweep.py` | GPU, this dir's env | the sweep above; resumes after a preemption |
 | `gcp_babysit.sh VM ZONE [SEEN]` | here | restarts a preempted Spot VM, relaunches the sweep, prints each finished row |
 | `tsne_check.py` | here, root env (~10 min) | the t-SNE comparison |
+| `density.py` | here, root env (~20 min) | intrinsic dimension against density |
+| `tsne_full.py` | here, root env + `--with openTSNE --with annoy` (~2 h) | t-SNE of all 7.76M papers, scored |
+| `gallery.py --umap` / `--tsne` / `--draw` | GPU, this dir's env / here + openTSNE / here | the density gallery |
+| `umaplearn_check.py` | here, root env + `--with umap-learn` (~7 min) | the gallery's cuML check |
+| `cluster_sweep.py [--grid samples] [--assign NAME]` | GPU, this dir's env | the HDBSCAN sweep; every paper into a cluster |
+| `draw_clusters.py NAME` | here, root env | cluster summaries (genes, field) and the cluster map |
+| `assign_check.py NAME...` | here, root env (~4 min) | scores voted labellings on held-out papers |
 
 GPU runs used GCP Spot `g2-standard-16` VMs with one L4 (project `agentic-ai-iuk-ipf`, image family
 `common-cu129-ubuntu-2204-nvidia-580`): `uv sync` in a copy of this directory installs cuML. The sweep took
