@@ -30,6 +30,11 @@ axes you choose. `/about` lists the data and how the map is made.
    journal. Behind the dots: its 6.26M human-gene papers (PubTator3 tags of HGNC genes) in their field colours. The map
    ends in early 2024; newer papers are counted, not drawn. At most 50,000 dots (a fixed sample beyond that). Build
    once (~2 min) with `uv run python landscape.py`, from `/data/public/PubMedLandscape/2024_v2/` (see its README).
+8. **MedEmbed map** tab (`&view=medmap`): the same, on our own map (`../geometry/README.md`): a t-SNE of the search's
+   MedEmbed-small embeddings of the 7.76M human-gene papers, coloured by 780 clusters found in a 12-D UMAP of the same
+   vectors and named by their most typical genes (some names are PubTator tagging errors, e.g. "TNM", "AST"). The 25
+   clusters holding most of the list's papers are labelled. Build (~10 s, after the geometry runs) with
+   `uv run python landscape.py medembed`; from `data/geometry/medembed_small/`.
 
 How it works
 
