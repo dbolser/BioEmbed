@@ -205,9 +205,9 @@ HDBSCAN (cuML) on the 12-D UMAP (k=15), swept on a 1M-paper sample that holds th
 | Score | Meaning |
 |---|---|
 | Noise | share of papers HDBSCAN leaves unclustered |
-| Together | of a query's true 15 neighbours, the share in its cluster; noise counts as a miss |
-| Gene lift | how much more often two papers in one cluster share a gene than two random papers |
-| Field lift, field purity | the same for journal field; the share of a cluster's papers in its commonest field |
+| Together | of a query's true 15 neighbours that are in the fitted papers, the share in its cluster; noise counts as a miss (queries with no such neighbours are skipped) |
+| Gene lift | how much more often two papers in one cluster share a gene than two random papers (same-cluster pairs: a random clustered paper, then a random other paper of its cluster, so a cluster weighs by its size) |
+| Field lift, field purity | the same for journal field; of clustered papers that have a field, the share in their cluster's commonest field |
 
 | Selection, min cluster size, min samples | Clusters | Noise | Together | Gene lift | Field lift | Field purity |
 |---|---|---|---|---|---|---|
@@ -243,6 +243,10 @@ HDBSCAN (cuML) on the 12-D UMAP (k=15), swept on a 1M-paper sample that holds th
 Voting keeps most of the purity (gene lift 10.3 to 7.6 for 780 clusters) and puts 80% of each paper's true
 neighbours in its cluster. `draw_clusters.py` names each cluster by its most typical genes and draws it on
 the t-SNE map (`clusters/<name>_summary.csv`, `.png`):
+
+The 20,000 queries were in the HDBSCAN sample, which could flatter "Together". `assign_check.py` re-scores on
+20,000 papers outside the sample, whose labels all come from the vote: 80.2% (780 clusters) and 73.9%
+(3,349), the same as above.
 
 ![780 clusters from 12-D UMAP drawn on the 2-D t-SNE map](figures/clusters_780.jpg)
 
@@ -282,6 +286,7 @@ the t-SNE map (`clusters/<name>_summary.csv`, `.png`):
 | `umaplearn_check.py` | here, root env + `--with umap-learn` (~7 min) | the gallery's cuML check |
 | `cluster_sweep.py [--grid samples] [--assign NAME]` | GPU, this dir's env | the HDBSCAN sweep; every paper into a cluster |
 | `draw_clusters.py NAME` | here, root env | cluster summaries (genes, field) and the cluster map |
+| `assign_check.py NAME...` | here, root env (~4 min) | scores voted labellings on held-out papers |
 
 GPU runs used GCP Spot `g2-standard-16` VMs with one L4 (project `agentic-ai-iuk-ipf`, image family
 `common-cu129-ubuntu-2204-nvidia-580`): `uv sync` in a copy of this directory installs cuML. The sweep took
