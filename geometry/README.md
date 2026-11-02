@@ -7,6 +7,33 @@ dimensions to cluster and draw them, how much of their structure survives?**
 
 Started 2026-10-28. Status: dimension reduction, drawing and clustering tuned (2026-11-02); one model so far.
 
+## Everything we tried, at a glance
+
+All on the 7.76M human-gene papers (MedEmbed-small, 384-D) unless a subset is named. "Share a gene": of a paper's
+15 nearest neighbours, the share tagged with one of its genes (61% in the original 384-D space). "Kept": of its
+true 15 neighbours, the share still among its 15 nearest. Details in the sections below.
+
+| # | What we tried | Best result | Against | Verdict |
+|---|---|---|---|---|
+| 1 | Intrinsic dimension (20k, then 40k queries) | TwoNN 14.0 ± 0.1; Levina-Bickel 13.7 to 17.0 | 384 numbers per paper | The papers spread in about 14 to 17 directions |
+| 2 | Intrinsic dimension against density (1% to all) | 19.4 at 78k papers → 14.0 at 7.76M, still falling | | More papers make the squeeze easier, not harder |
+| 3 | PCA, 2 to 24-D | 24-D: share a gene 42%, kept 23% | 384-D: 61% | Needs many dimensions; the baseline |
+| 4 | UMAP, 2 to 24-D (k = 15) | 6 to 12-D: share a gene 54%, kept 25% | 384-D: 61% | **Use 12-D UMAP for clustering** |
+| 5 | UMAP neighbours, k = 15, 50 (100+ out of GPU memory) | k = 15 | k = 50: 52% | More neighbours lose local detail |
+| 6 | UMAP's neighbour graph: more partitions, more nn-descent work | no change | graph recall 91 to 95% already | The graph is not the problem |
+| 7 | UMAP at 2-D | share a gene 31%, kept 6% | 12-D: 54% | Too lossy for a picture |
+| 8 | Published PubMedBERT t-SNE (González-Márquez et al.), 6.26M of our papers | share a gene 33% of its source's 49% | our 2-D UMAP: 31% of 61% | t-SNE draws better (fair test: row 9) |
+| 9 | t-SNE (openTSNE) of all 7.76M, 2-D, ~2 h CPU | share a gene 48%, kept 16% | 2-D UMAP: 31%, 6% | **Use t-SNE for drawing** |
+| 10 | Gallery, UMAP min_dist 0 to 0.99 (0.1%, 1%, 10% subsets) | ≤ 0.01: all the same | 0.1+: worse, an even disc | min_dist is not our problem (we used 0) |
+| 11 | Gallery, UMAP n_neighbors 2 to 200 | 5 | 2: noise; 50+: worse locally | Fewer is better locally |
+| 12 | Gallery, t-SNE against UMAP as density rises | t-SNE: ~80% of the gene ceiling at every density | best 2-D UMAP: 68% → 55% | 2-D UMAP degrades with density; t-SNE does not |
+| 13 | umap-learn (reference CPU UMAP) against cuML, 1% subset | umap-learn: share a gene 21% (k = 15) | cuML ~17%; t-SNE 32% | Not a cuML quirk |
+| 14 | cuML t-SNE, 0.1% subset | near chance | openTSNE | Not used |
+| 15 | HDBSCAN on 12-D UMAP: 14 settings (selection, min size, min samples), 1M sample | 40 to 60% noise at every setting | | HDBSCAN alone leaves half the papers out |
+| 16 | HDBSCAN on the sample, then every paper voted into a cluster | 780 clusters; 80% of true neighbours share the cluster (80.2% held out); gene lift 7.6 | 3,349 clusters: 74%, lift 10.4 | **780 clusters, every paper; on the MedEmbed map tab** |
+| 17 | 12-D clusters drawn on the 2-D t-SNE map | coherent patches | | Two separate methods agree |
+| 18 | Off-topic clusters as a check on PubTator3's gene tags | e.g. SQLE tagged via "SE" (self-efficacy, Se blood group); TNM, AST, Fe, CAR read as genes | | A cheap, label-free way to find tagging errors (`TODO.md`) |
+
 ## The papers and their vectors
 
 - **Human-gene papers**: every PubMed paper that PubTator3 (release 2026-10-06) tags with a gene that is an
