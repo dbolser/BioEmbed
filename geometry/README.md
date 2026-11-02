@@ -251,9 +251,12 @@ the t-SNE map (`clusters/<name>_summary.csv`, `.png`):
 - **The clusters read as topics**: bone (BMP2 RUNX2 BGLAP), COVID-19 (ACE2 TMPRSS2), breast cancer (ERBB2
   ESR1 PGR), prostate cancer (KLK3 FOLH1), stem cells (POU5F1 SOX2 NANOG), glutamate receptors (GRIA1 GRIN2B),
   lipoproteins (APOB APOA1 LPL), renin-angiotensin (REN AGT ACE), drug metabolism (CYP3A4 CYP2B6).
-- **Caveat: gene tagging.** Some labels are tagging errors in PubTator, gene symbols that are also common
-  abbreviations: PC (phosphatidylcholine), CS, CP, GPT, TF. They inflate a few clusters' gene lists, not the
-  clustering, which never sees genes.
+- **Caveat: gene tagging.** PubTator3 tags some bare abbreviations as genes. In `gene2pubtator3`, PC
+  (pyruvate carboxylase) is mostly the bare text "PC" (1,709 of the first ~2,000 mentions), likewise CS
+  (citrate synthase) and CP (ceruloplasmin). The "AP2B1 OXT PC" cluster is psychology (depression trials,
+  "PC-PTSD" for primary care). So these mislabel clusters, and some "human-gene papers" mention no gene at all.
+  The clustering itself never sees genes. GPT and TF are mostly real (alanine aminotransferase, transferrin).
+  Cleaning this is in `TODO.md`.
 
 **Cosine in HDBSCAN.** cuML's HDBSCAN only takes Euclidean distance (cuML DBSCAN also takes cosine). On
   unit-length vectors this matters less than it seems: Euclidean distance squared = 2 - 2 x cosine, so the
