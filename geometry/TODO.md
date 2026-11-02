@@ -28,6 +28,25 @@ PC (pyruvate carboxylase, NCBI 5091) is "PC" 1,709 times and "pyruvate carboxyla
 "CS" 2,101 against 612; CP (ceruloplasmin) "CP" 1,390 against 1,104. The "AP2B1 OXT PC" cluster (33k papers)
 is psychology: depression trials, primary care ("PC-PTSD"). GPT and TF are mostly real (alanine
 aminotransferase, transferrin: clinical blood tests).
+
+**Clearest example, from genesearch's own gene map: SQLE (squalene epoxidase).** PubTator matches it via "SE"
+2,402 times and "Se" 293 times, against 1,093 "SQLE" and 739 "squalene epoxidase". The cached SQLE map
+(`genesearch/index/cache/maps/3e324bc708a1ba465dbc.json`) splits cleanly. Share of each cluster's papers
+tagged only via "SE":
+
+| Cluster (papers) | Tagged only via "SE" | What it is |
+|---|---|---|
+| Clinical health services research (920) | 95% | self-efficacy, standardized examinees, shear bond strength |
+| Transcriptional regulation in oncology (619) | 77% | other "SE"s |
+| Blood group antigen genetics (414) | 72% | the Se (secretor) blood group locus, staphylococcal enterotoxin |
+| Viral infection and epidemiology (354) | 60% | other "SE"s |
+| Cholesterol metabolism in cancer (1,681) | 22% | real SQLE |
+| Fungal ergosterol biosynthesis (812) | 8% | real SQLE |
+
+A second kind of error: CTSS (cathepsin S) is matched via the plural "cathepsins" 5,471 times, so a family
+name becomes one gene.
+- [ ] Scan all genes for this: per gene, the share of its papers tagged only by a bare symbol of 2 to 3
+      letters, or only by a family plural; list the worst offenders.
 - [ ] Measure it: share of the 7.76M papers whose *only* gene tags are bare short symbols (2-3 letters, mention
       text = symbol).
 - [ ] Filter: drop gene tags whose only mentions are bare ambiguous symbols; rebuild the corpus and the scores.
