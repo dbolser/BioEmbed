@@ -4,10 +4,13 @@ Each setting is fitted on a 1M-paper sample (rng seed 3, always holding truth.py
 with --full. Scores:
   clusters, noise      number of clusters, share of papers left unclustered
   together15           of each clustered query's exact 384-D 15 nearest neighbours that are in the fit and
-                       clustered, the share in the query's own cluster
-  gene_lift            P(two papers share a gene | same cluster) / P(share a gene | any two clustered papers)
+                       clustered, the share in the query's own cluster (queries with none are skipped)
+  gene_lift            P(two papers share a gene | same cluster) / P(share a gene | any two clustered papers);
+                       same-cluster pairs: a random clustered paper, then a random other paper of its cluster
+                       (so a cluster of n papers weighs about n, not n^2)
   field_lift           the same for journal field (papers with a field only)
-  field_purity         mean over clustered papers of their cluster's most common field share
+  field_purity         over clustered papers that have a journal field, the share in their cluster's most
+                       common field
   together15_all       of every query's 15 nearest neighbours that are in the fit, the share in the query's own
                        cluster, noise counting as a miss (one number for the trade between purity and coverage)
 Appends to data/geometry/medembed_small/clusters/results.csv; --full also writes clusters/<name>.npy (labels).
@@ -100,6 +103,8 @@ def assign(args, U, q, knn, field, ptr, genes) -> None:
     core = np.zeros(n, bool); core[core_rows] = True
     out_lab[core_rows] = core_lab  # (HDBSCAN's own label wins where it gave one)
     out = args.data / "clusters"; out.mkdir(exist_ok=True)
+    if not (out / "results.csv").exists():
+        csv.DictWriter(open(out / "results.csv", "w", newline=""), FIELDS).writeheader()
     np.save(out / f"{args.assign}_all.npy", out_lab.astype(np.int32)); np.save(out / f"{args.assign}_core.npy", core)
     row = {"name": args.assign, "fit": "assigned", "n": n, "selection": sel, "min_cluster_size": int(mcs[3:]),
            "min_samples": int(ms[2:]), "secs": round(time.time() - t1),

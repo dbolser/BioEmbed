@@ -15,6 +15,7 @@ from sklearn.neighbors import NearestNeighbors
 REPO = Path(__file__).resolve().parent.parent
 D = REPO / "data/geometry/medembed_small"
 E, S = D / "eval", D / "sweep"
+S.mkdir(exist_ok=True)
 t0 = time.time()
 log = lambda *a: print(f"[{time.time() - t0:6.0f}s]", *a, flush=True)
 
@@ -42,11 +43,14 @@ for qi, row in zip(q, nbrs[:, :15]):
 fq, fn = field[q][:, None], field[nbrs[:, :15]]
 both = (fq > 0) & (fn > 0)
 a, b = np.random.default_rng(1).integers(0, len(X), (100_000, 2)).T
-orig = 1 - np.einsum("ij,ij->i", X[a], X[b])
+orig = 1 - np.einsum("ij,ij->i", X[a].astype(np.float32), X[b].astype(np.float32))
 row = {"name": "tsne_p30_d2", "method": "tsne", "n_neighbors": 90, "dims": 2, "min_dist": "", "build": "annoy",
        "secs": round(secs), "recall15": rec(15), "recall50": rec(50), "graph_recall": "", "gene15": hit / tot,
        "field15": float((fq == fn)[both].mean()),
        "spearman": float(spearmanr(orig, np.linalg.norm(Y[a] - Y[b], axis=1)).statistic)}
 log(row)
-with open(S / "results.csv", "a", newline="") as f:
-    csv.DictWriter(f, fieldnames=list(row)).writerow(row)
+if any(r["name"] == row["name"] for r in csv.DictReader(open(S / "results.csv"))):
+    log("already in results.csv: not appended")
+else:
+    with open(S / "results.csv", "a", newline="") as f:
+        csv.DictWriter(f, fieldnames=list(row)).writerow(row)

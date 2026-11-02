@@ -4,7 +4,7 @@
 (1%, 3%, 10%, 30%, all; rng seed 1: a row is in subset f iff u < f, the subsets gallery.py uses). The queries
 are in every subset. For each subset: TwoNN (with a bootstrap spread over queries) and Levina-Bickel at
 k = 10, 20, 50 as in truth.py, and the median distance to the 1st and 50th neighbour.
-Writes data/geometry/medembed_small/eval/density.json. CPU (~20 min on 96 threads): uv run python geometry/density.py
+Writes data/geometry/medembed_small/eval/density.json. CPU (~20 min on 96 threads; peak ~30 GB): uv run python geometry/density.py
 """
 import json, time
 from pathlib import Path
@@ -39,7 +39,7 @@ def main() -> None:
     q = np.sort(rng.choice(np.flatnonzero(u < FRACS[0]), Q, replace=False))
     Xq = torch.from_numpy(np.asarray(X[q], np.float32)); qt = torch.from_numpy(q)
     best = {f: (torch.full((Q, K + 1), -2.0), torch.zeros((Q, K + 1), dtype=torch.int64)) for f in FRACS}
-    C, t0 = 250_000, time.time()
+    C, t0 = 50_000, time.time()  # (40k x 50k similarities: 8 GB a block)
     for s in range(0, n, C):
         sim = Xq @ torch.from_numpy(np.asarray(X[s:s + C], np.float32)).T
         ub = torch.from_numpy(u[s:s + C])
