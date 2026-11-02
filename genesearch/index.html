@@ -209,7 +209,8 @@ function setList(html) {  // replace the results; free the old map's WebGL conte
 // "" = off, "any", or an id: diseases for a gene, Ensembl genes for a disease; ot = Open Targets
 // curated, ep = Europe PMC text-mined), named ("1" = only papers naming the gene or disease in the
 // title or abstract), ymin, ymax, sort, match ("" = all words, "any"), rank ("" = semantic, "keyword",
-// "hybrid"), view ("" = list, "map", "explore", "landscape": the PubMedBERT map), topic (map drill-in path, e.g. "3.2"), ax and ay
+// "hybrid"), view ("" = list, "map", "explore", "landscape": the PubMedBERT map,
+// "medmap": our MedEmbed map), topic (map drill-in path, e.g. "3.2"), ax and ay
 // (Map Explorer axes: words, or "topic:N"), page
 let S = {};
 let G = null;    // the current gene or disease, from /api/subject: id, kind ("gene", "disease"), label, ...
@@ -630,13 +631,17 @@ function howHTML() {
       <li><b>PubMedBERT map.</b> The same papers on a published map of all PubMed (González-Márquez et al., 2024): PubMedBERT
         embeddings of 23 million abstracts, squeezed to 2 dimensions with t-SNE. Its positions and fields (from the journal)
         are theirs; it ends in early 2024, so newer papers are not on it.</li>
+      <li><b>MedEmbed map.</b> Ours: the same 384 number embeddings as the search, for the 7.8 million papers about human genes,
+        squeezed to 2 dimensions with t-SNE. Colours are 780 clusters found separately in a 12 dimension UMAP of the same
+        embeddings, named by their most typical genes (some names are tagging errors: “TNM”, “AST” read as genes).
+        Details: <code>geometry/README.md</code>.</li>
     </ul>
     <p>More: <a href="/about">About</a> (the data, and how the map is made).</p>`;
 }
 
 function tabsHTML() {
   const t = (v, label) => `<button type="button" role="tab" data-view="${v}" aria-selected="${S.view === v}">${label}</button>`;
-  return `<div class="tabs" role="tablist">${t("", "List")}${t("map", "Map")}${t("explore", "Map Explorer")}${t("landscape", "PubMedBERT map")}</div>`;
+  return `<div class="tabs" role="tablist">${t("", "List")}${t("map", "Map")}${t("explore", "Map Explorer")}${t("landscape", "PubMedBERT map")}${t("medmap", "MedEmbed map")}</div>`;
 }
 
 function wireTop() {
@@ -648,7 +653,8 @@ function wireTop() {
 
 // ---- results: list or map
 const isMap = () => S.view === "map" || S.view === "explore";
-function show(push = true) { playing = false; return isMap() ? loadMap(push) : S.view === "landscape" ? loadLand(push) : loadPapers(push); }
+function show(push = true) { playing = false; return isMap() ? loadMap(push) : isLand() ? loadLand(push) : loadPapers(push); }
+const isLand = () => S.view === "landscape" || S.view === "medmap";
 
 function scopeText(n, facets = true) {  // facets: false for the map, which is of the list without them
   const conds = !facets ? [] : [S.ot && (S.ot === "any" ? `curated (any ${other()})` : `curated for ${esc(dname(S.ot))}`),
@@ -1258,26 +1264,45 @@ function wirePlot(el) {  // once per plot element; the handlers read the current
   });
 }
 
-// ---- PubMedBERT map: the list's papers placed on the published PubMedBERT landscape of PubMed
-// (landscape.py), over a picture of its human-gene papers coloured by field.
+// ---- PubMedBERT map and MedEmbed map: the list's papers placed on a fixed map of the literature
+// (landscape.py), over a picture of its human-gene papers coloured by field (PubMedBERT) or cluster (MedEmbed).
 const LAND_INK = "#16324f", LAND_BG_OPACITY = 0.6;
 const LAND_YEARS = [[0, "#b7d3f6"], [0.5, "#3987e5"], [1, "#0d366b"]];
 let L = null, LM = null, landColour = "plain", landFocus = -1, landZoom = 1, landAnn = [];
-const fieldName = (f) => f === 0 ? "no field" : LM.fields[f].name;
+const LMS = {};  // map name -> meta
+const landMap = () => S.view === "medmap" ? "medembed" : "pubmedbert";
+const LAND = {
+  pubmedbert: {title: "PubMedBERT map", unit: "field", units: "Fields", none: "No field (journal not labelled)",
+    unitsNote: "from the journal; click one to pick it out on the map",
+    about: (n) => `placed where the published PubMedBERT map of 23 million PubMed abstracts
+      puts it (${ext("https://pmc.ncbi.nlm.nih.gov/articles/PMC11240179/", "González-Márquez et al., Patterns 2024")}); close dots are close in meaning.
+      Behind them: the ${fmt(n)} papers about human genes, coloured by field (the journal’s; grey = no field).`,
+    off: "newer than early 2024, or not in its data"},
+  medembed: {title: "MedEmbed map", unit: "cluster", units: "Clusters", none: "No cluster",
+    unitsNote: "found in 12 dimensions, named by their most typical genes; click one to pick it out on the map",
+    about: (n) => `placed by a t-SNE of the search’s own MedEmbed embeddings of the ${fmt(n)} papers about
+      human genes; close dots are close in meaning. Behind them: all those papers, coloured by 780 clusters found separately
+      (12 dimension UMAP, HDBSCAN), named by their most typical genes.`,
+    off: "not about a human gene, or not embedded yet"},
+};
+const fieldName = (f) => f === 0 ? `no ${LAND[landMap()].unit}` : LM.fields[f].name;
 
 async function loadLand(push = true) {
   writeURL(push);
   const my = ++reqNo, t0 = performance.now();
   const head = () => tabsHTML() + filtersHTML();
-  const params = apiParams({page: 1, sort: ""}).toString();
+  const mp = landMap(), T = LAND[mp];
+  const params = apiParams({page: 1, sort: ""}).toString() + `&map=${mp}`;
   $("how").innerHTML = howHTML();
+  LM = LMS[mp] || null;  // (each map has its own fields and extent)
   if (!(L && L.params === params)) {
     setList(head() + `<p class="status"><b>Placing the papers…</b></p>`); wireTop();
-    let r;
+    let r, meta;
     try {
-      [r, LM] = await Promise.all([getJSON("/api/landscape?" + params), LM || getJSON("/api/landscape_meta"), loadPlotly()]);
+      [r, meta] = await Promise.all([getJSON("/api/landscape?" + params), LM || getJSON(`/api/landscape_meta?map=${mp}`), loadPlotly()]);
     } catch (e) { if (my === reqNo) { setList(head() + `<p class="note">Error: ${esc(e.message)}</p>`); wireTop(); } return; }
-    if (my !== reqNo) return;
+    if (my !== reqNo) return;  // (a newer request, e.g. the other map's tab, owns L and LM now)
+    LM = LMS[mp] = meta;
     L = Object.assign(r, {params, secs: ((performance.now() - t0) / 1000).toFixed(1)});
     landFocus = -1;
   }
@@ -1289,23 +1314,21 @@ async function loadLand(push = true) {
   const item = (f, c, label) => `<li><button type="button" data-field="${f}" class="${landFocus === f ? "on" : ""}">${sw(f)}
       <span><b>${esc(label)}</b> <span class="muted">· ${plural(c, "paper")}</span></span></button></li>`;
   setList(head() + `
-    <p class="status">PubMedBERT map of <b>${fmt(n)}</b>${L.sampled ? ` (a fixed sample of the ${fmt(L.n_on)})` : ""} ${scopeText(n)}
-      · ${off ? `${plural(off, "paper")} not on it (newer than early 2024, or not in its data) · ` : ""}${L.secs} s ${infoBtn()}</p>
-    <p class="hint" style="max-width:75ch">Dot = paper, placed where the published PubMedBERT map of 23 million PubMed abstracts
-      puts it (${ext("https://pmc.ncbi.nlm.nih.gov/articles/PMC11240179/", "González-Márquez et al., Patterns 2024")}); close dots are close in meaning.
-      Behind them: the ${fmt(LM.n_human)} papers about human genes, coloured by field (the journal’s; grey = no field).
-      Ring = curated paper. Click a dot to read it; scroll to zoom; <kbd>Esc</kbd> clears a picked field.</p>
+    <p class="status">${T.title} of <b>${fmt(n)}</b>${L.sampled ? ` (a fixed sample of the ${fmt(L.n_on)})` : ""} ${scopeText(n)}
+      · ${off ? `${plural(off, "paper")} not on it (${T.off}) · ` : ""}${L.secs} s ${infoBtn()}</p>
+    <p class="hint" style="max-width:75ch">Dot = paper, ${T.about(LM.n_human)}
+      Ring = curated paper. Click a dot to read it; scroll to zoom; <kbd>Esc</kbd> clears a picked ${T.unit}.</p>
     <div class="bar">
       <span>Colour by <span class="seg" role="group" aria-label="Colour by">
         <button type="button" data-lcolour="plain" aria-pressed="${landColour === "plain"}">One colour</button>
-        <button type="button" data-lcolour="field" aria-pressed="${landColour === "field"}">Field</button>
+        <button type="button" data-lcolour="field" aria-pressed="${landColour === "field"}">${T.unit[0].toUpperCase() + T.unit.slice(1)}</button>
         <button type="button" data-lcolour="year" aria-pressed="${landColour === "year"}">Year</button></span></span>
     </div>
-    <div id="plot" role="img" aria-label="PubMedBERT map: ${fmt(n)} papers over the human-gene literature. The field list below gives the same information."></div>
+    <div id="plot" role="img" aria-label="${T.title}: ${fmt(n)} papers over the human-gene literature. The ${T.unit} list below gives the same information."></div>
     <div id="mappaper"></div>
-    <h2>Fields <span class="muted" style="font-weight:normal">(from the journal; click one to pick it out on the map)</span></h2>
+    <h2>${T.units} <span class="muted" style="font-weight:normal">(${T.unitsNote})</span></h2>
     <ol class="topics">${fields.map(([f, c]) => item(f, c, LM.fields[f].name)).join("")}
-      ${counts.get(0) ? item(0, counts.get(0), "No field (journal not labelled)") : ""}</ol>`);
+      ${counts.get(0) ? item(0, counts.get(0), T.none) : ""}</ol>`);
   wireTop();
   document.querySelectorAll("[data-lcolour]").forEach((b) => b.onclick = () => {
     landColour = b.dataset.lcolour;
@@ -1361,7 +1384,7 @@ function drawLand() {
     paper_bgcolor: "rgba(0,0,0,0)", plot_bgcolor: "rgba(0,0,0,0)",
     xaxis: {visible: false, range: [...(keep ? el.layout.xaxis.range : E.x)]},
     yaxis: {visible: false, range: [...(keep ? el.layout.yaxis.range : E.y)], scaleanchor: "x"},
-    images: [{source: `/landscape.png?v=${LM.version}`, xref: "x", yref: "y", x: E.x[0], y: E.y[1],
+    images: [{source: `/landscape.png?map=${landMap()}&v=${LM.version}`, xref: "x", yref: "y", x: E.x[0], y: E.y[1],
               sizex: E.x[1] - E.x[0], sizey: E.y[1] - E.y[0], sizing: "stretch", layer: "below", opacity: LAND_BG_OPACITY}],
     annotations: landAnn,
     hoverlabel: {font: {size: 16, family: FONT, color: INK}, bgcolor: "#fff", bordercolor: "#888"},
@@ -1371,14 +1394,20 @@ function drawLand() {
     .then(() => { wireLand(el); placeLandLabels(); });
 }
 
-// Field names at the centre of their human-gene papers, biggest field first; a name that would
+// Field (or cluster) names at the centre of their human-gene papers; a name that would
 // overlap one already placed is left out until you zoom in (all are in the list below).
 function placeLandLabels() {
   const el = $("plot"), fl = el?._fullLayout;
   if (!fl?.xaxis?.l2p || !LM) return;
   const xa = fl.xaxis, ya = fl.yaxis, fs = 15, h = fs * 1.6, placed = [], out = [];
-  const fields = LM.fields.filter((f) => f.id > 0 && f.x != null && (landFocus < 0 ? f.n >= 1000 : f.id === landFocus))
-    .sort((a, b) => b.n - a.n);
+  // PubMedBERT: its 40 fields, biggest first. MedEmbed: 780 clusters, too many to name at once, so the 25
+  // holding most of the list's papers, most first.
+  const mine = landMap() === "medembed", have = new Map();
+  if (mine) for (const f of L.f) have.set(f, (have.get(f) || 0) + 1);
+  const top = new Set([...have].filter(([f]) => f > 0).sort((a, b) => b[1] - a[1]).slice(0, 25).map(([f]) => f));
+  const fields = LM.fields.filter((f) => f.id > 0 && f.x != null &&
+      (landFocus >= 0 ? f.id === landFocus : mine ? top.has(f.id) : f.n >= 1000))
+    .sort((a, b) => mine ? have.get(b.id) - have.get(a.id) : b.n - a.n);
   for (const f of fields) {
     const px = xa._offset + xa.l2p(f.x), py = ya._offset + ya.l2p(f.y), w = textWidth(f.name, fs) + 16;
     const b = {x0: px - w / 2, x1: px + w / 2, y0: py - h / 2, y1: py + h / 2};
@@ -1414,7 +1443,7 @@ function wireLand(el) {  // once per plot element
   });
 }
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && S.view === "landscape" && landFocus >= 0 && !document.querySelector("#how:popover-open")) setLandFocus(-1);
+  if (e.key === "Escape" && isLand() && landFocus >= 0 && !document.querySelector("#how:popover-open")) setLandFocus(-1);
 });
 
 // ---- wiring

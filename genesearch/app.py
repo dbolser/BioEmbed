@@ -50,7 +50,16 @@ RRF_K = 60  # reciprocal-rank fusion constant for hybrid ranking
 SEM_CAP = 30_000  # most papers given semantic ranking while vectors are computed here on CPU
 MAP_CAP = 20_000  # most papers on a map (a fixed sample beyond that)
 MAP_VERSION = 7  # bump to recompute cached maps
-LAND_CAP = 50_000  # most papers drawn on the PubMedBERT map (a fixed sample beyond that)
+LAND_CAP = 50_000  # most papers drawn on a whole-literature map (a fixed sample beyond that)
+LAND_NAMES = {"pubmedbert": "PubMedBERT map", "medembed": "MedEmbed map"}
+
+
+def land_or_503(name: str) -> landscape.Landscape:
+    if name not in landscape.MAPS:
+        raise HTTPException(404, f"No map {name!r}: one of {', '.join(landscape.MAPS)}.")
+    if (land := landscape.load(name)) is None:
+        raise HTTPException(503, f"The {LAND_NAMES.get(name, name + ' map')} is not built: run landscape.py {name}.")
+    return land
 EPMC_TOP = 50  # text-mined facets listed per subject
 
 STEMMER = Stemmer.Stemmer("english")
@@ -796,13 +805,12 @@ def api_map_facets(subject: str, key: str):
 
 @app.get("/api/landscape")
 def api_landscape(subject: str, term: str = "", ot: str = "", ep: str = "", ymin: int = 0, ymax: int = 0,
-                  match: str = "all", rank: str = "semantic", named: int = 0):
-    """The PubMedBERT map tab: the current list (facets and all, as the list shows it) placed on the
-    published PubMedBERT landscape (landscape.py), with its field (from the journal) per paper.
-    Papers newer than the landscape (2024) or not in it are counted, not drawn."""
-    land = landscape.load()
-    if land is None:
-        raise HTTPException(503, "The PubMedBERT map is not built: run landscape.py.")
+                  match: str = "all", rank: str = "semantic", named: int = 0, map: str = "pubmedbert"):
+    """The whole-literature map tabs: the current list (facets and all, as the list shows it) placed on a
+    fixed map (landscape.py): the published PubMedBERT landscape, with each paper's field (from the journal),
+    or our MedEmbed map of the human-gene papers, with each paper's cluster. Papers not on the map (newer than
+    it, or not in its data) are counted, not drawn."""
+    land = land_or_503(map)
     df, _ = scope(subject, term, ot, ep, ymin, ymax, match, rank, bool(named))
     df = df.sort_values("pmid")
     on, at = land.lookup(df.pmid.to_numpy())
@@ -822,18 +830,15 @@ def api_landscape(subject: str, term: str = "", ot: str = "", ep: str = "", ymin
 
 
 @app.get("/api/landscape_meta")
-def api_landscape_meta():
-    """The landscape's fields (name, colour, centre, human-gene papers) and extent, for drawing."""
-    land = landscape.load()
-    if land is None:
-        raise HTTPException(503, "The PubMedBERT map is not built: run landscape.py.")
-    return land.meta
+def api_landscape_meta(map: str = "pubmedbert"):
+    """A map's fields or clusters (name, colour, centre, human-gene papers) and extent, for drawing."""
+    return land_or_503(map).meta
 
 
 @app.get("/landscape.png")
-def landscape_png():
-    """The landscape's human-gene papers, drawn once (landscape.py); the page puts it behind the dots."""
-    return FileResponse(landscape.OUT / "background.png", headers={"Cache-Control": "public, max-age=604800"})
+def landscape_png(map: str = "pubmedbert"):
+    """A map's human-gene papers, drawn once (landscape.py); the page puts it behind the dots."""
+    return FileResponse(land_or_503(map).dir / "background.png", headers={"Cache-Control": "public, max-age=604800"})
 
 
 MIN_MAP = 20  # fewest papers for a map
