@@ -58,7 +58,7 @@ def land_or_503(name: str) -> landscape.Landscape:
     if name not in landscape.MAPS:
         raise HTTPException(404, f"No map {name!r}: one of {', '.join(landscape.MAPS)}.")
     if (land := landscape.load(name)) is None:
-        raise HTTPException(503, f"The {LAND_NAMES[name]} is not built: run landscape.py {name}.")
+        raise HTTPException(503, f"The {LAND_NAMES.get(name, name + ' map')} is not built: run landscape.py {name}.")
     return land
 EPMC_TOP = 50  # text-mined facets listed per subject
 

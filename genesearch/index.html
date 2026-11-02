@@ -1297,12 +1297,12 @@ async function loadLand(push = true) {
   LM = LMS[mp] || null;  // (each map has its own fields and extent)
   if (!(L && L.params === params)) {
     setList(head() + `<p class="status"><b>Placing the papers…</b></p>`); wireTop();
-    let r;
+    let r, meta;
     try {
-      [r, LM] = await Promise.all([getJSON("/api/landscape?" + params), LM || getJSON(`/api/landscape_meta?map=${mp}`), loadPlotly()]);
-      LMS[mp] = LM;
+      [r, meta] = await Promise.all([getJSON("/api/landscape?" + params), LM || getJSON(`/api/landscape_meta?map=${mp}`), loadPlotly()]);
     } catch (e) { if (my === reqNo) { setList(head() + `<p class="note">Error: ${esc(e.message)}</p>`); wireTop(); } return; }
-    if (my !== reqNo) return;
+    if (my !== reqNo) return;  // (a newer request, e.g. the other map's tab, owns L and LM now)
+    LM = LMS[mp] = meta;
     L = Object.assign(r, {params, secs: ((performance.now() - t0) / 1000).toFixed(1)});
     landFocus = -1;
   }
