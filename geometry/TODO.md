@@ -47,11 +47,31 @@ A second kind of error: CTSS (cathepsin S) is matched via the plural "cathepsins
 name becomes one gene.
 - [ ] Scan all genes for this: per gene, the share of its papers tagged only by a bare symbol of 2 to 3
       letters, or only by a family plural; list the worst offenders.
+
+More found by reading the 780 clusters' gene labels against `gene2pubtator3` mention text (2026-11-02):
+
+| Gene | PubTator matched | Which really means |
+|---|---|---|
+| GTF2E1 | "Fe" 4,692 | iron (materials-science clusters) |
+| GAN, KAT8 | "GaN", "MOF" | gallium nitride, metal-organic frameworks |
+| SLC17A5 | "AST" 82,018 | the liver test AST (gene GOT1) |
+| TENM1 | "TNM" 64,765 | tumour staging |
+| AP2B1 | "ACE" 36,568 | angiotensin-converting enzyme (gene ACE) |
+| CXADRP1 (pseudogene) | "CAR" 12,448 | CAR-T cells |
+| NPEPPS | "PSA" 21,480 | prostate-specific antigen (gene KLK3) |
+| GGH | "GH" 27,439 | growth hormone |
+| BTG3 | "ANA" 8,650 | antinuclear antibodies |
+| SLTM | "MET" 31,802 | MET receptor, methionine, metabolic equivalent |
+| MATK, MT-TH, POLR2B | "matK", "trnH", "RPB2" | plant and fungal DNA barcodes |
+| SHROOM4, PCSK1, PHF1, ABL2 | "SHAP", "PC1", "PCL", "Arg" | an ML method, principal component 1, polycaprolactone, arginine |
+| TXK, GSTK1, HSPA4 | "tyrosine kinase", "GST", "HSP70" | a whole family credited to one gene |
 - [ ] Measure it: share of the 7.76M papers whose *only* gene tags are bare short symbols (2-3 letters, mention
       text = symbol).
 - [ ] Filter: drop gene tags whose only mentions are bare ambiguous symbols; rebuild the corpus and the scores.
       Note: this also changes the corpus itself (some "human-gene papers" mention no gene).
 - [ ] Re-score gene lift and gene sharing on the clean labels.
+- [ ] Calibrate: score PubTator3 on the NLM-Gene test set (100 hand-annotated abstracts; the 450 training ones
+      likely trained its tagger). It cannot measure non-gene papers pulled in (it holds only gene papers).
 
 ## 3. Robustness
 
