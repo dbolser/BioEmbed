@@ -209,13 +209,11 @@ colleague matched D.B.'s grade on 78% and the judges on 80% (difference +2
 points, 95% bootstrap over abstracts −8 to +12); on "relevant?" 89% against
 88%; on grade 2, 86% against 91%
 <!-- results/figures/judge_agreement_overlap.csv: analysis overlap; scripts/judge_agreement.py, 10,000 resamples, seed 0 -->.
-TODO(check): this CSV and the script change that makes it are not yet committed.
 
 The judges grade lower than D.B. Where they differ from his 194 labels they
 are lower 44 times and higher 14, mostly his 2 as their 1 and his 1 as their
 0 (18 and 19 of the 44)
 <!-- results/figures/judge_agreement_overlap.csv: analysis direction; scripts/judge_agreement.py -->.
-TODO(check): not yet committed.
 The human guide counts cell models as evidence (grade 2), and the judges'
 rubric does not (PREREG 2026-10-19 14:32). A registered check (PREREG
 2026-11-03) resent the same 184 abstracts to the judges with the human
