@@ -6,8 +6,9 @@ the date is on record. That stops us (or a reviewer suspecting us) from
 picking the flattering analysis after seeing the results. Changes are
 allowed, but each one goes in the change log at the bottom with its date.
 
-**Waiting on Dan:** (1) is the relevance rubric right? (2) for the yes/no
-scores, does "relevant" mean grade 1 or 2 (default), or only 2?
+**Signed off by Dan (2026-11-03):** the rubric stands; for the yes/no
+scores "relevant" means grade 1 or 2 (the default), with "only 2" reported
+as a check.
 
 ## The three questions
 
@@ -288,3 +289,21 @@ bge-base-gaf − bge-base +0.015 (p = 0.11, 7/12).
   publication year after the title (from the IUK-IPF PubMed records). The
   judges did not see the year. Labels made before this: dan 71, alex bladon 50,
   helena 10.
+- 2026-11-03 (calibration labelling finished; Dan's sign-off): Dan graded all 200
+  calibration abstracts plus 30 repeats; colleagues graded 120 (alex bladon 50,
+  helena 50, elena 20). Dan signed off the rubric (labellers' notes raised no
+  rubric faults; the grey areas are related diseases and abstract-only grading).
+  "Relevant" stays grade >= 1; grade == 2 is reported alongside as a check.
+  Agreement, `scripts/judge_agreement.py` -> `results/figures/judge_agreement.{csv,png}`,
+  now also splits Dan's labels at the wording change (2026-10-19 14:32 entry):
+  13 gradeable labels before it, 181 after. The judges' rubric and grades are
+  unchanged.
+- 2026-11-03 (exploratory check, registered before running; Dan's request): **do the judges
+  grade lower than the humans because of the wording?** The 2026-11-03 agreement shows the
+  judges lower than Dan when they differ (44 lower, 14 higher). Both judges re-grade the
+  calibration abstracts in their original requests (same batch, order and settings), two arms:
+  (a) the request resent unchanged, to measure run-to-run drift; (b) the rubric lines replaced
+  by the human guide's final wording (grades 2/1/0 and the "same disease, or related?" note,
+  labeller/index.html). Read-out: judges-vs-Dan exact agreement and the lower/higher split,
+  (b) against (a). This does not change the answer key; whether to re-judge the pool on the
+  human wording is a separate decision and would get its own entry first.
