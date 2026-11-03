@@ -1,0 +1,200 @@
+# Results
+
+*Draft, 2026-11-03, from `docs/WRITEUP.md` §3–6. Same conventions as
+`methods.md`: each number is followed by an HTML comment naming its source;
+`TODO(check)` marks a number not yet reproduced by a committed script. Only
+the claims in Table 1 are confirmatory; everything else is exploratory.*
+
+## Confirmatory claims
+
+Nine claims were run (C4 was dropped, below) and corrected together (Holm).
+Five differences were shown and four were not (Table 1).
+
+**Table 1.** Pre-registered claims on the test sets. Difference = A − B, with
+a 95% paired bootstrap interval (not corrected for multiplicity). The lowest
+corrected p possible with 10,000 sign vectors and nine tests is 0.0009.
+
+| Claim | A | B | Score | n | A | B | A − B [95% CI] | p (Holm) | Result |
+|---|---|---|---|---|---|---|---|---|---|
+| C1† | First pass + Gemini 3.1 Flash-Lite rerank | embeddinggemma-300m | haystack nDCG@10 | 494 | 0.834 | 0.701 | +0.133 [+0.119, +0.149] | 0.0009 | A better |
+| C2 | embeddinggemma-300m | BM25, tuned | haystack nDCG@10 | 493 | 0.717 | 0.759 | −0.042 [−0.061, −0.022] | 0.0009 | B better |
+| C3a‡ | Gemini 3.1 Flash-Lite, corpus in context | embeddinggemma-300m | small task hit@1 | 300 | 0.740 | 0.793 | −0.053 [−0.110, +0.007] | 0.36 | none shown |
+| C3b‡ | Gemini 3.1 Flash-Lite, corpus in context | BMRetriever-410M | small task hit@1 | 300 | 0.740 | 0.717 | +0.023 [−0.037, +0.087] | 1.0 | none shown |
+| C5 | bge-base, fine-tuned (ours, 3 seeds) | bge-base | haystack nDCG@10 | 493 | 0.764 | 0.675 | +0.090 [+0.076, +0.104] | 0.0009 | A better |
+| C6 | bge-base, fine-tuned (ours, 3 seeds) | BiCA-base | haystack nDCG@10 | 493 | 0.764 | 0.699 | +0.065 [+0.053, +0.078] | 0.0009 | A better |
+| C7 | BiCA-base | bge-base | haystack nDCG@10 | 493 | 0.699 | 0.675 | +0.024 [+0.015, +0.034] | 0.0009 | A better |
+| C8† | First pass + MedCPT cross-encoder, fine-tuned (ours) | First pass + Gemini 3.1 Flash-Lite rerank | haystack nDCG@10 | 494 | 0.837 | 0.834 | +0.003 [−0.008, +0.014] | 1.0 | none shown |
+| C9‡ | Gemini 3.1 Pro | Qwen3-Embedding-8B | 12-task suite, mean | 12 | 0.689 | 0.662 | +0.027 [−0.020, +0.081] | 1.0 | none shown |
+
+<!-- results/claims.csv: mean_a, mean_b, effect, ci_low, ci_high, p_holm, decision, n; results/claims.md -->
+
+Haystack scores are graded nDCG@10. † Scored on DeepSeek's grades alone, so
+the Gemini rerank is not graded by Gemini; every system scores lower on these
+grades (embeddinggemma-300m 0.701, against 0.717 with both judges)
+<!-- results/claims.csv: C1 mean_b vs C2 mean_a; results/writeup/cost_notes.md -->.
+‡ Test numbers were seen before the rule that uses them was fixed
+(Disclosures, `methods.md`). "None shown" does not mean equal: C9 tests
+superiority only, with no equivalence margin registered.
+
+**C4 dropped.** It asked whether an LLM's edge is larger on pairs whose paper
+it can name from memory. Gemini 3.1 Flash-Lite named the paper for 9 test
+pairs, below the registered minimum of 15, so the claim was not run and the
+correction was recomputed over nine tests
+<!-- results/claims.csv: C4 note; docs/PREREG.md: change log 2026-10-16 -->.
+
+**Reranking beats the best embedder (C1).** The cheap first pass (BM25 and
+bge-base, fused) reranked by Gemini 3.1 Flash-Lite scored 0.133 above
+embeddinggemma-300m, the best off-the-shelf embedder on practice.
+
+**Keyword search beats the best embedder (C2).** Tuned BM25 scored 0.042
+above embeddinggemma-300m on the graded key. This depends on the key; see
+"The answer key decides BM25 against embedders" below.
+
+**An LLM reading the whole small corpus was not shown better (C3a, C3b).**
+On the 300 test queries Gemini 3.1 Flash-Lite put the right paper first for
+74.0%, against 79.3% for embeddinggemma-300m and 71.7% for BMRetriever-410M,
+the two embedders tied best on practice. Discordant pairs: 31 against 47
+(C3a) and 49 against 42 (C3b) <!-- results/claims.csv: C3a, C3b note -->.
+
+**Our fine-tune helps (C5, C6, C7).** Fine-tuning bge-base on gene–disease
+pairs added 0.090 (three seeds, range 0.761–0.767), and the result beat
+BiCA-base, the best PubMed-trained embedder of similar size, by 0.065.
+BiCA-base in turn beat bge-base by 0.024, so domain pre-training helps less
+than task fine-tuning here <!-- results/claims.csv: C5-C7; results/writeup/cost_quality.csv: seed_min 0.7606, seed_max 0.7667 -->.
+
+**A small fine-tuned reranker matched the LLM reranker (C8).** Our
+fine-tuned MedCPT cross-encoder and the Gemini rerank of the same first pass
+differ by 0.003, with a 95% interval of −0.008 to +0.014: any real difference
+is probably under 0.015 either way (one seed).
+
+**An LLM was not shown better than a large embedder on the suite (C9).**
+Gemini 3.1 Pro averaged 0.689 over the 12 tasks and Qwen3-Embedding-8B 0.662,
+as registered (PREREG expected no difference).
+
+## Cost and quality (exploratory)
+
+![Quality against cost for every test-haystack system. Dashed line: systems
+nothing cheaper beats.](../writeup_frontier.png)
+
+<!-- docs/writeup_frontier.png, built by scripts/cost_quality.py -->
+
+**Table 2.** Key test-haystack systems. Graded and curator-only nDCG@10 over
+the pairs with a relevant paper (493); cost to run all 500 test queries once.
+"+" rows rerank the first pass (cross-encoders its top 100, LLMs its top 20).
+
+| System | Graded nDCG@10 [95% CI] | Curator-only nDCG@10 | Cost (USD) |
+|---|---|---|---|
+| BM25, tuned | 0.759 [0.738, 0.779] | 0.372 | 0 |
+| embeddinggemma-300m | 0.717 [0.696, 0.738] | 0.430 | 6.55 |
+| BiCA-base | 0.699 [0.678, 0.720] | 0.382 | 1.65 |
+| bge-base | 0.675 [0.653, 0.696] | 0.381 | 1.67 |
+| bge-base, fine-tuned (ours, 3 seeds) | 0.764 [seeds 0.761–0.767] | 0.400 | 1.67 + 0.31 training |
+| First pass: BM25 + bge-base | 0.750 [0.730, 0.770] | 0.416 | 1.67 |
+| + MedCPT cross-encoder | 0.750 [0.733, 0.768] | 0.393 | 1.71 |
+| + MedCPT cross-encoder, fine-tuned (ours) | **0.861** [0.847, 0.874] | 0.477 | 1.71 + 0.40 training |
+| + bge-reranker-base, fine-tuned (ours) | 0.838 [0.822, 0.853] | 0.439 | 1.71 + 0.46 training |
+| + Qwen3-Reranker-4B | 0.827 [0.811, 0.843] | 0.489 | 3.19 |
+| + Gemini 3.1 Flash-Lite rerank | 0.853 [0.837, 0.869] | **0.497** | 2.54 |
+| + DeepSeek-V4-Flash rerank | 0.841 [0.825, 0.857] | 0.479 | 1.74 |
+| BM25 + Gemini 3.1 Flash-Lite rerank (no GPU) | 0.844 [0.827, 0.860] | 0.455 | 0.88 |
+| BM25 + DeepSeek-V4-Flash rerank (no GPU) | 0.832 [0.814, 0.849] | 0.436 | 0.13 |
+
+<!-- results/writeup/cost_quality.csv: graded_ndcg10, graded_ci_low/high, seed_min/max, curator_ndcg10, run_cost_usd, train_cost_usd -->
+
+Cost is logged GPU hours at one price ($0.94 per L4-hour) plus API charges;
+10 runs without logs are estimated (`results/writeup/cost_notes.md`).
+Embedders pay mostly once, to embed the 1.7M candidate abstracts; rerankers
+pay per query. The LLM rerankers are also the judges, so their graded scores
+may be flattered. Scored on the other judge's grades alone, the Gemini rerank
+scores 0.834 (our fine-tuned MedCPT: 0.837 on the same grades) and the
+DeepSeek rerank 0.843 (MedCPT: 0.876) <!-- results/writeup/cost_notes.md: other-judge table -->.
+The 11 other off-the-shelf embedders all score below BM25 on the graded key
+(0.542–0.697) <!-- results/writeup/cost_quality.csv: group single -->.
+
+**Good rerankers win, but not every reranker.** The top seven of 46 test
+runs are reranked <!-- results/haystack/graded/stats.csv: graded_ndcg@10, pooled -->.
+Yet of five off-the-shelf cross-encoders only Qwen3-Reranker-4B beat the
+first pass (0.827); two tied it (MedCPT 0.750, Qwen3-Reranker-0.6B 0.749)
+and two scored lower (bge-reranker-v2-m3 0.703, bge-reranker-base 0.608)
+<!-- results/writeup/cost_quality.csv: group rerank -->.
+
+**Fine-tuning helps rerankers most.** Our training lifted MedCPT's
+cross-encoder from 0.750 to 0.861 and bge-reranker-base from 0.608 to 0.838,
+for $0.40–0.46 of training each. On the curator-only key the reranker gains
+hold (MedCPT 0.393 to 0.477) but the embedder gain shrinks (bge-base 0.381 to
+0.400). Our training negatives were checked against the judges' practice
+grades, which may favour our models on the graded key (`methods.md`,
+Fine-tuning).
+
+**The cheapest strong system needs no GPU.** BM25 reranked by DeepSeek-V4-Flash
+scores 0.832 for about $0.13 per 500 queries ($0.07 at the later API price); our fine-tuned MedCPT
+reranker scores 0.861 for $1.71, almost all of it the first pass's embedding
+(the rerank step itself: $0.04, against $0.88 for the Gemini rerank of BM25)
+<!-- results/writeup/cost_quality.csv: step_cost_usd 0.043 vs 0.877 -->.
+
+**Gene Ontology fine-tunes hurt.** bge-base and bge-small fine-tuned on GO
+annotation pairs scored 0.554 and 0.540, both about 0.12 below their bases
+(0.675, 0.658) <!-- results/writeup/cost_quality.csv: GO rows -->: training on
+a neighbouring biological task does not transfer.
+
+## The answer key decides BM25 against embedders (exploratory)
+
+On the graded key tuned BM25 beats all 14 off-the-shelf embedders. On the
+curator-only key it trails seven of them (embeddinggemma-300m 0.430 against
+BM25's 0.372) <!-- results/writeup/cost_quality.csv: curator_ndcg10, group single -->.
+Curator-only scores are lower for every system (0.25–0.50), since good papers
+curators did not cite count as wrong. Two readings fit, and we did not test
+between them: curators miss papers keyword search finds, or the judges favour
+papers that name both the gene and the disease. C2 is registered on the
+graded key, so it stands as a result about that key.
+
+## The small task (exploratory)
+
+A third of the LLM answers listed several papers rather than one (Gemini 98,
+DeepSeek 89, of 300), often in the order given, so hit@1 partly measures
+order. Breaking such ties at random gives Gemini 75% and DeepSeek 74%; scored as
+given, DeepSeek reaches 82% <!-- results/llm_v2/summary.csv: n_multi, hit1_tiebreak, hit1 over batches 1-4 -->.
+The small task's v2 drops v1's "wrong" papers on related diseases, since they
+could be right. That should make it easier, yet embedder scores barely moved
+(median change −0.015 to −0.03 over 24 models, on different pairs)
+<!-- results/embedding/*/*/GeneDiseaseRetrieval.json vs results/v2_scores.csv -->.
+
+## Judges checked against human graders (exploratory)
+
+Dan graded 200 calibration abstracts with the judges' 0/1/2
+scale, and three colleagues graded subsets <!-- labeller/items_calibration.parquet; labeller/labels_calibration.sqlite -->.
+The judges agree with Dan about as often as a second human does (Table 3).
+
+**Table 3.** Agreement on the calibration abstracts. Exact = same grade;
+relevant = same answer to "grade ≥ 1?"; grade 2 = same answer to "grade = 2?".
+Unsure labels and one unblinded item are left out.
+
+| Comparison | n | Exact | Relevant | Grade 2 |
+|---|---|---|---|---|
+| Dan vs judges (merged grade) | 194 | 70% | 82% | 84% |
+| Colleagues vs judges (three people) | 20–48 | 71–75% | 81–90% | 79–94% |
+| Dan vs colleagues (three people) | 20–47 | 75–79% | 83–95% | 80–93% |
+| Dan vs Dan, repeat | 27 | 78% | 81% | 96% |
+| DeepSeek vs Gemini | 199 | 80% | 90% | 86% |
+
+<!-- results/figures/judge_agreement.csv, scripts/judge_agreement.py; exclusion: PREREG 2026-10-19 12:31 -->
+
+![Agreement between the judges and the human graders.](../../results/figures/judge_agreement.png)
+
+On the 91 abstracts Dan and a colleague both graded, the colleague matched
+Dan's grade on 78% and the judges on 80% (difference +2 points, 95% bootstrap
+−8 to +12); on "relevant?" 89% against 88%; on grade 2, 86% against 91%
+<!-- docs/WRITEUP.md §6; computed in commit 3cb0969, no script output: TODO(check) -->.
+
+The judges grade lower than Dan. Where they differ from his 194 labels they
+are lower 44 times and higher 14, mostly his 2 as their 1 and his 1 as their
+0 <!-- docs/WRITEUP.md §6: TODO(check), reproduce in scripts/judge_agreement.py -->.
+The human guide counts cell models as evidence (grade 2), and the judges'
+rubric does not (PREREG 2026-10-19 14:32). A registered check (PREREG
+2026-11-03) resent the same 184 abstracts to the judges with the human
+guide's wording: agreement with Dan moved from 70% (42 lower, 13 higher) to
+71% (38 lower, 15 higher) <!-- results/judge_wording_check.csv: arm same vs human, judge judges -->.
+The wording is not the cause. The gap is mostly DeepSeek's: its mean grade is
+0.95 against Dan's 1.16 and Gemini's 1.15, and the merged grade rounds down
+<!-- results/judge_wording_check.csv: arm same, mean_grade, dan_mean -->.
+So graded scores are, if anything, strict; the answer key stands as judged.
