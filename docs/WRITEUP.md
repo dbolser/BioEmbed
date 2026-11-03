@@ -159,6 +159,10 @@ removed; test diseases with other genes allowed.
   his 1 → their 0), probably because the human guide's 2 counts cell models and
   the judges' rubric doesn't (PREREG 2026-10-19 14:32). So graded scores are, if
   anything, strict. Exploratory; the stats are on few abstracts.
+  **Not the wording** (PREREG 2026-11-03 check, `llm/judge_wording_check.py`): resent unchanged,
+  the judges match Dan 71% (43 lower, 13 higher, 191 abstracts); with the human guide's wording,
+  70% (40 lower, 15 higher, 186). The gap is mostly DeepSeek (mean grade 0.95 vs Dan's 1.16;
+  Gemini 1.14), carried into the merged grade by rounding down. The answer key stays as judged.
 - **One first pass.** Its top 100 (cross-encoders) holds 76% of curator-cited
   papers; its top 20 (LLM rerankers) 58%. No cross-encoder ran on BM25 alone.
 - **The small task changed.** v2 drops v1's "wrong" papers on related
