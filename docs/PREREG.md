@@ -298,3 +298,12 @@ bge-base-gaf − bge-base +0.015 (p = 0.11, 7/12).
   now also splits Dan's labels at the wording change (2026-10-19 14:32 entry):
   13 gradeable labels before it, 181 after. The judges' rubric and grades are
   unchanged.
+- 2026-11-03 (exploratory check, registered before running; Dan's request): **do the judges
+  grade lower than the humans because of the wording?** The 2026-11-03 agreement shows the
+  judges lower than Dan when they differ (44 lower, 14 higher). Both judges re-grade the
+  calibration abstracts in their original requests (same batch, order and settings), two arms:
+  (a) the request resent unchanged, to measure run-to-run drift; (b) the rubric lines replaced
+  by the human guide's final wording (grades 2/1/0 and the "same disease, or related?" note,
+  labeller/index.html). Read-out: judges-vs-Dan exact agreement and the lower/higher split,
+  (b) against (a). This does not change the answer key; whether to re-judge the pool on the
+  human wording is a separate decision and would get its own entry first.
