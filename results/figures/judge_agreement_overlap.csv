@@ -1,0 +1,21 @@
+analysis,measure,n,value,ci_low,ci_high
+overlap,abstracts,91,91.0,,
+overlap,pairs,109,109.0,,
+overlap,exact: colleague vs dan,109,0.7798165137614679,,
+overlap,exact: judges vs dan,109,0.7981651376146789,,
+overlap,exact: judges minus colleague,109,0.01834862385321101,-0.07895388223032829,0.12037037037037036
+overlap,relevant: colleague vs dan,109,0.8899082568807339,,
+overlap,relevant: judges vs dan,109,0.8807339449541285,,
+overlap,relevant: judges minus colleague,109,-0.00917431192660545,-0.08403557684756145,0.06666666666666667
+overlap,only2: colleague vs dan,109,0.8623853211009175,,
+overlap,only2: judges vs dan,109,0.908256880733945,,
+overlap,only2: judges minus colleague,109,0.04587155963302747,-0.019417475728155338,0.11504424778761062
+direction,same,194,136.0,,
+direction,judges lower,194,44.0,,
+direction,judges higher,194,14.0,,
+direction,dan 0 -> judges 1,194,8.0,,
+direction,dan 0 -> judges 2,194,0.0,,
+direction,dan 1 -> judges 0,194,19.0,,
+direction,dan 1 -> judges 2,194,6.0,,
+direction,dan 2 -> judges 0,194,7.0,,
+direction,dan 2 -> judges 1,194,18.0,,

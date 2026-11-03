@@ -35,7 +35,7 @@ what cost, and does our training help?
   **0** = neither. A paper gets the judges' mean, rounded down.
 - Judges weren't told which papers curators cited; 30% of those (735 of
   2,431) got a 0.
-- Curator-only scores are lower (0.3–0.5): good uncited papers count as wrong.
+- Curator-only scores are lower (0.25–0.50): good uncited papers count as wrong.
 - All grading cost about $8.60.
 
 **Haystack (main test).** 500 gene–disease pairs. Candidates: abstracts
@@ -50,10 +50,10 @@ wrong sharing its gene or disease, and the rest. hit@1 = right paper first.
 **12-task suite** (C9 only): mixed biomedical tasks, 7 from *The Embedder's
 Dilemma*, 5 ours.
 
-**Practice vs test.** Every choice was made on practice sets with other
-genes, then run once on test. Claims and tests were committed in
-`docs/PREREG.md` before the one look at claim results (2026-10-17); some test
-scores came earlier (Caveats).
+**Practice vs test.** Every pick was made on practice sets with other genes,
+though some test runs already existed when picks were made (Caveats). Claims
+and tests were committed in `docs/PREREG.md` before the one look at claim
+results (2026-10-17).
 
 **Our fine-tunes.** Embedders bge-base and bge-small (3 seeds, within 0.01);
 cross-encoders MedCPT and bge-reranker-base (1 seed). Trained on curated plus
@@ -75,18 +75,19 @@ removed; test diseases with other genes allowed.
 | C4 | LLM edge bigger on papers it remembers? | Dropped (9 remembered pairs; needed 15) | | |
 | C5 | Our fine-tuned bge-base vs bge-base | **Ours better** | +0.090 [+0.076, +0.104] | 0.0009 |
 | C6 | Our fine-tuned bge-base vs BiCA-base (best PubMed-trained, same size) | **Ours better** | +0.065 [+0.053, +0.078] | 0.0009 |
-| C7 | BiCA-base vs bge-base (general) | **BiCA better** | +0.024 [+0.015, +0.034] | 0.0009 |
+| C7 | BiCA-base vs bge-base (general; different base models, so not a clean PubMed-training effect) | **BiCA better** | +0.024 [+0.015, +0.034] | 0.0009 |
 | C8† | Our fine-tuned MedCPT cross-encoder vs Gemini rerank (best off the shelf) | No difference shown | +0.003 [−0.008, +0.014] | 1.0 |
 | C9‡ | Suite: Gemini 3.1 Pro vs Qwen3-Embedding-8B (expected not) | No difference shown | +0.027 [−0.020, +0.081] | 1.0 |
 
 - Score: graded nDCG@10, hit@1 (small task) or mean task score (suite).
-- † DeepSeek grades only (Gemini doesn't grade its own rerank). All systems
-  score lower on these (embeddinggemma 0.701, not 0.717).
+- † DeepSeek grades only (Gemini doesn't grade its own rerank). Almost all
+  systems (all but the two GO fine-tunes) score lower on these
+  (embeddinggemma 0.701, not 0.717).
 - ‡ Test numbers seen before the rule was fixed.
 - 95% ranges not corrected for 9 tests. 0.0009 is the lowest p possible.
   "No difference shown" does not mean equal.
 
-<!-- Source: results/claims.md and results/claims.csv (mean_a, mean_b, effect, ci_low, ci_high, p_holm, decision, n) -->
+<!-- Source: results/claims.md and results/claims.csv (mean_a, mean_b, effect, ci_low, ci_high, p_holm, decision, n); results/writeup/cost_notes.md (no-Gemini grades lower for all but the two GO fine-tunes) -->
 
 ## 4. Cost vs quality (exploratory)
 
@@ -125,39 +126,47 @@ removed; test diseases with other genes allowed.
 ## 5. What it means (exploratory unless a claim is named)
 
 - **Good rerankers win.** Gemini rerank beat the best embedder by 0.13
-  (C1); the top 7 of 46 test runs are reranked. But 4 of 5 off-the-shelf
-  cross-encoders were no better than the first pass (2 worse).
+  (C1); the top 7 of 46 test runs are reranked. But of 5 off-the-shelf
+  cross-encoders only Qwen3-Reranker-4B scored above the first pass (0.827
+  vs 0.750); MedCPT (0.750) and Qwen3-Reranker-0.6B (0.749) were level with
+  it; bge-reranker-v2-m3 (0.703) and bge-reranker-base (0.608) were lower
+  (untested).
 - **Fine-tuning helps, most for rerankers.** bge-base gained 0.09 (C5) and
   beat BiCA-base (C6); MedCPT went 0.750 → 0.861, bge-reranker-base
   0.608 → 0.838. On curator-only scores the embedder gain shrinks to +0.02
   (reranker gains hold). Our training negatives were checked against the
   judges' practice grades, which may favour our models.
-- **A small fine-tuned reranker did as well as the LLM reranker, as far as
-  we can tell** (C8): the gap is probably under 0.015 either way (95% range,
-  not corrected; one seed), at $0.04 vs $0.88 per 500 queries.
+- **A small fine-tuned reranker was not shown different from the LLM
+  reranker** (C8: +0.003, 95% range −0.008 to +0.014, not corrected; one
+  seed; superiority test only, so not shown equal), at $0.04 vs $0.88 per
+  500 queries for the rerank step.
 - **The answer key decides BM25 vs embedders.** BM25 beats all 14
   off-the-shelf embedders on graded scores (C2 tested the best) but trails 7
   on curator-only. Curators may miss papers keyword search finds, or judges
   may favour papers naming the gene and disease (untested).
 - **The practice-picked LLM (Gemini) was not shown better than the best
-  embedders** (C3a, C3b): 74% right first vs 79%. A third of LLM answers
+  embedders** (C3a, C3b): 74% right first vs 79% (embeddinggemma-300m) and
+  72% (BMRetriever-410M). A third of LLM answers
   listed several papers, often in the given order, so hit@1 partly reflects
   order. Ties broken at random: Gemini 75%, DeepSeek 74% (raw 82%).
-- **GO fine-tunes hurt gene–disease search:** 0.12–0.14 below their bases.
+- **GO fine-tunes hurt gene–disease search:** about 0.12 below their bases
+  on the haystack (0.554 vs 0.675; 0.540 vs 0.658).
 
 <!-- Sources: results/claims.csv; results/haystack/graded/stats.csv (graded_ndcg@10 pooled: top 7 of 46 reranked; ndcg@10 raw); results/writeup/cost_quality.csv (cross-encoders 0.827/0.749/0.750/0.703/0.608 vs first pass 0.750; curator bge-base 0.381 -> 0.400, MedCPT-CE 0.393 -> 0.477; GO 0.675 -> 0.554, 0.658 -> 0.540; step_cost_usd 0.043 vs 0.877); docs/paper/methods.md (negatives "carry the judges' view"); results/llm_v2/summary.csv (test: n_multi 98/89 of 300, hit1_tiebreak 0.752/0.743); results/llm_v2/pairs_test.csv (DeepSeek vs embeddinggemma p 0.44263); results/v2_scores.csv (batches 1-4: bge-base 0.753 vs gaf 0.633; bge-small 0.750 vs gaf 0.607) -->
 
 ## 6. Caveats
 
-- **Judges checked against humans: they agree with an expert about as often as
-  a second expert does, but grade lower.** On the 91 abstracts Dan and a
-  colleague both graded, the colleague matched Dan's grade on 78% and the judges
-  on 80% (difference +2 points, 95% bootstrap −8 to +12); "relevant?" (grade
+- **Judges checked against humans: on the abstracts both graded, the judges
+  agreed with the expert about as often as a colleague did, but they grade
+  lower.** On the 91 abstracts Dan and a colleague both graded, the colleague
+  matched Dan's grade on 78% and the judges on 80% (difference +2 points, 95%
+  bootstrap −8 to +12; 109 abstract–colleague pairs); "relevant?" (grade
   ≥ 1) 89% vs 88%; grade 2 only 86% vs 91%. Dan matches himself on 78% of 27
   repeats. Over all 194 of his gradeable labels the judges match 70%, and when
   they differ they are lower 44 times and higher 14 (mostly his 2 → their 1,
-  his 1 → their 0), probably because the human guide's 2 counts cell models and
-  the judges' rubric doesn't (PREREG 2026-10-19 14:32). So graded scores are, if
+  his 1 → their 0). The human guide's 2 also counts cell models and the
+  judges' rubric doesn't (PREREG 2026-10-19 14:32), but the wording check
+  below shows this explains little. So graded scores are, if
   anything, strict. Exploratory; the stats are on few abstracts.
   **Not the wording** (PREREG 2026-11-03 check, `llm/judge_wording_check.py`): on the same 184
   abstracts, resent unchanged the judges match Dan 70% (42 lower, 13 higher); with the human
@@ -178,13 +187,15 @@ removed; test diseases with other genes allowed.
   - C6/C7 groups, C1 reranker candidates and C8 arms were fixed on
     2026-10-17, after many test runs.
 - **Costs are rough.** One GPU price; 10 runs estimated. Rerank and fine-tune
-  VMs ran ~7% dearer. BM25 + DeepSeek: ~$0.07 at the later API price. Not
+  VMs ran ~7% dearer. BM25 + DeepSeek: $0.13; a later DeepSeek rerank (of
+  the first pass) with almost the same tokens was charged ~$0.07. Not
   counted: grading, data building, storage, recipe search (~$3.50).
 
-<!-- Sources: labeller/items_calibration.parquet (200 items), labeller/labels_calibration.sqlite (0 labels); docs/PREREG.md (Waiting on Dan; change log; Starting numbers); docs/paper/methods.md (Disclosures: RESULTS.md by 2026-10-15 16:59; 2d0d111 at 22:37; 540ef36 on 2026-10-17 05:16); results/haystack/graded/stats.csv (recall@100 raw 0.7604); qrels.parquet x runs/rrf-...bge-base (recall@20 0.579); results/writeup/cost_quality.csv (seed_min/seed_max); results/embedding/*/*/GeneDiseaseRetrieval.json vs results/v2_scores.csv (v2 hit@1 minus v1 recall@1 median -0.015, minus v1 precision@1 -0.028; 24 models); results/writeup/cost_notes.md (europe-west3; DeepSeek $0.126 vs $0.074; hs-ft non-test 3.77 h = $3.54) -->
+<!-- Sources: labeller/items_calibration.parquet (200 items), labeller/labels_calibration.sqlite; results/figures/judge_agreement.csv and judge_agreement_overlap.csv (overlap: 91 abstracts, 109 pairs; direction), scripts/judge_agreement.py; results/judge_wording_check.csv; docs/PREREG.md (Waiting on Dan; change log; Starting numbers); docs/paper/methods.md (Disclosures: RESULTS.md by 2026-10-15 16:59; 2d0d111 at 22:37; 540ef36 on 2026-10-17 05:16); results/haystack/graded/stats.csv (recall@100 raw 0.7604); qrels.parquet x runs/rrf-...bge-base (recall@20 0.579); results/writeup/cost_quality.csv (seed_min/seed_max); results/embedding/*/*/GeneDiseaseRetrieval.json vs results/v2_scores.csv (v2 hit@1 minus v1 recall@1 median -0.015, minus v1 precision@1 -0.028; 24 models); results/writeup/cost_notes.md (europe-west3; DeepSeek $0.126 vs $0.074; hs-ft non-test 3.77 h = $3.54) -->
 
 ## 7. What's next
 
-1. **Paper:** add results, including the judge check, to `docs/paper/methods.md`.
+1. **Paper:** sections drafted in `docs/paper/` (results in `results.md`);
+   clear the TODO(check) items and build with `scripts/build_paper.sh`.
 2. **Release:** decide what to share (answer key, scripts, models; not
    abstracts).

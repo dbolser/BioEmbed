@@ -29,3 +29,6 @@ models/
 # datasets map/filter caches
 data/tasks/**/cache-*.arrow
 .env.gcp
+
+# Paper build output (scripts/build_paper.sh)
+docs/paper/build/

@@ -8,7 +8,17 @@ Exact = same 0/1/2 grade. Relevant = same answer to "grade >= 1?" (PREREG); only
 the human guide's wording (commit fde21fc, 2026-10-19 14:32 BST; PREREG 2026-10-19 14:32): "dan, old
 wording" is his first 16 labels, "dan, new wording" the rest.
 
-Run: uv run python scripts/judge_agreement.py   # -> results/figures/judge_agreement.{png,csv}
+Also -> judge_agreement_overlap.csv (same labels, exclusions and pass-0 rule):
+- overlap: on the abstracts Dan and at least one colleague graded, how often a colleague matches Dan,
+  next to how often the merged judge grade matches Dan. Counted per (abstract, colleague) pair, as in
+  the first computation (commit 3cb0969): an abstract two colleagues graded gives two pairs, and the
+  judges' match with Dan is counted once per pair too, so both rates use the same rows. The interval
+  on judges minus colleague is a paired bootstrap over abstracts (all of an abstract's pairs move
+  together), 10,000 resamples, seed 0, percentile 95%.
+- direction: over all Dan's labels, how often the merged judge grade is the same, lower or higher,
+  and the counts for each (Dan grade -> judge grade) change. Pool aggregates only.
+
+Run: uv run python scripts/judge_agreement.py   # -> results/figures/judge_agreement{,_overlap}.csv, .png
 """
 import sqlite3
 from pathlib import Path
@@ -33,6 +43,44 @@ BLUE, ORANGE = "#2a78d6", "#eb6834"
 
 def agreement(a, b):
     return len(a), float((a == b).mean()), float(((a >= 1) == (b >= 1)).mean()), float(((a == 2) == (b == 2)).mean())
+
+
+MEASURES = {"exact": lambda a, b: a == b, "relevant": lambda a, b: (a >= 1) == (b >= 1),
+            "only2": lambda a, b: (a == 2) == (b == 2)}
+N_BOOT, SEED = 10_000, 0
+
+
+def overlap(d):
+    """Colleague vs Dan and judges vs Dan on the same (abstract, colleague) pairs; bootstrap over abstracts."""
+    dan = d[d.labeller == "dan"][["item_id", "grade", "Judges"]]
+    oth = d[d.labeller != "dan"][["item_id", "grade"]].rename(columns={"grade": "other"})
+    m = dan.merge(oth, on="item_id")  # one row per (abstract, colleague)
+    items, idx = np.unique(m.item_id, return_inverse=True)
+    w = np.random.default_rng(SEED).multinomial(len(items), np.full(len(items), 1 / len(items)), N_BOOT)
+    pairs = np.bincount(idx, minlength=len(items))
+    rows = [("overlap", "abstracts", len(items), len(items), None, None),
+            ("overlap", "pairs", len(m), len(m), None, None)]
+    for k, f in MEASURES.items():
+        hc = np.bincount(idx, f(m.grade, m.other).to_numpy(float), len(items))
+        hj = np.bincount(idx, f(m.grade, m.Judges).to_numpy(float), len(items))
+        c, j = hc.sum() / pairs.sum(), hj.sum() / pairs.sum()
+        lo, hi = np.percentile((w @ (hj - hc)) / (w @ pairs), [2.5, 97.5])
+        rows += [("overlap", f"{k}: colleague vs dan", len(m), c, None, None),
+                 ("overlap", f"{k}: judges vs dan", len(m), j, None, None),
+                 ("overlap", f"{k}: judges minus colleague", len(m), j - c, lo, hi)]
+    return rows
+
+
+def direction(d):
+    """Merged judge grade against Dan's: same, lower, higher, and each (dan -> judges) change."""
+    dan = d[d.labeller == "dan"]
+    a, b = dan.grade.astype(int), dan.Judges.astype(int)
+    rows = [("direction", k, len(dan), int(v), None, None)
+            for k, v in (("same", (b == a).sum()), ("judges lower", (b < a).sum()), ("judges higher", (b > a).sum()))]
+    for (x, y), v in pd.crosstab(a, b).stack().items():
+        if x != y:
+            rows.append(("direction", f"dan {x} -> judges {y}", len(dan), int(v), None, None))
+    return rows
 
 
 def main():
@@ -69,6 +117,10 @@ def main():
     t = pd.DataFrame(rows, columns=["kind", "pair", "n", "exact", "relevant", "only2"])
     t.to_csv(OUT.with_suffix(".csv"), index=False)
     print(t.round(2).to_string(index=False))
+
+    o = pd.DataFrame(overlap(d) + direction(d), columns=["analysis", "measure", "n", "value", "ci_low", "ci_high"])
+    o.to_csv(f"{OUT}_overlap.csv", index=False)
+    print(o.round(3).to_string(index=False))
 
     order = ["human vs judges", "human vs human", "judge vs judge"]
     t = t.set_index("kind").loc[order].reset_index()
