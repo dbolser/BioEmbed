@@ -3,7 +3,8 @@ exploratory.) Both judges re-grade the calibration abstracts in their original t
 (same batch, doc order and settings, from the judge cache), two arms:
   same   the request resent unchanged (run-to-run drift)
   human  the rubric lines swapped for the human guide's final wording (labeller/index.html)
-Grades for the calibration pairs are compared with Dan's pass-0 labels; the answer key is untouched.
+Grades for the calibration pairs are compared with Dan's pass-0 labels, on the pairs both judges graded
+in every arm, leaving out the unblinded item (PREREG 2026-10-19 12:31); the answer key is untouched.
 
 Run (from llm/):
     uv run --with duckdb python judge_wording_check.py               # cost of what is pending, no calls
@@ -37,12 +38,15 @@ HUMAN = (  # labeller/index.html, the guide's grade list and the same-or-related
     "described only by its symptoms: all count as the same disease. Rate a broader disease as 1 or 0 unless "
     "the study includes this disease. Use your own scientific judgement to decide whether two different "
     "diseases are related, e.g. epilepsy and schizophrenia.")
+EXCLUDED = {"ENSG00000008853|MONDO_0800491|29276004"}  # as scripts/judge_agreement.py
 ARMS = {"same": lambda s: s, "human": lambda s: s.replace(OLD, HUMAN)}
 
 
 def calibration() -> pd.DataFrame:
-    q = "select round_id qid, pmid, grade dan from labels where labeller='dan' and pass=0"
-    return pd.read_sql(q, sqlite3.connect(DB))
+    q = "select item_id, round_id qid, pmid, grade dan from labels where labeller='dan' and pass=0"
+    with sqlite3.connect(DB) as con:
+        cal = pd.read_sql(q, con)
+    return cal[~cal.item_id.isin(EXCLUDED)].drop(columns="item_id")
 
 
 def batches(cal: pd.DataFrame) -> list[dict]:
@@ -69,12 +73,15 @@ def batches(cal: pd.DataFrame) -> list[dict]:
     return out
 
 
-def grades() -> pd.DataFrame:
+def grades(current: set[str]) -> pd.DataFrame:
+    """Grades from the cache files of the current requests (stale files from an edited request are ignored)."""
     rows = []
     for p in OUT.glob("*/*/*.json"):
         if p.name.endswith((".failed.json", ".error.json")):
             continue
         d = json.loads(p.read_text())
+        if d["request_hash"] not in current:
+            continue
         content = (jp.choice(d["response"]).get("message") or {}).get("content")
         arm, short = d["config"].split("|")[0], p.parent.name
         rows += [(arm, short, d["qid"], pmid, g) for pmid, (g, _) in jp.parse_grades(content, d["pmids"]).items()]
@@ -82,12 +89,13 @@ def grades() -> pd.DataFrame:
         ["arm", "judge", "qid", "pmid"])
 
 
-def compare(cal: pd.DataFrame) -> pd.DataFrame:
+def compare(cal: pd.DataFrame, current: set[str]) -> pd.DataFrame:
     orig = pd.read_parquet(jp.HAYSTACKS / HAY / "judgments.parquet")
     orig["judge"] = orig.judge.map({s["model"]: k for k, s in jp.JUDGES.items()})
     orig["arm"] = "original"
-    g = pd.concat([orig[["arm", "judge", "qid", "pmid", "grade"]], grades()])
+    g = pd.concat([orig[["arm", "judge", "qid", "pmid", "grade"]], grades(current)])
     w = g.pivot_table(index=["arm", "qid", "pmid"], columns="judge", values="grade").dropna().reset_index()
+    w = w[w.groupby(["qid", "pmid"]).arm.transform("nunique") == g.arm.nunique()]  # same pairs in every arm
     w["judges"] = np.floor(w[list(jp.JUDGES)].mean(axis=1))
     d = cal.dropna(subset=["dan"]).merge(w, on=["qid", "pmid"])
     rows = []
@@ -106,12 +114,13 @@ def main() -> None:
     ap.add_argument("--concurrency", type=int, default=8)
     a = ap.parse_args()
     cal = calibration()
-    todo = [b for b in batches(cal) if not b["path"].exists()]
+    every = batches(cal)
+    todo = [b for b in every if not b["path"].exists()]
     print(f"{len(todo)} requests pending, list-price ceiling ${sum(jp.price_ceiling(b['request']) for b in todo):.2f}")
     if todo and a.budget > 0:
         spent = asyncio.run(jp.send_all(jp.read_env(jp.OR_ENV), todo, a.budget, a.concurrency))
         print(f"spent ${spent:.2f}")
-    t = compare(cal)
+    t = compare(cal, {b["request_hash"] for b in every})
     CSV.parent.mkdir(parents=True, exist_ok=True)
     t.to_csv(CSV, index=False)
     print(t.round(3).to_string(index=False))
