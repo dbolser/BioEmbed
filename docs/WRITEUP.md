@@ -149,9 +149,16 @@ removed; test diseases with other genes allowed.
 
 ## 6. Caveats
 
-- **Judges not yet checked against a human.** Dan's 200 blind labels are
-  pending, as is his sign-off on the rubric and cut-off (does grade 1 count
-  as relevant? nDCG doesn't use it).
+- **Judges checked against humans: they agree with an expert about as often as
+  a second expert does, but grade lower.** On the 91 abstracts Dan and a
+  colleague both graded, the colleague matched Dan's grade on 78% and the judges
+  on 80% (difference +2 points, 95% bootstrap −8 to +12); "relevant?" (grade
+  ≥ 1) 89% vs 88%; grade 2 only 86% vs 91%. Dan matches himself on 78% of 27
+  repeats. Over all 194 of his gradeable labels the judges match 70%, and when
+  they differ they are lower 44 times and higher 14 (mostly his 2 → their 1,
+  his 1 → their 0), probably because the human guide's 2 counts cell models and
+  the judges' rubric doesn't (PREREG 2026-10-19 14:32). So graded scores are, if
+  anything, strict. Exploratory; the stats are on few abstracts.
 - **One first pass.** Its top 100 (cross-encoders) holds 76% of curator-cited
   papers; its top 20 (LLM rerankers) 58%. No cross-encoder ran on BM25 alone.
 - **The small task changed.** v2 drops v1's "wrong" papers on related
@@ -174,8 +181,6 @@ removed; test diseases with other genes allowed.
 
 ## 7. What's next
 
-1. **Dan's labels:** grade the 200 papers in `labeller/`; sign off rubric and
-   cut-off.
-2. **Paper:** add results to `docs/paper/methods.md` once judges are checked.
-3. **Release:** decide what to share (answer key, scripts, models; not
+1. **Paper:** add results, including the judge check, to `docs/paper/methods.md`.
+2. **Release:** decide what to share (answer key, scripts, models; not
    abstracts).

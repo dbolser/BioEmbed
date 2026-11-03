@@ -1,0 +1,14 @@
+kind,pair,n,exact,relevant
+human vs judges,alex bladon vs judges,47,0.7446808510638298,0.8085106382978723
+human vs judges,dan vs judges,194,0.7010309278350515,0.8247422680412371
+human vs judges,elena vs judges,20,0.75,0.9
+human vs judges,helena vs judges,48,0.7083333333333334,0.875
+human vs judges,"dan, old wording, vs judges",13,0.6923076923076923,0.9230769230769231
+human vs judges,"dan, new wording, vs judges",181,0.7016574585635359,0.8176795580110497
+human vs human,alex bladon vs dan,42,0.7857142857142857,0.8333333333333334
+human vs human,alex bladon vs helena,10,0.7,0.9
+human vs human,dan vs elena,20,0.75,0.95
+human vs human,dan vs helena,47,0.7872340425531915,0.9148936170212766
+human vs human,elena vs helena,9,0.7777777777777778,0.7777777777777778
+human vs human,"dan vs dan, repeat",27,0.7777777777777778,0.8148148148148148
+judge vs judge,DeepSeek vs Gemini,199,0.8040201005025126,0.9045226130653267
