@@ -1,7 +1,8 @@
 """Judge calibration: how often the LLM judges agree with the human labellers, next to how often the
 humans agree with each other (labeller/labels_calibration.sqlite x data/haystack/<NAME>/judgments.parquet).
 
-Exact = same 0/1/2 grade. Relevant = same answer to "grade >= 1?". Pass-0 labels only (the first look);
+Exact = same 0/1/2 grade. Relevant = same answer to "grade >= 1?" (PREREG); only2 = same answer to
+"grade == 2?" (the check PREREG reports alongside). Pass-0 labels only (the first look);
 "dan, repeat" is Dan's pass 1 vs pass 0. Item ENSG00000008853|MONDO_0800491|29276004 is left out
 (PREREG 2026-10-19 12:31). Unsure labels are left out. Dan's labels are also split at the change to
 the human guide's wording (commit fde21fc, 2026-10-19 14:32 BST; PREREG 2026-10-19 14:32): "dan, old
@@ -31,11 +32,12 @@ BLUE, ORANGE = "#2a78d6", "#eb6834"
 
 
 def agreement(a, b):
-    return len(a), float((a == b).mean()), float(((a >= 1) == (b >= 1)).mean())
+    return len(a), float((a == b).mean()), float(((a >= 1) == (b >= 1)).mean()), float(((a == 2) == (b == 2)).mean())
 
 
 def main():
-    lab = pd.read_sql("select labeller, item_id, pass, round_id qid, pmid, grade, first_at from labels", sqlite3.connect(DB))
+    with sqlite3.connect(DB) as con:
+        lab = pd.read_sql("select labeller, item_id, pass, round_id qid, pmid, grade, first_at from labels", con)
     lab = lab[~lab.item_id.isin(EXCLUDED) & lab.grade.notna()]
     first = lab[lab["pass"] == 0]
     j = duckdb.sql(f"select qid, pmid, judge, grade from '{HAYSTACK}/judgments.parquet'").df()
@@ -43,7 +45,7 @@ def main():
     jw = j.pivot_table(index=["qid", "pmid"], columns="judge", values="grade").reset_index()
     jw["Judges"] = np.floor((jw.DeepSeek + jw.Gemini) / 2)  # PREREG: mean, rounded down
     d = first.merge(jw, on=["qid", "pmid"], how="left")
-    assert d.Judges.notna().all()
+    assert d.Judges.notna().all(), f"no judge grade for {d[d.Judges.isna()][['qid', 'pmid']].values.tolist()}"
 
     rows = []
     for name, g in d.groupby("labeller"):
@@ -64,7 +66,7 @@ def main():
         rows.append(("human vs human", f"{name} vs {name}, repeat", *agreement(g[0], g[1])))
     one = d.drop_duplicates(["qid", "pmid"])
     rows.append(("judge vs judge", "DeepSeek vs Gemini", *agreement(one.DeepSeek, one.Gemini)))
-    t = pd.DataFrame(rows, columns=["kind", "pair", "n", "exact", "relevant"])
+    t = pd.DataFrame(rows, columns=["kind", "pair", "n", "exact", "relevant", "only2"])
     t.to_csv(OUT.with_suffix(".csv"), index=False)
     print(t.round(2).to_string(index=False))
 
