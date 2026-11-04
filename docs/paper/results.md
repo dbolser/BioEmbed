@@ -79,6 +79,43 @@ seed <!-- results/claims.csv: C8 effect 0.0028, ci_low −0.0076, ci_high 0.0136
 Gemini 3.1 Pro averaged 0.689 over the 12 tasks and Qwen3-Embedding-8B 0.662.
 PREREG expected no difference.
 
+## Do the fine-tunes depend on test diseases? (sensitivity check)
+
+Training allowed test and practice diseases when paired with other genes
+(Methods, Fine-tuning). We retrained the chosen recipe without them, at
+seed 42, and compared each model with its seed-42 original. This check was
+registered after the test results were seen, with a rule fixed in advance:
+a drop of 0.02 or less in graded nDCG@10 means the gain does not depend on
+test diseases (PREREG change log 2026-11-04). The retraining set is also a
+third smaller (5,165 curated pairs against 7,574), so a drop would mix the
+two causes.
+
+| Model | Score | Without test diseases | Original (seed 42) | Difference [95% CI] |
+|---|---|---|---|---|
+| bge-base, fine-tuned | graded nDCG@10 | 0.750 | 0.765 | −0.015 [−0.021, −0.008] |
+| bge-base, fine-tuned | curator-only nDCG@10 | 0.398 | 0.399 | −0.001 [−0.009, +0.007] |
+| MedCPT cross-encoder, fine-tuned | graded nDCG@10 | 0.869 | 0.861 | +0.009 [+0.004, +0.014] |
+| MedCPT cross-encoder, fine-tuned | graded, DeepSeek only | 0.847 | 0.836 | +0.011 [+0.006, +0.016] |
+| MedCPT cross-encoder, fine-tuned | curator-only nDCG@10 | 0.489 | 0.477 | +0.012 [+0.002, +0.023] |
+
+<!-- results/ntd_readout.csv, .md (scripts/ntd_readout.py): registered rows; 493 pairs graded (494 on DeepSeek's grades), 500 curator-only -->
+
+Scores use the key with the check's 179 new papers (Methods, Graded answer
+key), so an original can differ from Confirmatory claims in the third
+decimal (the cross-encoder on DeepSeek's grades: 0.836 here, 0.837 in C8).
+Paired bootstrap over pairs, 10,000 resamples; no p-values, as registered.
+
+Both models pass the rule. Without test diseases, the embedder lost 0.015 on
+graded nDCG@10, more than its seed spread (0.761–0.767), and the interval
+reaches just past the 0.02 line. On curator-only nDCG@10 it lost nothing.
+It still beat its base by 0.076 and BiCA-base by 0.051, against 0.090 and
+0.065 for the three-seed mean in C5 and C6. The cross-encoder did slightly
+better without test diseases, on every score. On DeepSeek's grades it led
+the Gemini rerank by 0.014 (95% CI +0.003 to +0.025), against 0.003 for the
+original in C8. That comparison is descriptive: one seed, no test, outside
+the registered family. C8's result stands as registered
+<!-- results/ntd_readout.csv: context rows; results/claims.csv: C5, C6, C8; results/writeup/cost_quality.csv: seed_min 0.7606, seed_max 0.7667 -->.
+
 ## Cost and quality (exploratory)
 
 ![Quality against cost for every test-haystack system. Dashed line: systems

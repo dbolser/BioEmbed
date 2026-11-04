@@ -193,7 +193,11 @@ The 22 runs added later (MedCPT, MedCPT by cosine, BiCA-small/base,
 embeddinggemma-300m, BMRetriever-410M, BioLORD-2023, the six gene–disease
 fine-tunes, the seven cross-encoder reranks and the two LLM reranks of the C1
 first pass) were pooled and graded under the add-later rule below on
-2026-10-17. The final test pool holds 33,531 items from 46 runs <!-- data/haystack/GeneDiseaseHaystack/pool.parquet: rows, distinct systems -->.
+2026-10-17. The test pool then held 33,531 items from 46 runs; this is the
+key behind every result except the sensitivity check below <!-- data/haystack/GeneDiseaseHaystack/pool.parquet: rows, distinct systems, before 2026-11-04 -->.
+The check's two runs added 179 items on 2026-11-04 (33,710 from 48 runs).
+Rescoring the 46 runs on the larger key moves no run's mean graded nDCG@10 by
+more than 0.0006, and no claim effect by more than 0.0001 <!-- recomputed 2026-11-04 against the key without the 179 items (judgments.parquet rows whose request is dated 2026-11-04), which reproduces results/claims.csv exactly; not yet in a script output -->.
 Each run's share of the pool: supplementary table, TODO(check). The practice
 pool, built the same way from 58 practice runs, holds 12,417 items <!-- data/haystack/GeneDiseaseHaystackDev/pool.parquet: rows, distinct systems -->.
 
@@ -248,6 +252,9 @@ The later runs' 6,917 new items, and Gemini's 4 missing ones, were graded on
 2026-10-17, 10:27–10:35 <!-- judgments.parquet joined to the request cache: created -->.
 The test key holds 33,531 items, all graded by both judges (merged grade 0:
 20,564; 1: 5,755; 2: 7,212) <!-- data/haystack/GeneDiseaseHaystack/judgments.parquet, judgments_merged.parquet -->.
+The sensitivity check's 179 new items were graded by both judges on
+2026-11-04, 17:35–17:37 UTC, for $0.24 (merged grade 0: 109; 1: 25; 2: 45)
+<!-- llm/llm_results/judge/GeneDiseaseHaystack/*/: 292 requests dated 2026-11-04, none failed; judge_pool.py cost table before and after; judgments_merged.parquet -->.
 Practice: 7,190 items over all 200 pairs, 7,189 merged, by 2026-10-16 22:00
 <!-- count recorded in commit ba86db4 (21:57); the request cache now gives 7,199 (DeepSeek) and 7,198 (Gemini) first grades before then: TODO(check) -->;
 12,417 items, all graded by both judges, by 2026-10-17 06:43 <!-- data/haystack/GeneDiseaseHaystackDev/judgments.parquet: rows, mtime -->.
@@ -475,9 +482,14 @@ genes and 14,630 PMIDs <!-- data/finetune_gd/manifest.json: funnel_curated -->.
 Test and practice diseases with another gene are allowed: 2,425 training pairs use 543
 distinct diseases that are registry query diseases or their twins (856
 registry diseases, 1,209 with twins) <!-- data/finetune_gd/manifest.json: sizes.train, exclusion.registry_diseases_with_twins -->.
-A variant without them was built (`data/finetune_gd/no_test_disease/`, 17,677
-curated rows) <!-- data/finetune_gd/no_test_disease/manifest.json: sizes.train -->
-but not used; whether to run it as a sensitivity check: TODO(check). Half
+A variant without them was built (`data/finetune_gd/no_test_disease/`: 5,165
+curated pairs and 17,677 rows, against 7,574 and 23,237) <!-- data/finetune_gd/no_test_disease/manifest.json and data/finetune_gd/manifest.json: sizes.train -->
+and used for one sensitivity check only, registered after the test results
+were seen (PREREG change log 2026-11-04): the chosen recipe retrained on it at
+seed 42, for bge-base and the MedCPT cross-encoder, and compared with the
+matching seed-42 model (Results, "Do the fine-tunes depend on test
+diseases?"). The variant is also a third smaller, so a drop would mix
+the two causes. Half
 the anchors use the test query template (below). Published PubMed-trained
 models may have seen test PMIDs, or the citations behind the gold, in
 pretraining; we do not control this.

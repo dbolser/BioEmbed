@@ -182,7 +182,11 @@ which abstracts it reads, with a human checking the output
   0.400) while the reranker gain holds (MedCPT 0.393 to 0.477), though there
   the Gemini rerank (0.497) and Qwen3-Reranker-4B (0.489) score higher,
   untested <!-- docs/paper/methods.md: Fine-tuning; results/writeup/cost_quality.csv: curator_ndcg10 -->.
-  Test diseases, with other genes, were allowed in training.
+  Test diseases, with other genes, were allowed in training. Retrained
+  without them (on a third less data), the embedder lost 0.015 on graded
+  nDCG@10 and nothing on curator-only, and the cross-encoder gained 0.009:
+  both within the 0.02 rule, registered after the test results were seen
+  (Results, sensitivity check) <!-- results/ntd_readout.csv -->.
 - **One seed for rerankers.** The embedder fine-tunes have three seeds
   (0.761–0.767); each cross-encoder fine-tune has one, so C8's interval omits
   seed variation <!-- results/writeup/cost_quality.csv: seed_min, seed_max -->.
