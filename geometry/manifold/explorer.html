@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Manifold explorer: the space of biological ideas</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root {
+  --surface: #fcfcfb; --page: #f9f9f7; --ink: #0b0b0b; --ink2: #52514e; --muted: #898781;
+  --grid: #e1e0d9; --base: #c3c2b7; --neg: #2a78d6; --mid: #f0efec; --pos: #e34948; --pt: #b9b8b0;
+  --accent: #0b0b0b; --card: #ffffff;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --surface: #1a1a19; --page: #0d0d0d; --ink: #f0efec; --ink2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --base: #383835; --neg: #3987e5; --mid: #383835; --pos: #e66767; --pt: #55544f;
+    --accent: #f0efec; --card: #222221; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--page); color: var(--ink); }
+header { padding: 10px 16px; border-bottom: 1px solid var(--grid); display: flex; gap: 16px; align-items: baseline; }
+header h1 { font-size: 17px; margin: 0; }
+header span { color: var(--ink2); }
+main { display: grid; grid-template-columns: 330px 1fr 400px; height: calc(100vh - 46px); }
+aside, section.results { overflow-y: auto; padding: 12px 14px; }
+aside { border-right: 1px solid var(--grid); }
+section.results { border-left: 1px solid var(--grid); }
+#mapwrap { position: relative; background: var(--surface); }
+canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+#tip { position: absolute; pointer-events: none; background: var(--card); color: var(--ink); border: 1px solid var(--base);
+  border-radius: 6px; padding: 4px 8px; font-size: 12px; display: none; max-width: 280px; box-shadow: 0 2px 8px #0002; }
+label.h { display: block; font-weight: 600; margin: 12px 0 4px; }
+input[type=text], select { width: 100%; padding: 7px 8px; border: 1px solid var(--base); border-radius: 6px;
+  background: var(--card); color: var(--ink); font: inherit; }
+button { padding: 7px 12px; border: 1px solid var(--ink); border-radius: 6px; background: var(--ink); color: var(--surface);
+  font: inherit; cursor: pointer; }
+button.ghost { background: transparent; color: var(--ink); border-color: var(--base); }
+.tabs { display: flex; gap: 4px; margin-top: 12px; }
+.tabs button { flex: 1; background: transparent; color: var(--ink2); border-color: var(--base); padding: 6px 4px; }
+.tabs button.on { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+.pane { display: none; } .pane.on { display: block; }
+.sugg { border: 1px solid var(--base); border-radius: 6px; margin-top: 2px; background: var(--card); max-height: 240px; overflow-y: auto; display: none; }
+.sugg div { padding: 5px 8px; cursor: pointer; } .sugg div:hover { background: var(--mid); }
+.tag { font-size: 11px; color: var(--muted); margin-left: 6px; }
+.start { margin-top: 8px; padding: 6px 8px; border-radius: 6px; background: var(--mid); color: var(--ink); }
+.row { display: flex; gap: 6px; align-items: center; margin-top: 8px; }
+.note { color: var(--ink2); font-size: 12px; margin-top: 6px; }
+h2 { font-size: 14px; margin: 14px 0 6px; } h2:first-child { margin-top: 0; }
+ol, ul { margin: 0; padding-left: 20px; } li { margin: 2px 0; }
+a { color: var(--neg); text-decoration: none; } a:hover { text-decoration: underline; }
+.click { cursor: pointer; border-bottom: 1px dotted var(--muted); }
+.sim { color: var(--muted); font-size: 11px; margin-left: 4px; font-variant-numeric: tabular-nums; }
+.coord { display: grid; grid-template-columns: 1fr 120px 1fr; gap: 6px; align-items: center; font-size: 12px; margin: 3px 0; }
+.coord .l { text-align: right; color: var(--ink2); } .coord .r { color: var(--ink2); }
+.bar { position: relative; height: 10px; background: var(--mid); border-radius: 4px; }
+.bar i { position: absolute; top: 0; height: 10px; border-radius: 4px; }
+.bar b { position: absolute; left: 50%; top: -2px; width: 1px; height: 14px; background: var(--base); }
+.card { background: var(--card); border: 1px solid var(--grid); border-radius: 8px; padding: 8px 10px; margin: 8px 0; }
+.card .st { font-weight: 600; font-variant-numeric: tabular-nums; }
+.legend { display: flex; align-items: center; gap: 8px; margin-top: 6px; font-size: 12px; color: var(--ink2); }
+.legend .ramp { flex: 1; height: 10px; border-radius: 4px; }
+.manifold { font-size: 12px; color: var(--ink2); }
+.warn { color: var(--pos); }
+.pairs { font-size: 12px; color: var(--ink2); margin-top: 6px; }
+</style>
+</head>
+<body>
+<header><h1>Manifold explorer</h1>
+<span>7.76M human-gene papers (MedEmbed-small). Type an idea, then locate it, walk it along an axis, complete an analogy, or route between topics.</span></header>
+<main>
+<aside>
+  <label class="h" for="q">Start from</label>
+  <input id="q" type="text" placeholder="an idea, disease, process… e.g. ferroptosis" autocomplete="off">
+  <div id="sugg" class="sugg"></div>
+  <div id="startbox" class="start">Nothing yet. Type and press Enter, or pick a topic or concept.</div>
+
+  <div class="tabs">
+    <button data-tab="locate" class="on">Locate</button><button data-tab="walk">Walk</button>
+    <button data-tab="analogy">Analogy</button><button data-tab="path">Path</button>
+  </div>
+  <div class="pane on" id="p-locate">
+    <div class="note">Where the start point sits: nearest topics, concepts and papers, and its coordinates on the main axes.
+      A single typed word carries little signal: a phrase, or a MeSH/GO concept picked from the suggestions (its definition is used), places better.
+      Coordinates are standard deviations against other concepts (typed text, concepts) or against papers (topics).</div>
+    <div class="row"><button id="go-locate">Locate</button></div>
+  </div>
+  <div class="pane" id="p-walk">
+    <label class="h" for="axis">Axis</label><select id="axis"></select>
+    <div id="axisinfo" class="note"></div>
+    <label class="h" for="reach">Steps each way: <span id="reachv">3</span></label>
+    <input id="reach" type="range" min="1" max="5" value="3" style="width:100%">
+    <div class="row"><button id="go-walk">Walk</button></div>
+    <div class="note">One step = one standard deviation of papers on that axis (for analogy themes: one typical hop between paired topics).</div>
+  </div>
+  <div class="pane" id="p-analogy">
+    <div class="note"><b>a</b> is to <b>b</b> as <b>start</b> is to <b>?</b> Answer = start + (b − a). Text or topic (type "#" then a topic name).</div>
+    <label class="h" for="ana">a</label><input id="ana" type="text" placeholder="e.g. #Rheumatoid synovial inflammation">
+    <label class="h" for="anb">b</label><input id="anb" type="text" placeholder="e.g. #Spondyloarthritis and RA treatment">
+    <div class="row"><button id="go-analogy">Complete</button></div>
+  </div>
+  <div class="pane" id="p-path">
+    <div class="note">The shortest chain of neighbouring topics from the start topic to another.</div>
+    <label class="h" for="pto">To topic</label><input id="pto" type="text" placeholder="type a topic name">
+    <div id="ptosugg" class="sugg"></div>
+    <div class="row"><button id="go-path">Route</button></div>
+  </div>
+
+  <label class="h" for="colour">Colour the map by</label>
+  <select id="colour"><option value="">nothing (grey)</option></select>
+  <div id="legend" style="display:none; margin-top:6px">
+    <div class="ramp" id="ramp" style="height:10px;border-radius:4px"></div>
+    <div class="legend" style="justify-content:space-between;margin-top:3px"><span id="lgneg"></span><span id="lgpos" style="text-align:right"></span></div>
+  </div>
+  <div class="note">Drag to pan, wheel to zoom. Hover for the topic under the pointer; click to start from it.</div>
+</aside>
+<div id="mapwrap"><canvas id="cv"></canvas><canvas id="ov"></canvas><div id="tip"></div></div>
+<section class="results" id="res"><h2>How to use it</h2>
+<p>Every point here is a direction in a 384-number space where each paper is an arrow. Close arrows mean similar papers.</p>
+<p><b>Axes</b> were found three ways: directions papers vary along <i>inside</i> nearly every topic (W: e.g. gene mapping ↔ drug treatment), directions that separate topics (B), and the shared <b>time</b> direction (older → newer). <b>Analogy themes</b> (A) are between-topic moves that recur across the map, e.g. "X in cancer → X".</p>
+<p>Results always name real topics, concepts and papers near the point. "Nearest paper" says how close the point still is to a real paper: if it drops, the walk has left the literature.</p>
+</section>
+</main>
+<script>
+const $ = s => document.querySelector(s);
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+let META, AXES, TOPICS, MAPX, MAPY, MAPT, MAPC = null, START = null, OVER = {};
+const view = { s: 1, x: 0, y: 0 };
+
+// ---------- colours: diverging blue <-> grey <-> red, 5 steps per arm, mixed in sRGB
+function hex2rgb(h) { h = h.replace('#', ''); return [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16)); }
+function mix(a, b, t) { const A = hex2rgb(a), B = hex2rgb(b); return 'rgb(' + A.map((v, i) => Math.round(v + (B[i] - v) * t)).join(',') + ')'; }
+function divSteps() {
+  const neg = css('--neg'), mid = css('--mid'), pos = css('--pos'), out = [];
+  for (let i = 5; i >= 1; i--) out.push(mix(mid, neg, i / 5));
+  out.push(mid);
+  for (let i = 1; i <= 5; i++) out.push(mix(mid, pos, i / 5));
+  return out;  // 11 bins, index 0 = most negative
+}
+
+// ---------- map
+const cv = $('#cv'), ov = $('#ov'), ctx = cv.getContext('2d'), octx = ov.getContext('2d');
+let W = 0, H = 0, bounds;
+function resize() {
+  const r = $('#mapwrap').getBoundingClientRect(), d = devicePixelRatio || 1;
+  W = r.width; H = r.height;
+  for (const c of [cv, ov]) { c.width = W * d; c.height = H * d; c.getContext('2d').setTransform(d, 0, 0, d, 0, 0); }
+  draw();
+}
+function fit() {
+  let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+  for (let i = 0; i < MAPX.length; i++) { const x = MAPX[i], y = MAPY[i]; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  bounds = { x0, x1, y0, y1 };
+}
+const sx = x => (x - bounds.x0) / (bounds.x1 - bounds.x0) * Math.min(W, H) * 0.94 * view.s + view.x + (W - Math.min(W, H) * 0.94) / 2;
+const sy = y => (bounds.y1 - y) / (bounds.y1 - bounds.y0) * Math.min(W, H) * 0.94 * view.s + view.y + (H - Math.min(W, H) * 0.94) / 2;
+function draw() {
+  if (!MAPX) return;
+  ctx.fillStyle = css('--surface'); ctx.fillRect(0, 0, W, H);
+  const r = Math.max(1.2, Math.min(3, 1.1 * Math.sqrt(view.s)));
+  if (MAPC) {
+    const steps = divSteps(), groups = steps.map(() => []);
+    for (let i = 0; i < MAPX.length; i++) groups[Math.max(0, Math.min(10, Math.round(MAPC[i] / 40 * 2.5) + 5))].push(i);
+    ctx.globalAlpha = 0.55;
+    // neutral first, extremes last so they stay visible
+    for (const b of [5, 4, 6, 3, 7, 2, 8, 1, 9, 0, 10]) { ctx.fillStyle = steps[b]; for (const i of groups[b]) ctx.fillRect(sx(MAPX[i]) - r / 2, sy(MAPY[i]) - r / 2, r, r); }
+  } else {
+    ctx.globalAlpha = 0.35; ctx.fillStyle = css('--pt');
+    for (let i = 0; i < MAPX.length; i++) ctx.fillRect(sx(MAPX[i]) - r / 2, sy(MAPY[i]) - r / 2, r, r);
+  }
+  ctx.globalAlpha = 1;
+  labels(); overlay();
+}
+function labels() {
+  const n = view.s < 1.5 ? 45 : view.s < 3 ? 120 : 400, taken = [];
+  ctx.font = '12px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const order = [...TOPICS].sort((a, b) => b.size - a.size).slice(0, n);
+  for (const t of order) {
+    const x = sx(t.x), y = sy(t.y), w = ctx.measureText(t.label).width + 6, box = [x - w / 2, y - 8, x + w / 2, y + 8];
+    if (box[0] < 2 || box[2] > W - 2 || y < 10 || y > H - 10) continue;
+    if (taken.some(b => !(box[2] < b[0] || box[0] > b[2] || box[3] < b[1] || box[1] > b[3]))) continue;
+    taken.push(box);
+    ctx.lineWidth = 3; ctx.strokeStyle = css('--surface'); ctx.strokeText(t.label, x, y);
+    ctx.fillStyle = css('--ink2'); ctx.fillText(t.label, x, y);
+  }
+}
+function marker(c, x, y, txt) {
+  c.beginPath(); c.arc(x, y, 9, 0, 7); c.fillStyle = css('--accent'); c.fill();
+  c.lineWidth = 2; c.strokeStyle = css('--surface'); c.stroke();
+  if (txt !== undefined) { c.fillStyle = css('--surface'); c.font = '600 10px system-ui'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(txt, x, y + 0.5); }
+}
+function overlay() {
+  octx.clearRect(0, 0, W, H);
+  const line = pts => { octx.beginPath(); pts.forEach(([x, y], i) => i ? octx.lineTo(sx(x), sy(y)) : octx.moveTo(sx(x), sy(y)));
+    octx.lineWidth = 2; octx.strokeStyle = css('--accent'); octx.stroke(); };
+  if (OVER.path) { line(OVER.path); OVER.path.forEach(([x, y], i) => marker(octx, sx(x), sy(y), i + 1)); }
+  if (OVER.walk) { line(OVER.walk.map(s => s.xy)); OVER.walk.forEach(s => marker(octx, sx(s.xy[0]), sy(s.xy[1]), s.step > 0 ? '+' + s.step : s.step)); }
+  if (OVER.point) marker(octx, sx(OVER.point[0]), sy(OVER.point[1]), '●');
+  if (OVER.ans) { marker(octx, sx(OVER.ans[0]), sy(OVER.ans[1]), '?'); }
+}
+let drag = null;
+ov.addEventListener('mousedown', e => drag = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y, moved: false });
+addEventListener('mouseup', e => { if (drag && !drag.moved) clickMap(e); drag = null; });
+addEventListener('mousemove', e => {
+  if (drag) { const dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (Math.abs(dx) + Math.abs(dy) > 3) drag.moved = true;
+    view.x = drag.vx + dx; view.y = drag.vy + dy; draw(); return; }
+  hover(e);
+});
+ov.addEventListener('wheel', e => { e.preventDefault(); const r = ov.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+  const f = e.deltaY < 0 ? 1.2 : 1 / 1.2, ns = Math.max(0.6, Math.min(40, view.s * f)), k = ns / view.s;
+  view.x = mx - (mx - view.x - (W - Math.min(W, H) * 0.94) / 2) * k - (W - Math.min(W, H) * 0.94) / 2;
+  view.y = my - (my - view.y - (H - Math.min(W, H) * 0.94) / 2) * k - (H - Math.min(W, H) * 0.94) / 2;
+  view.s = ns; draw(); }, { passive: false });
+function nearestTopic(e) {
+  const r = ov.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+  let best = null, bd = 1e9;
+  // nearest background point, then its topic
+  for (let i = 0; i < MAPX.length; i += 3) { const dx = sx(MAPX[i]) - mx, dy = sy(MAPY[i]) - my, d = dx * dx + dy * dy; if (d < bd) { bd = d; best = i; } }
+  return bd < 100 ? TOPICS[MAPT[best]] : null;
+}
+function hover(e) {
+  if (!MAPX || e.target !== ov) { $('#tip').style.display = 'none'; return; }
+  const t = nearestTopic(e), tip = $('#tip');
+  if (!t) { tip.style.display = 'none'; return; }
+  const r = ov.getBoundingClientRect();
+  tip.innerHTML = `<b>${esc(t.label)}</b><br>${esc(t.blurb || '')}<br><span class="sim">${t.size.toLocaleString()} papers · median year ${t.median_year}</span>`;
+  tip.style.left = (e.clientX - r.left + 14) + 'px'; tip.style.top = (e.clientY - r.top + 10) + 'px'; tip.style.display = 'block';
+}
+function clickMap(e) { if (e.target !== ov) return; const t = nearestTopic(e); if (t) setStart({ topic: t.topic }, 'topic: ' + t.label); }
+
+// ---------- start point and suggestions
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function setStart(spec, label) { START = spec; $('#startbox').textContent = label; $('#sugg').style.display = 'none'; run(); }
+let sTimer;
+$('#q').addEventListener('input', () => { clearTimeout(sTimer); sTimer = setTimeout(suggest, 150); });
+let SUGGEST_GEN = 0;
+$('#q').addEventListener('keydown', e => { if (e.key === 'Enter') { clearTimeout(sTimer); SUGGEST_GEN++; const v = $('#q').value.trim(); if (v) setStart({ text: v }, '“' + v + '”'); } });
+async function suggest() {
+  const q = $('#q').value.trim(), box = $('#sugg'), gen = ++SUGGEST_GEN;
+  if (q.length < 2) { box.style.display = 'none'; return; }
+  const ql = q.toLowerCase();
+  const ts = TOPICS.filter(t => (t.label || '').toLowerCase().includes(ql)).slice(0, 6);
+  const cs = await (await fetch('/api/concepts?q=' + encodeURIComponent(q))).json();
+  if (gen !== SUGGEST_GEN) return;  // Enter was pressed, or newer typing, while this was in flight
+  box.innerHTML = `<div data-k="text">Use the text “${esc(q)}”</div>` +
+    ts.map(t => `<div data-k="topic" data-v="${t.topic}">${esc(t.label)}<span class="tag">topic</span></div>`).join('') +
+    cs.map(c => `<div data-k="concept" data-v="${c.idx}">${esc(c.name)}<span class="tag">${c.source.toUpperCase()}</span></div>`).join('');
+  box.style.display = 'block';
+  box.querySelectorAll('div').forEach(d => d.onclick = () => {
+    const k = d.dataset.k, v = d.dataset.v;
+    if (k === 'text') setStart({ text: q }, '“' + q + '”');
+    else if (k === 'topic') setStart({ topic: +v }, 'topic: ' + TOPICS[+v].label);
+    else setStart({ concept: +v }, d.textContent.replace(/(MESH|GO)$/, '').trim());
+  });
+}
+function specOf(s) {
+  s = s.trim(); if (s.startsWith('#')) { const q = s.slice(1).toLowerCase(), t = TOPICS.find(t => (t.label || '').toLowerCase() === q) || TOPICS.find(t => (t.label || '').toLowerCase().includes(q)); if (t) return { topic: t.topic }; }
+  return { text: s };
+}
+
+// ---------- tabs and actions
+let TAB = 'locate';
+document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
+  TAB = b.dataset.tab; document.querySelectorAll('.tabs button').forEach(x => x.classList.toggle('on', x === b));
+  document.querySelectorAll('.pane').forEach(p => p.classList.toggle('on', p.id === 'p-' + TAB));
+});
+async function api(path, body) {
+  const r = await fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  if (!r.ok) throw new Error((await r.json()).detail || r.statusText); return r.json();
+}
+function run() { ({ locate, walk, analogy, path: route })[TAB](); }
+$('#go-locate').onclick = () => locate(); $('#go-walk').onclick = () => walk(); $('#go-analogy').onclick = () => analogy(); $('#go-path').onclick = () => route();
+$('#reach').oninput = () => $('#reachv').textContent = $('#reach').value;
+const need = () => { if (!START) { $('#res').innerHTML = '<p>Pick a start point first.</p>'; return false; } return true; };
+function busy() { $('#res').innerHTML = '<p class="note">Working…</p>'; }
+function fail(e) { $('#res').innerHTML = `<p class="warn">${esc(e.message)}</p>`; }
+
+const AXNAME = a => a.name ? `${a.id}: ${a.name}` : a.id;
+function coordBars(c) {
+  const show = ['time', 'W0', 'W1', 'W2', 'W3', 'W4', 'W5', 'B0', 'B1', 'B2', 'B3'];
+  return show.filter(k => k in c).map(k => {
+    const a = AXES.find(x => x.id === k), z = Math.max(-3, Math.min(3, c[k])), w = Math.abs(z) / 3 * 50;
+    const col = z < 0 ? css('--neg') : css('--pos');
+    return `<div class="coord" title="${esc(AXNAME(a))}: ${c[k]} sd"><span class="l">${esc(a.minus_pole || k + ' −')}</span>
+      <div class="bar"><b></b><i style="left:${z < 0 ? 50 - w : 50}%;width:${w}%;background:${col}"></i></div>
+      <span class="r">${esc(a.plus_pole || k + ' +')}</span></div>`;
+  }).join('');
+}
+const topicLi = t => `<li><span class="click" data-topic="${t.topic}">${esc(t.label)}</span><span class="sim">${t.sim}</span></li>`;
+const conceptLi = c => `<li><span class="click" data-concept="${c.idx}">${esc(c.name)}</span><span class="tag">${c.source.toUpperCase()}</span><span class="sim">${c.sim}</span></li>`;
+const paperLi = p => `<li><a href="https://pubmed.ncbi.nlm.nih.gov/${p.pmid}/" target="_blank">${esc(p.title || 'PMID ' + p.pmid)}</a> <span class="sim">${p.year} · ${p.sim}</span></li>`;
+function manifold(d) { const w = d.nearest_paper < 0.55; return `<div class="manifold ${w ? 'warn' : ''}">Nearest paper: cosine ${d.nearest_paper}${w ? ' (far from any paper: off the literature)' : ''}</div>`; }
+function wire() {
+  $('#res').querySelectorAll('[data-topic]').forEach(e => e.onclick = () => setStart({ topic: +e.dataset.topic }, 'topic: ' + TOPICS[+e.dataset.topic].label));
+  $('#res').querySelectorAll('[data-concept]').forEach(e => e.onclick = () => setStart({ concept: +e.dataset.concept }, e.textContent));
+}
+async function locate() {
+  if (!need()) return; busy();
+  try {
+    const d = await api('/api/locate', { start: START }); OVER = { point: d.xy }; overlay();
+    $('#res').innerHTML = `<h2>${esc(d.label)}</h2>${manifold(d)}<h2>Coordinates</h2>${coordBars(d.coords)}
+      <h2>Nearest topics</h2><ol>${d.topics.map(topicLi).join('')}</ol>
+      <h2>Nearest concepts</h2><ol>${d.concepts.map(conceptLi).join('')}</ol>
+      <h2>Nearest papers</h2><ol>${d.papers.map(paperLi).join('')}</ol>`; wire();
+  } catch (e) { fail(e); }
+}
+async function walk() {
+  if (!need()) return; busy();
+  const n = +$('#reach').value, steps = []; for (let i = -n; i <= n; i++) steps.push(i);
+  try {
+    const d = await api('/api/walk', { start: START, axis: $('#axis').value, steps }); OVER = { walk: d.steps }; overlay();
+    const a = d.axis;
+    $('#res').innerHTML = `<h2>${esc(d.label)} along ${esc(AXNAME(a))}</h2><div class="note">− ${esc(a.minus_pole || '')} &nbsp;…&nbsp; + ${esc(a.plus_pole || '')}</div>` +
+      d.steps.map(s => `<div class="card"><span class="st">${s.step > 0 ? '+' : ''}${s.step}</span> ${manifold(s)}
+        <div>Topic: <span class="click" data-topic="${s.topics[0].topic}">${esc(s.topics[0].label)}</span><span class="sim">${s.topics[0].sim}</span></div>
+        <div class="note">${s.concepts.slice(0, 4).map(c => esc(c.name)).join(' · ')}</div>
+        <ul>${s.papers.slice(0, 2).map(paperLi).join('')}</ul></div>`).join(''); wire();
+  } catch (e) { fail(e); }
+}
+async function analogy() {
+  if (!need()) return; busy();
+  try {
+    const d = await api('/api/analogy', { a: specOf($('#ana').value), b: specOf($('#anb').value), c: START });
+    OVER = { point: d.baseline.xy, ans: d.result.xy }; overlay();
+    $('#res').innerHTML = `<h2>${esc(d.label)}</h2>${manifold(d.result)}
+      <h2>Answer: nearest topics</h2><ol>${d.result.topics.slice(0, 6).map(topicLi).join('')}</ol>
+      <h2>Answer: nearest concepts</h2><ol>${d.result.concepts.slice(0, 8).map(conceptLi).join('')}</ol>
+      <h2>Answer: nearest papers</h2><ol>${d.result.papers.slice(0, 6).map(paperLi).join('')}</ol>
+      <h2>Baseline: the start alone</h2><div class="note">If the answer just repeats these, the analogy did nothing.</div>
+      <ol>${d.baseline.topics.slice(0, 4).map(topicLi).join('')}</ol>`; wire();
+  } catch (e) { fail(e); }
+}
+let PTO = null;
+$('#pto').addEventListener('input', () => {
+  const q = $('#pto').value.toLowerCase(), box = $('#ptosugg');
+  const ts = q.length < 2 ? [] : TOPICS.filter(t => (t.label || '').toLowerCase().includes(q)).slice(0, 8);
+  box.innerHTML = ts.map(t => `<div data-v="${t.topic}">${esc(t.label)}</div>`).join(''); box.style.display = ts.length ? 'block' : 'none';
+  box.querySelectorAll('div').forEach(d => d.onclick = () => { PTO = +d.dataset.v; $('#pto').value = TOPICS[PTO].label; box.style.display = 'none'; });
+});
+async function route() {
+  if (!need()) return;
+  if (START.topic === undefined) { $('#res').innerHTML = '<p>Path needs a topic as the start: click one on the map or in a result list.</p>'; return; }
+  if (PTO === null) { $('#res').innerHTML = '<p>Pick a destination topic.</p>'; return; }
+  busy();
+  try {
+    const d = await api('/api/path', { start: START, to: PTO }); OVER = { path: d.route.map(t => [t.x, t.y]) }; overlay();
+    $('#res').innerHTML = `<h2>${d.route.length - 1} hops</h2><ol>${d.route.map(t => `<li><span class="click" data-topic="${t.topic}">${esc(t.label)}</span><div class="note">${esc(t.blurb)}</div></li>`).join('')}</ol>`; wire();
+  } catch (e) { fail(e); }
+}
+
+// ---------- colour by axis
+$('#colour').onchange = async () => {
+  const a = $('#colour').value;
+  if (!a) { MAPC = null; $('#legend').style.display = 'none'; draw(); return; }
+  MAPC = new Int8Array(await (await fetch('/api/mapaxis?axis=' + a)).arrayBuffer());
+  const ax = AXES.find(x => x.id === a), st = divSteps();
+  $('#lgneg').textContent = ax.minus_pole || '−'; $('#lgpos').textContent = ax.plus_pole || '+';
+  $('#ramp').style.background = `linear-gradient(90deg, ${st.join(',')})`; $('#legend').style.display = 'block'; draw();
+};
+$('#axis').onchange = () => { const a = AXES.find(x => x.id === $('#axis').value);
+  $('#axisinfo').innerHTML = esc(a.description || '') + (a.pairs ? `<div class="pairs">e.g. ${a.pairs.slice(0, 3).map(p => esc(p[0]) + ' → ' + esc(p[1])).join('<br>')}</div>` : ''); };
+
+(async function init() {
+  META = await (await fetch('/api/meta')).json(); AXES = META.axes; TOPICS = META.topics;
+  const groups = [['Time', a => a.kind === 'time'], ['Themes inside topics (W)', a => a.kind === 'within'],
+    ['Between topics (B)', a => a.kind === 'between'], ['Analogy themes (A)', a => a.kind === 'analogy']];
+  for (const sel of [$('#axis'), $('#colour')]) for (const [g, f] of groups) {
+    const og = document.createElement('optgroup'); og.label = g;
+    AXES.filter(f).forEach(a => { const o = document.createElement('option'); o.value = a.id; o.textContent = AXNAME(a); og.appendChild(o); });
+    sel.appendChild(og);
+  }
+  $('#axis').onchange();
+  const buf = await (await fetch('/api/map')).arrayBuffer(), n = buf.byteLength / 10;
+  const xy = new Float32Array(buf, 0, n * 2); MAPT = new Int16Array(buf, n * 8, n);
+  MAPX = new Float32Array(n); MAPY = new Float32Array(n); for (let i = 0; i < n; i++) { MAPX[i] = xy[2 * i]; MAPY[i] = xy[2 * i + 1]; }
+  fit(); resize(); addEventListener('resize', resize);
+  $('#colour').value = 'time'; $('#colour').onchange();  // start with the time field: the map's most legible axis
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+})();
+</script>
+</body>
+</html>
