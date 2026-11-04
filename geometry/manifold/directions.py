@@ -77,7 +77,7 @@ for t in range(nt):
     tops = np.unique(E[m]); reg = np.bincount(region[tops], minlength=20) / len(tops)
     spread = float(1 / np.sum(reg ** 2))
     # overlap with principal axes (in the working space, axis coordinate j = PC j when not whitened)
-    pc_share = ax ** 2
+    pc_share = ax ** 2  # top_pc below is 0-based: 1 = the second principal axis (B1)
     o = np.argsort(proj)
     rows.append(dict(theme=t, edges=int(m.sum()), topics=len(tops), coherence=round(coh, 3), spread=round(spread, 1),
                      top_pc=int(np.argmax(pc_share)), top_pc_share=round(float(pc_share.max()), 2),

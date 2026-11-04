@@ -16,18 +16,20 @@ complete an analogy, or route between topics.
 | # | Question | Answer | Against |
 |---|---|---|---|
 | 1 | Is the space centred? | No: the mean paper vector has length 0.79. Every paper shares one big direction; everything below works on vectors minus that mean | 0 for a centred space |
-| 2 | Do between-topic vectors, clustered directly, give themes? | Not on their own: one blob of 3,107 of 5,355 edges, which is just the first principal axis (clinical ↔ molecular) | A Gaussian null gives the same picture |
+| 2 | Do between-topic vectors, clustered directly, give themes? | Only one coarse one: a loose blob of 3,107 of 5,355 edges (coherence 0.18) along hospital care ↔ basic science (mostly the second principal axis, B1), and noise | A Gaussian null gives 36 small clusters and no blob, so the blob is real; it just hides everything finer |
 | 3 | Do between-topic vectors repeat across the map? | Yes: 10.9% of edges have a partner elsewhere on the map with \|cos\| > 0.6 | null: 0.0% |
 | 4 | Analogy themes, calibrated so the null gives none | 22 themes; the top three: **"X in cancer → X"** (39 edges, 16 regions), **"X in the clinic → X genetics"** (26, 12), **"X in the body → X in the brain"** (21, 10) | Largest \|cos\| in 5 null draws: 0.593 |
-| 5 | Do the analogy vectors work on topics that did not define them? | Yes: "X → X in cancer" applied to the 740 other topics lands on topics with +50 points more Neoplasms headings (z = 128 against random directions) | Random directions of the same length |
-| 6 | Themes behind the clusters: directions papers vary along *inside* topics | 6 axes are among the top-20 local directions of most topics (93%, 83%, 82%, 74%, 65%, 52%): gene mapping ↔ drug treatment; populations ↔ mechanism; bench biochemistry ↔ patient outcomes; immune cells ↔ drug design; … | Chance: 20/384 = 5% |
+| 5 | Do the analogy vectors work on topics that did not define them? | Yes: "X → X in cancer" applied to the 710 other topics lands on topics with +50 points more Neoplasms headings (z = 128 against random directions) | Random directions of the same length |
+| 5b | At 3,349 finer topics | 34.6% of edges have a partner above the null's maximum; 182 themes; the largest read as a grammar of moves: change the level of explanation (clinic → genetics, disease → its microRNAs, target → drugs), the context (non-cancer → cancer, brain → body), or the organ (gut → lung, body → mouth) | Same null procedure |
+| 5c | Does a dictionary learned from single papers agree? | Yes: a sparse autoencoder (4,096 features, 84% of variance) has single features within cos 0.80-0.92 of the cancer, brain and microRNA analogy vectors | |
+| 6 | Themes behind the clusters: directions papers vary along *inside* topics | 6 axes have at least half their length inside the top-20 local directions of most topics (93%, 83%, 82%, 74%, 65%, 52%): gene mapping ↔ drug treatment; populations ↔ mechanism; bench biochemistry ↔ patient outcomes; immune cells ↔ drug design; … | A random direction has 5% (20/384) of its length there on average and essentially never half |
 | 7 | Can concepts be placed by their text alone? | Yes: a MeSH concept's "name: definition" vector finds its own papers' centroid first among 22,142 in 60% of cases, top-10 in 88% | Chance: 1 in 22,142 |
 | 8 | Is there a time vector? | Yes, one shared by topics: each topic's own drift (slope of its papers on year) agrees with the others' (mean pairwise cos 0.32); a paper's position on it correlates with its year at r = 0.49 (within topic) | 0 in 384-D |
-| 9 | Does it predict where topics move? | Yes: chosen on 1999-2008, then fixed, it beats "nothing moves" for 2021-23 in 90% of 749 topics (error 0.86x); 68% (0.97x) when the target is rebuilt without the clustering | Persistence |
+| 9 | Does it predict where topics move? | Yes: chosen on 1999-2008, then fixed, it beats "nothing moves" for 2021-23 in 91% of 749 topics (squared error 0.86x); 68% (0.97x) when the target is rebuilt without the clustering | Persistence |
 | 10 | Does it predict which topics grow? | No: position on the time vector adds R² 0.006 to past growth | |
-| 11 | Does geometry predict new gene-disease links? | Yes: among pairs never co-mentioned up to 2015, closeness adds to popularity and common neighbours (AUC 0.934 → 0.951, average precision 0.152 → 0.171); moving genes and diseases along their own time vectors helps on top | The two graph baselines |
-| 12 | ForeSCITE's move: shift a topic's papers along its time vector | Right direction, tiny effect: a small shift brings 60% of topics closer to the real 2019-23 papers (another topic's vector: 30%, backwards: 14%, random: 2%), but the gain is +0.0003 cosine | Placebo directions |
-| 13 | Does a topic's time vector say which MeSH headings rise in it? | No (median Spearman 0.005; simple trend: 0.025) | |
+| 11 | Does geometry predict new gene-disease links? | Yes: among pairs never co-mentioned up to 2015, closeness adds to popularity and common neighbours (AUC 0.934 → 0.950, average precision 0.152 → 0.163), though it lowers precision of the top 1,000 (0.636 → 0.566); moving genes and diseases along their own time vectors recovers that and adds a little (0.951, 0.171, 0.646) | The two graph baselines |
+| 12 | ForeSCITE's move: shift a topic's papers along its time vector | Right direction, small effect: at the topic's own past rate over the real 8-year gap, the shift brings 68% of 776 topics closer to the real 2019-23 papers (another topic's vector 41%, backwards 1%, random 1%); a quarter of that step: 90% (79%, 3%, 22%). Gains are about +0.001 cosine | The same steps in placebo directions |
+| 13 | Does a topic's time vector say which MeSH headings rise in it? | A little: median Spearman 0.08 with the actual change (positive in 71% of topics), 0.07 beyond what trend extrapolation predicts (trend alone: 0.13) | Trend extrapolation |
 | 14 | Is it MedEmbed only? | Running: Qwen3-Embedding-8B (best embedder on BioScore) on 100 papers per topic | |
 
 ## 1. The papers sit in a narrow cone
@@ -35,7 +37,13 @@ complete an analogy, or route between topics.
 The mean of all 7.76M paper vectors has length 0.79 (1 would mean every paper identical); a topic's centroid
 has length 0.86 (median). So most of every vector is the shared "this is a biomedical abstract" direction, and
 cosine similarity between any two papers is high. Differences between centroids cancel it; kNN graphs and
-concept placement do not, so every step below subtracts the mean first (`centroids.py`).
+concept placement do not, so the geometry below subtracts the mean first (`centroids.py`; the one exception is
+picking each topic's central papers for naming, `topic_inputs.py`, which ranks by raw cosine).
+
+**Centring changes the neighbours, not just the scale** (1M papers, 5,000 queries): two random papers have raw
+cosine 0.62 (sd 0.056), centred 0.00 (sd 0.10); a paper's nearest neighbour stands 4.8 random-pair sds above
+random raw, 6.9 centred; and only 80% of the 15 (79% of the 100) nearest neighbours are the same under the two.
+So cosine clustering of these vectors (e.g. a cosine HDBSCAN) should centre them first.
 
 Centred, the 780 topic centroids spread in many directions: the first principal axis holds 10.6% of their
 variance, 45 axes hold 80%, participation ratio 27.
@@ -43,19 +51,23 @@ variance, 45 axes hold 80%, participation ratio 27.
 ## 2. Topics with names
 
 `topic_inputs.py` collects per topic the MeSH headings most over-represented in it (from the PubMed XML,
-`parse_mesh.py`: 7.55M of the papers found, 81% with MeSH, median 11 headings), its genes, journal field, median
+`parse_mesh.py`: 7.55M of the papers found, 81% with MeSH, median 13 headings among those), its genes, journal field, median
 year and the titles of its 8 most central papers. 20 agents named the 780 topics from that (a name, a line, a
 kind, and a flag if it lumps unrelated things): `<name>_labels.csv`. 12 are flagged mixed, e.g. "Journal
-corrigenda", "Letters, replies and journal history", and **topic 125, retracted lncRNA/miRNA cancer papers
-(likely paper-mill output)**: the map puts paper mills in a region of their own.
+corrigenda", "Letters, replies and journal history", and topic 125, named "retracted lncRNA/miRNA cancer
+papers". It is the most retraction-heavy topic (13.6% of its papers are flagged Retracted Publication, 65x the
+corpus rate of 0.21%), but most retracted papers are elsewhere: neighbouring ncRNA-cancer topics hold more of them
+("Cancer microRNA targeting networks" 1,217, "Cancer lncRNAs and ceRNA networks" 1,008, topic 125 413 of 15,680).
 
 ## 3. Between-topic vectors and analogy themes
 
 **Clustering them directly does not work.** `directions.py` links each topic to its 10 nearest, takes the unit
 difference of the two centroids per edge, and clusters the 5,355 edges with HDBSCAN on 1 − |cos| (an edge has no
-direction, so v and −v are one axis). In 384-D one cluster takes 3,107 edges, and it is the first principal axis
-(surgery, cardiology, nursing ↔ nuclear transport, splicing, cell cycle). Whitened spaces give noise. Centroids
-drawn from a Gaussian with the same covariance give the same picture, so this finds nothing beyond the spread.
+direction, so v and −v are one axis). In 384-D one loose cluster (coherence 0.18) takes 3,107 edges: mostly the
+centroids' second principal axis, B1 (cos 0.73; with the first 0.55): surgery, cardiology, nursing ↔ nuclear
+transport, splicing, cell cycle. Centroids drawn from a Gaussian with the same covariance give 36 small clusters
+(largest 112 edges) and no blob, so this is real: neighbouring topics most often differ along hospital care ↔ basic
+science. But it swallows everything finer, and in whitened spaces the clustering gives noise (as does the null).
 
 **But the vectors do repeat.** Allow two edges to vouch for each other only if they share no topic and no
 endpoint region (20 k-means regions of the map), and use mutual neighbours only (no hub topics). Then 10.9% of
@@ -84,9 +96,12 @@ Directions are not kept by 2-D maps (t-SNE keeps neighbourhoods), so each theme 
 **Do they work?** Two checks.
 - *Completion* (leave one edge out): start at the edge's first topic, add the theme vector built from its other
   edges, and the true partner is the nearest topic 76% of the time (top-5: 97.5%), against 17% (63%) for the start
-  topic's own nearest neighbour. This is partly by construction (edges were picked for being parallel).
+  topic's own nearest neighbour and 72% top-5 for a step of the same length along another theme's vector. This is
+  partly by construction (edges were picked for being parallel).
 - *Held out* (`analogy_check.py`), the real test: apply the vector to every topic that did not define it, land on the
   nearest topic, and compare its MeSH branches with the start's; z against 200 random directions of the same length.
+
+Over the 710 topics outside A0, 738 outside A1, 748 outside A2:
 
 | Theme | Step toward + : landing topic has more | Step toward − : more |
 |---|---|---|
@@ -105,13 +120,13 @@ three kinds of move:
 | Kind of move | Themes (topic pairs; held-out z of the main MeSH shift) |
 |---|---|
 | **Change the level of explanation** | clinical care → genetics (82; z 38); disease → its microRNA studies (58; z 552); genetic association → cell or tissue mechanism (32; z 151); immune → intrinsic cell biology (20); drug target → medicinal chemistry (19; z 177) |
-| **Change the context** | non-cancer → cancer (53; z 102); brain → whole body (49; z 179); cardiovascular → metabolic (38); substance use → other disorders (23); kidney disease → general (20; z 134); pregnancy and newborn → general (14; z 415); stem cells → native tissue (14); animals and ecosystems → human toxicology (14) |
-| **Change the organ** | gut → lung (20; z 47); body → mouth and jaw (14; z 236); pancreas → stomach and colon (14); cancer → glioma (14; z 344); prostate → other cancers (14); GI cancer → breast cancer (12) |
+| **Change the context** | non-cancer → cancer (53; z 102); brain → whole body (49; z 179); cardiovascular → metabolic (38); substance use → other disorders (23); kidney disease → general (20; z 134); pregnancy and newborn → general (17; z 415); stem cells → native tissue (14); animals and ecosystems → human toxicology (14) |
+| **Change the organ** | gut → lung (20; z 47); body → mouth and jaw (18; z 236); pancreas → stomach and colon (16); cancer → glioma (15; z 344); prostate → other cancers (15); GI cancer → breast cancer (12) |
 
 **A learned dictionary agrees** (`sae.py`). A top-k sparse autoencoder on the centred paper vectors (4,096
 features, 32 active per paper, trained on 2.9M papers capped at 4,000 per topic; no topics, no MeSH) explains 84%
-of held-out variance; every feature fires (median on 0.33% of papers) and reads as one idea from the MeSH headings
-where it fires (dopamine and striatum; multiple sclerosis and EAE; postmenopausal hormone therapy; topoisomerase II
+of held-out variance; every feature fires (median on 0.33% of papers), and 99% have a MeSH heading at 5x lift or more where they
+fire, most reading as one idea (dopamine and striatum; multiple sclerosis and EAE; postmenopausal hormone therapy; topoisomerase II
 poisons; BNP and heart failure; pre-eclampsia; islet transplantation; …; `sae/features.csv`). The analogy vectors,
 built from pairs of topic centroids, are close to single features: "X in cancer → X" to the tumour cell-line
 feature (cos −0.92), "→ brain" to the brain / neurons / Alzheimer feature (0.89), "→ microRNAs" to the microRNA
@@ -122,8 +137,8 @@ pair as the within-topic axis W0 (+0.62 / −0.72): one contrast, seen between t
 
 `axes.py` takes, for each topic, its papers' scatter around the centroid, scales each topic to equal weight, and
 averages: W. W's top directions are the ways papers differ *inside* topics, shared across topics. For most topics
-they are among that topic's own top-20 directions: W0 93% of topics, W1 83%, W2 82%, W3 74%, W4 65%, W5 52%
-(chance 5%). `label_axes.py` reads them off the papers' MeSH headings and publication types (effect = how far
+at least half of each lies in that topic's own top-20 directions: W0 93% of topics, W1 83%, W2 82%, W3 74%,
+W4 65%, W5 52% (a random direction has 5% of its length there on average and essentially never half). `label_axes.py` reads them off the papers' MeSH headings and publication types (effect = how far
 toward + the papers with a heading sit, in sd), and `concept_axes.py` independently from where MeSH and GO concept
 *texts* fall on them. The two agree:
 
@@ -159,6 +174,15 @@ explorer places typed text. On the time axis, a concept's text coordinate predic
 papers (Spearman 0.32, 22,142 concepts; a full 384-D regression reaches 0.38; no other single axis beats 0.26).
 Against the year MeSH introduced the heading it is weak (0.10; 2010s headings sit 0.54 sd toward "new").
 
+**Coordinates of core ideas** (`core_map.py`): the 72 GO slim biological processes placed by their own text on two
+named axes. Cell and cancer biology (cell cycle, DNA replication and repair, chromosome segregation, transcription)
+sit right, whole-body physiology (endocrine, renal, circulatory, digestive, lipid metabolism) left. Newer-style
+research sits high (ncRNA gene silencing +2.3 sd, wound healing, autophagy, programmed cell death, protein folding),
+older-style low (renal physiology, cytoplasmic translation, membrane and lysosome organisation). All 141 GO slim
+terms on the main axes: `<name>_core_concepts.csv`.
+
+![The 72 GO slim processes on two named axes](../figures/manifold_core_ideas.jpg)
+
 ## 6. Time vectors
 
 The inspiration Dan remembered is most likely **ForeSCITE** (Chang, Ondov, …, Hua Xu, "Learning Scientific
@@ -169,22 +193,23 @@ in model weights, https://arxiv.org/abs/2312.13401) and Tshitoyan et al. 2019 (e
 later discoveries, https://www.nature.com/articles/s41586-019-1335-8).
 
 **Topics share one time direction.** Each topic's time vector (least-squares slope of its papers on year) points
-the same way as the others' (mean pairwise cos 0.32 over 780 topics; the mean of the unit vectors has length 0.57).
+the same way as the others' (mean pairwise cos 0.32 over 780 topics; the mean of the unit vectors has length 0.56).
 44% of it lies on within-topic axis W2 (bench ↔ outcomes).
 
 ![Papers' within-topic position on the time vector by year](../figures/manifold_time.jpg)
 
-The median paper climbs steadily from −1.45 sd (1975) to +0.75 sd (2026), steeper after 2022.
+The median paper is nearly flat until the mid-1980s (−1.45 sd in 1975, −1.34 in 1984), then climbs steadily to
++0.75 sd (2026), steeper after 2022.
 
 **Forecasting topic positions** (`timevec.py drift`). Train 2009-2018, predict the 2021-23 centroid, error relative
 to "the topic stays where it was in 2016-18":
 
-| Prediction | Error vs persistence (median) | Topics improved |
+| Prediction | Squared error vs persistence (median) | Topics improved |
 |---|---|---|
 | own slope | 1.19 | 33% |
 | shared time vector | 0.91 | 87% |
 | own and shared, half each | 0.87 | 69% |
-| **chosen on 1999-2008 → 2011-13, then fixed: 0.2 own + 0.8 shared, 0.75 of the step** | **0.86** | **90%** |
+| **chosen on 1999-2008 → 2011-13, then fixed: 0.2 own + 0.8 shared, 0.75 of the step** | **0.86** | **91%** |
 | the same, target rebuilt without the clustering (2021-23 papers to the nearest 2016-18 centroid) | 0.97 | 68% |
 
 A topic's own slopes are noisy; shrunk toward the shared one they help. The clustering saw all years, which could
@@ -218,12 +243,26 @@ cutoff; "time" moves each along its own slope to the middle of the horizon.
 
 Caveat: MedEmbed-small was trained after 2015 and may have read some of the future.
 
-**ForeSCITE's move, in embedding space** (`foresee.py`, nothing after 2015 used): shift each topic's 2011-15 papers
-along its own time vector (refitted on papers up to 2015) and measure how close the real 2019-23 papers (assigned
-by nearest pre-2016 centroid) come to the shifted cloud. A half step helps 60% of topics; another topic's vector
-30%, backwards 14%, a random direction 2%. The direction is right, but the gain is tiny (+0.0003 cosine) and larger
-steps overshoot. Reading the shift as "which MeSH headings will rise in this topic" fails (median Spearman 0.005;
-simple trend extrapolation 0.025).
+**ForeSCITE's move, in embedding space** (`foresee.py`). Built from papers up to 2015, except that the topic seeds
+come from the all-years clustering: centre with the pre-2016 mean, take each topic's pre-2016 centroid, give every
+paper (1975-2023) to its nearest such centroid, refit each topic's time vector on its papers up to 2015, then shift
+its 2011-15 papers along it and measure how close the real 2019-23 papers come to the shifted cloud. Step 1 = the
+topic's own past rate carried over the real gap (2013 → 2021). Share of 776 topics whose future papers get closer:
+
+| Step | Own time vector | Another topic's | Backwards | Random direction |
+|---|---|---|---|---|
+| 0.25 | **90%** | 79% | 3% | 22% |
+| 0.5 | **86%** | 69% | 2% | 7% |
+| 1 | **68%** | 41% | 1% | 1% |
+| 1.5 | 48% | 21% | 1% | 0% |
+
+Another topic's vector does well because the time direction is largely shared; the topic's own does better at every
+step, so it also carries topic-specific direction. The gains are small (at most +0.001 in best-match cosine), and
+the full past rate already overshoots a little. **Decoding** the shift as "which MeSH headings will rise in this
+topic" (cos of the time vector with each heading's concept vector, against the change from 2011-15 to 2019-23 under
+the same assignment): median Spearman 0.08, positive in 71% of 742 topics; 0.07 beyond trend extrapolation (which
+alone gives 0.13). A weak but real signal. (A first version mixed two assignment rules and gave ~0; a review caught
+it.)
 
 ## 7. The explorer
 
@@ -268,8 +307,11 @@ All CPU scripts use the repo root env (`uv run python geometry/manifold/<script>
 | `timevec.py drift / drift_reassigned / growth / links` | s / 1 min / s / 50 min | the time tests |
 | `foresee.py` | 2 min | ForeSCITE-style shift test |
 | `axis_evidence.py NAME` | s | evidence file the axis names came from |
+| `mesh_labels.py eom_mcs50_ms3` | s | MeSH-only names for the 3,349 finer topics (after `topic_inputs.py`) |
+| `sae.py` | 12 min (16 threads) | the sparse autoencoder and its feature names |
+| `figures.py NAME` | 1 min | the two figures |
 | `atlas.py NAME`, `explorer.py` | 3 min, 1 min | the explorer |
-| `subset_texts.py NAME`, `gcp_embed.sh VM SHARD`, `gpu_embed.py` | ~2 h GPU | model check |
+| `subset_texts.py NAME`, `gcp_embed.sh VM SHARD`, `gpu_embed.py`, `modelcheck.py` | ~1.5 h on two Spot L4s, 3 min | model check |
 
 Outputs: `data/geometry/medembed_small/manifold/` (not in git). Topic and axis names were made by agents from MeSH,
 gene and title evidence; the titles and abstracts themselves stay local.

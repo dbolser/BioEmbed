@@ -8,7 +8,8 @@ that matrix. The same run on Gaussian centroids with the real covariance (--null
 chance alone gives. A theme's axis is the axial mean (top eigenvector of sum v v^T) of its edges.
 
 Before the edge vectors are taken, topic positions can be expressed in a whitened top-PC space (--pcs, --whiten)
-so the strongest axis does not take every edge (directions.py's first run: one theme of 3,107 edges = PC1).
+so the strongest axis does not take every edge (directions.py's first run: one loose theme of 3,107 edges, mostly the
+centroids' second principal axis, B1).
 Writes data/geometry/medembed_small/manifold/<name>_relations_<tag>.{csv,npz}
 CPU, root env: uv run python geometry/manifold/relations.py eom_mcs200_ms3 [--k 10] [--null]
 """
