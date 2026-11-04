@@ -43,7 +43,7 @@ def go_terms():
 
 def build_table():
     md = pq.read_table(M / "mesh_desc.parquet").to_pandas()
-    mesh = pd.DataFrame({"source": "mesh", "id": md.ui.map(lambda u: f"D{u:06d}"), "name": md.name,
+    mesh = pd.DataFrame({"source": "mesh", "id": md.uid, "name": md.name,  # the NLM id string (6 or 9 digits)
                          "definition": md.scope.fillna(""), "tag": md.trees.map(lambda t: "|".join(t)), "slim": False})
     return pd.concat([mesh, go_terms()], ignore_index=True)
 

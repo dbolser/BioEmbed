@@ -29,9 +29,11 @@ def descriptors():
     for _, el in ET.iterparse(gzip.open(DESC), events=("end",)):
         if el.tag != "DescriptorRecord": continue
         sn = el.find("ConceptList/Concept[@PreferredConceptYN='Y']/ScopeNote")
-        rows.append(dict(ui=ui(el.findtext("DescriptorUI")), name=el.findtext("DescriptorName/String"),
+        uid = el.findtext("DescriptorUI")  # keep the NLM string too: D + 6 digits (older) or D + 9 digits (newer)
+        rows.append(dict(ui=ui(uid), uid=uid, name=el.findtext("DescriptorName/String"),
                          scope=(sn.text or "").strip() if sn is not None else "",
-                         trees=[t.text for t in el.findall("TreeNumberList/TreeNumber")]))
+                         trees=[t.text for t in el.findall("TreeNumberList/TreeNumber")],
+                         introduced=int(el.findtext("DateIntroduced/Year") or 0)))
         el.clear()
     pq.write_table(pa.Table.from_pylist(rows), OUT / "mesh_desc.parquet")
     log(f"descriptors {len(rows):,}")
@@ -53,6 +55,7 @@ def one(path):
 
 if __name__ == "__main__":
     descriptors()
+    if "--descriptors-only" in sys.argv: raise SystemExit
     pm = np.load(D / "pmids.npy"); order = np.argsort(pm); spm = pm[order]
     files = sorted(RAW.glob("pubmed26n*.xml.gz"))
     best = {}

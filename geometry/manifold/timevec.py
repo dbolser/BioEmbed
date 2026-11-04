@@ -204,11 +204,14 @@ def auc(score, y):
 
 
 def links(name, min_gene=10, min_dis=100, pos_min=3):
-    X = np.load(D / "X.npy", mmap_mode="r"); mu = np.load(M / "mean.npy"); year = np.load(M / "year.npy")
+    X = np.load(D / "X.npy", mmap_mode="r"); year = np.load(M / "year.npy")
+    ys, yn = np.load(M / f"{name}_ysum.npy"), np.load(M / f"{name}_ysize.npy")
     G, gu, Dz, dis = entity_matrices(); log(f"genes {G.shape[1]:,}, disease headings {Dz.shape[1]:,}")
     res, feats = {}, {}
     for T, H in ((2010, 5), (2015, 8)):
         before = (year > 0) & (year <= T); after = (year > T) & (year <= T + H)
+        # centre with the mean of papers up to the cutoff (the all-years mean leans along the time vector)
+        mu = (ys[:, :yi(T) + 1].sum((0, 1)) / yn[:, :yi(T) + 1].sum()).astype(np.float32)
         gc, gsl, gn, gyb = centroids_and_slopes(G, X, mu, year, before)
         dc, dsl, dn, dyb = centroids_and_slopes(Dz, X, mu, year, before)
         gk, dk = np.flatnonzero(gn >= min_gene), np.flatnonzero(dn >= min_dis)

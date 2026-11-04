@@ -21,7 +21,7 @@ import numpy as np, torch
 REPO = Path(__file__).resolve().parents[2]
 D = REPO / "data/geometry/medembed_small"
 M = D / "manifold"
-torch.set_num_threads(96)
+torch.set_num_threads(16)
 t0 = time.time()
 log = lambda *a: print(f"[{time.time() - t0:6.0f}s]", *a, flush=True)
 name = sys.argv[1]
@@ -56,8 +56,19 @@ for g in range(k):
     v, Vg = np.linalg.eigh(Cg[g]); top = Vg[:, -20:]
     energy[g] = ((top.T @ wV) ** 2).sum(0)
 share = (energy >= 0.5).mean(0)
+# leave one topic out: W rebuilt without topic g, its axes matched to the full W's by |cos|; is each still mostly
+# inside g's own top-20 directions? (W averages the same topics' covariances, so the plain share is partly circular)
+loo = np.zeros((k, 6))
+for g in range(k):
+    Wg = (k * W - Cg[g] / tr[g]) / (k - 1)
+    v, Vg = np.linalg.eigh(Wg); Vg = Vg[:, ::-1][:, :12]
+    match = Vg[:, np.abs(wV[:, :6].T @ Vg).argmax(1)]  # (384, 6): the LOO axis nearest each full-W axis
+    top = np.linalg.eigh(Cg[g])[1][:, -20:]
+    loo[g] = ((top.T @ match) ** 2).sum(0) >= 0.5
+share_loo = loo.mean(0)
 np.savez(M / f"{name}_axes.npz", W_vals=wv, W_vecs=wV, B_vals=bv, B_vecs=bV, tvec=tvec, tn=tn, ybar=ybar,
-         share_top20=share, trace=tr, cen=cen)
+         share_top20=share, share_top20_loo=share_loo, trace=tr, cen=cen)
+log(f"leave-one-topic-out shares for W0-W5: {np.round(share_loo, 2)}")
 ev = wv / wv.sum(); evb = bv / bv.sum()
 log(f"W: top10 share {np.round(ev[:10], 3)}; participation ratio {1 / np.sum(ev ** 2):.1f}")
 log(f"B: top10 share {np.round(evb[:10], 3)}; participation ratio {1 / np.sum(evb ** 2):.1f}")
