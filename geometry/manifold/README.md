@@ -76,6 +76,11 @@ below, with a skeptic checking each name (`<name>_axes_named.json`):
 | A14 | 3 / 5 | X under injury → X regeneration | Cardiac reperfusion injury → Cardiac regeneration; Cerebral ischaemia → Nerve regeneration |
 | A20 | 3 / 4 | Drug treatment of X → immune biology of X | Tacrolimus dosing → Transplant rejection; Antiretroviral regimens → HIV pathogenesis |
 
+![The four largest analogy themes, each drawn in its own plane](../figures/manifold_analogies.jpg)
+
+Directions are not kept by 2-D maps (t-SNE keeps neighbourhoods), so each theme is drawn in a projection of the
+384-D space: across, the theme vector; up, the main remaining direction among topics.
+
 **Do they work?** Two checks.
 - *Completion* (leave one edge out): start at the edge's first topic, add the theme vector built from its other
   edges, and the true partner is the nearest topic 76% of the time (top-5: 97.5%), against 17% (63%) for the start
@@ -90,6 +95,28 @@ below, with a skeptic checking each name (`<name>_axes_named.json`):
 | A2 body → brain | **Central nervous system +28 points (z 204)** | |
 | A3 → microRNAs | **Antisense elements / nucleic acids +51 points (z 354)** | |
 | A7 heart → kidney | Urologic diseases (z 67) | Heart diseases (z 17) |
+
+**Finer topics, more themes.** On the 3,349 finer topics (named from their top MeSH headings, `mesh_labels.py`),
+9,539 mutual edges, null threshold 0.540: 34.6% of edges have a partner above it, 182 themes with 3+ edges.
+The 20 largest, named and checked by agents from their pairs and held-out MeSH shifts
+(`eom_mcs50_ms3_themes_named.json`; one, dopamine → serotonin, rejected as a local axis), read as a grammar with
+three kinds of move:
+
+| Kind of move | Themes (topic pairs; held-out z of the main MeSH shift) |
+|---|---|
+| **Change the level of explanation** | clinical care → genetics (82; z 38); disease → its microRNA studies (58; z 552); genetic association → cell or tissue mechanism (32; z 151); immune → intrinsic cell biology (20); drug target → medicinal chemistry (19; z 177) |
+| **Change the context** | non-cancer → cancer (53; z 102); brain → whole body (49; z 179); cardiovascular → metabolic (38); substance use → other disorders (23); kidney disease → general (20; z 134); pregnancy and newborn → general (14; z 415); stem cells → native tissue (14); animals and ecosystems → human toxicology (14) |
+| **Change the organ** | gut → lung (20; z 47); body → mouth and jaw (14; z 236); pancreas → stomach and colon (14); cancer → glioma (14; z 344); prostate → other cancers (14); GI cancer → breast cancer (12) |
+
+**A learned dictionary agrees** (`sae.py`). A top-k sparse autoencoder on the centred paper vectors (4,096
+features, 32 active per paper, trained on 2.9M papers capped at 4,000 per topic; no topics, no MeSH) explains 84%
+of held-out variance; every feature fires (median on 0.33% of papers) and reads as one idea from the MeSH headings
+where it fires (dopamine and striatum; multiple sclerosis and EAE; postmenopausal hormone therapy; topoisomerase II
+poisons; BNP and heart failure; pre-eclampsia; islet transplantation; …; `sae/features.csv`). The analogy vectors,
+built from pairs of topic centroids, are close to single features: "X in cancer → X" to the tumour cell-line
+feature (cos −0.92), "→ brain" to the brain / neurons / Alzheimer feature (0.89), "→ microRNAs" to the microRNA
+feature (0.80); "clinic → genetics" is mutation / genotype (+0.63) against treatment outcome / RCT (−0.56), the same
+pair as the within-topic axis W0 (+0.62 / −0.72): one contrast, seen between topics and inside them.
 
 ## 4. The themes behind the clusters: axes inside every topic
 
@@ -144,6 +171,10 @@ later discoveries, https://www.nature.com/articles/s41586-019-1335-8).
 **Topics share one time direction.** Each topic's time vector (least-squares slope of its papers on year) points
 the same way as the others' (mean pairwise cos 0.32 over 780 topics; the mean of the unit vectors has length 0.57).
 44% of it lies on within-topic axis W2 (bench ↔ outcomes).
+
+![Papers' within-topic position on the time vector by year](../figures/manifold_time.jpg)
+
+The median paper climbs steadily from −1.45 sd (1975) to +0.75 sd (2026), steeper after 2022.
 
 **Forecasting topic positions** (`timevec.py drift`). Train 2009-2018, predict the 2021-23 centroid, error relative
 to "the topic stays where it was in 2016-18":

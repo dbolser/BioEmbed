@@ -65,11 +65,31 @@ for i, v in enumerate(an["axes"]):
     m = np.flatnonzero(comp == i)  # comp ids follow the order themes were found, before sorting by size
     vv = cen[E[m, 1]] - cen[E[m, 0]]
     add(f"A{i}", "analogy", v, np.median(np.abs(vv @ (v / np.linalg.norm(v)))))
+# the 20 largest analogy themes among the 3,349 finer topics (named in <fine>_themes_named.json)
+FINE = "eom_mcs50_ms3"
+if (M / f"{FINE}_themes_named.json").exists():
+    fz = np.load(M / f"{FINE}_analogies.npz"); fth = json.load(open(M / f"{FINE}_analogies.json"))["themes"]
+    fS, fn = np.load(M / f"{FINE}_sum.npy"), np.load(M / f"{FINE}_size.npy"); fcen = fS / fn[:, None] - mu
+    fnamed = {t["theme"]: t for t in json.load(open(M / f"{FINE}_themes_named.json"))["themes"]}
+    for i, v in enumerate(fz["axes"][:20]):
+        m = np.flatnonzero(fz["comp"] == i); vv = fcen[fz["edges"][m, 1]] - fcen[fz["edges"][m, 0]]
+        add(f"F{i}", "fine_analogy", v, np.median(np.abs(vv @ (v / np.linalg.norm(v)))))
+        meta[-1] |= dict(pairs=fth[i]["pairs"][:8], edges=fth[i]["edges"], fine=fnamed.get(f"F{i}", {}))
 np.save(OUT / "axes.npy", np.array(axes))
 named = M / f"{name}_axes_named.json"
 names = {a["axis"]: a for a in json.load(open(named))["axes"]} if named.exists() else {}
-for mta in meta: mta |= {k_: names.get(mta["id"], {}).get(k_, "") for k_ in ("name", "minus_pole", "plus_pole", "description", "confidence")}
+for mta in meta:
+    if mta["kind"] == "fine_analogy":
+        f = mta.pop("fine"); x, _, y = f.get("name", "").partition("->")
+        mta |= dict(name=f.get("name", ""), minus_pole=x.strip(), plus_pole=y.strip(), description=f.get("description", ""),
+                    confidence=f.get("confidence", ""))
+    else:
+        mta |= {k_: names.get(mta["id"], {}).get(k_, "") for k_ in ("name", "minus_pole", "plus_pole", "description", "confidence")}
 for i, mta in enumerate(meta):
     if mta["kind"] == "analogy": mta["edges"], mta["pairs"] = th[int(mta["id"][1:])]["edges"], th[int(mta["id"][1:])]["pairs"][:8]
+# the learned dictionary (sae.py), for "ideas in this point"
+if (M / "sae/sae.pt").exists():
+    import shutil
+    shutil.copy(M / "sae/sae.pt", OUT / "sae.pt"); shutil.copy(M / "sae/features.csv", OUT / "sae_features.csv")
 (OUT / "axes.json").write_text(json.dumps(meta, indent=1))
 print("atlas written:", len(rows), "papers,", k, "topics,", int(use.sum()), "concepts,", len(axes), "axes")

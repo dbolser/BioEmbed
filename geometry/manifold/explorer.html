@@ -61,6 +61,8 @@ a { color: var(--neg); text-decoration: none; } a:hover { text-decoration: under
 .manifold { font-size: 12px; color: var(--ink2); }
 .warn { color: var(--pos); }
 .pairs { font-size: 12px; color: var(--ink2); margin-top: 6px; }
+.ideas { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0; }
+.chip { font-size: 11px; padding: 2px 7px; border-radius: 10px; background: var(--mid); color: var(--ink); border: 1px solid var(--grid); }
 </style>
 </head>
 <body>
@@ -287,6 +289,8 @@ function coordBars(c) {
 const topicLi = t => `<li><span class="click" data-topic="${t.topic}">${esc(t.label)}</span><span class="sim">${t.sim}</span></li>`;
 const conceptLi = c => `<li><span class="click" data-concept="${c.idx}">${esc(c.name)}</span><span class="tag">${c.source.toUpperCase()}</span><span class="sim">${c.sim}</span></li>`;
 const paperLi = p => `<li><a href="https://pubmed.ncbi.nlm.nih.gov/${p.pmid}/" target="_blank">${esc(p.title || 'PMID ' + p.pmid)}</a> <span class="sim">${p.year} · ${p.sim}</span></li>`;
+const ideasHtml = d => d.ideas && d.ideas.length ? `<div class="ideas">${d.ideas.map(i =>
+  `<span class="chip" title="learned feature F${i.feature}, activation ${i.act}">${esc(i.name || 'F' + i.feature)}</span>`).join('')}</div>` : '';
 function manifold(d) { const w = d.nearest_paper < 0.55; return `<div class="manifold ${w ? 'warn' : ''}">Nearest paper: cosine ${d.nearest_paper}${w ? ' (far from any paper: off the literature)' : ''}</div>`; }
 function wire() {
   $('#res').querySelectorAll('[data-topic]').forEach(e => e.onclick = () => setStart({ topic: +e.dataset.topic }, 'topic: ' + TOPICS[+e.dataset.topic].label));
@@ -296,7 +300,9 @@ async function locate() {
   if (!need()) return; busy();
   try {
     const d = await api('/api/locate', { start: START }); OVER = { point: d.xy }; overlay();
-    $('#res').innerHTML = `<h2>${esc(d.label)}</h2>${manifold(d)}<h2>Coordinates</h2>${coordBars(d.coords)}
+    $('#res').innerHTML = `<h2>${esc(d.label)}</h2>${manifold(d)}
+      <h2>Ideas in this point</h2><div class="note">The strongest of 4,096 features a sparse autoencoder learned from the papers, named by their MeSH headings.</div>${ideasHtml(d)}
+      <h2>Coordinates</h2>${coordBars(d.coords)}
       <h2>Nearest topics</h2><ol>${d.topics.map(topicLi).join('')}</ol>
       <h2>Nearest concepts</h2><ol>${d.concepts.map(conceptLi).join('')}</ol>
       <h2>Nearest papers</h2><ol>${d.papers.map(paperLi).join('')}</ol>`; wire();
@@ -311,7 +317,7 @@ async function walk() {
     $('#res').innerHTML = `<h2>${esc(d.label)} along ${esc(AXNAME(a))}</h2><div class="note">− ${esc(a.minus_pole || '')} &nbsp;…&nbsp; + ${esc(a.plus_pole || '')}</div>` +
       d.steps.map(s => `<div class="card"><span class="st">${s.step > 0 ? '+' : ''}${s.step}</span> ${manifold(s)}
         <div>Topic: <span class="click" data-topic="${s.topics[0].topic}">${esc(s.topics[0].label)}</span><span class="sim">${s.topics[0].sim}</span></div>
-        <div class="note">${s.concepts.slice(0, 4).map(c => esc(c.name)).join(' · ')}</div>
+        <div class="note">${s.concepts.slice(0, 4).map(c => esc(c.name)).join(' · ')}</div>${ideasHtml({ ideas: (s.ideas || []).slice(0, 3) })}
         <ul>${s.papers.slice(0, 2).map(paperLi).join('')}</ul></div>`).join(''); wire();
   } catch (e) { fail(e); }
 }
@@ -361,7 +367,8 @@ $('#axis').onchange = () => { const a = AXES.find(x => x.id === $('#axis').value
 (async function init() {
   META = await (await fetch('/api/meta')).json(); AXES = META.axes; TOPICS = META.topics;
   const groups = [['Time', a => a.kind === 'time'], ['Themes inside topics (W)', a => a.kind === 'within'],
-    ['Between topics (B)', a => a.kind === 'between'], ['Analogy themes (A)', a => a.kind === 'analogy']];
+    ['Between topics (B)', a => a.kind === 'between'], ['Analogy themes (A)', a => a.kind === 'analogy'],
+    ['Analogy themes, finer topics (F)', a => a.kind === 'fine_analogy']];
   for (const sel of [$('#axis'), $('#colour')]) for (const [g, f] of groups) {
     const og = document.createElement('optgroup'); og.label = g;
     AXES.filter(f).forEach(a => { const o = document.createElement('option'); o.value = a.id; o.textContent = AXNAME(a); og.appendChild(o); });

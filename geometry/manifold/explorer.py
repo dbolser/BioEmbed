@@ -49,6 +49,23 @@ CSTAT = (_cp.mean(0), _cp.std(0))
 _pp = (P["vec"][:100_000].astype(np.float32) - pmean) @ AV.T
 PSTAT = (_pp.mean(0), _pp.std(0))
 pmid_row = {int(p): i for i, p in enumerate(p_pmid)}
+# the learned dictionary (sae.py): which of its 4,096 "ideas" a point is made of
+SAE = None
+if (A / "sae.pt").exists():
+    _ck = torch.load(A / "sae.pt", weights_only=False)  # our own checkpoint (sae.py)
+    SAE = {k: v.float() for k, v in _ck["state"].items()}
+    SAE_K = int(_ck["k"])
+    _sf = pd.read_csv(A / "sae_features.csv").set_index("feature")
+    SAE_NAME = {int(f): " · ".join(h.rsplit(" (", 1)[0] for h in str(m).split(" | ")[:3]) for f, m in _sf.mesh.items()}
+
+
+def ideas(v: np.ndarray, n=6) -> list:
+    """Top active SAE features of a point (direction only: the SAE was trained on unit-average-length inputs)."""
+    if SAE is None: return []
+    x = torch.from_numpy((v / max(np.linalg.norm(v), 1e-9)).astype(np.float32))[None]
+    pre = torch.relu((x - SAE["b_dec"]) @ SAE["W_enc"].T + SAE["b_enc"])[0]
+    val, idx = pre.topk(n)
+    return [dict(feature=int(i), act=round(float(a), 3), name=SAE_NAME.get(int(i), "")) for a, i in zip(val, idx) if a > 0]
 # topic graph: each topic to its 10 nearest; edge weight 1 - cos
 sim = Tn @ Tn.T; np.fill_diagonal(sim, -1)
 nb = np.argsort(-sim, 1)[:, :10]
@@ -93,7 +110,7 @@ def describe(v: np.ndarray, n_papers=8, pop="paper") -> dict:
     ps = (Xc @ torch.from_numpy(vn)).numpy(); pi = np.argpartition(-ps, 40)[:40]; pi = pi[np.argsort(-ps[pi])]
     m_, s_ = CSTAT if pop == "concept" else PSTAT
     z = (v @ AV.T - m_) / s_
-    coords = {a["id"]: round(float(z[i]), 2) for i, a in enumerate(AX) if a["kind"] != "analogy"}
+    coords = {a["id"]: round(float(z[i]), 2) for i, a in enumerate(AX) if "analogy" not in a["kind"]}
     return dict(
         topics=[dict(topic=int(t), label=str(TOP.label[t]), blurb=str(TOP.blurb[t]), sim=round(float(ts[t]), 3),
                      size=int(TOP["size"][t])) for t in ti],
@@ -101,7 +118,7 @@ def describe(v: np.ndarray, n_papers=8, pop="paper") -> dict:
         papers=[dict(pmid=int(p_pmid[i]), year=int(p_year[i]), title=str(titles[i]), sim=round(float(ps[i]), 3),
                      topic=str(TOP.label[p_topic[i]])) for i in pi[:n_papers]],
         xy=[float(np.median(p_x[pi[:15]])), float(np.median(p_y[pi[:15]]))],
-        nearest_paper=round(float(ps[pi[0]]), 3), coords=coords)
+        nearest_paper=round(float(ps[pi[0]]), 3), coords=coords, ideas=ideas(v))
 
 
 app = FastAPI(); app.add_middleware(GZipMiddleware, minimum_size=2000)
@@ -170,7 +187,7 @@ def walk(q: Q):
     if q.axis not in AXI: raise HTTPException(400, "unknown axis")
     v, lab, pop = point(q.start); i = AXI[q.axis]; ax = AV[i]
     # one step = one sd of the start's own population on this axis (analogy themes: one typical hop)
-    u = AX[i]["unit"] if AX[i]["kind"] == "analogy" else float((CSTAT if pop == "concept" else PSTAT)[1][i])
+    u = AX[i]["unit"] if "analogy" in AX[i]["kind"] else float((CSTAT if pop == "concept" else PSTAT)[1][i])
     out = []
     for s in q.steps:
         d = describe(v + s * u * ax, n_papers=4, pop=pop); d["step"] = s; out.append(d)
