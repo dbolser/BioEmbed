@@ -312,3 +312,22 @@ bge-base-gaf − bge-base +0.015 (p = 0.11, 7/12).
   abstracts), which stays local. Every commit hash changed; author and commit dates did not.
   Hashes cited in the docs were updated; the full old → new map is
   `docs/history/commit-map-20261104.txt`.
+- 2026-11-04 (two exploratory sensitivity checks, registered before running; Dan's go-ahead).
+  Neither adds a claim or changes the Holm family; both are reported as observations.
+  (1) **Probe re-check.** `llm/probe_loop_recheck.py` as written: the 13 v2 probe replies that
+  did not stop (12 Gemini, 10 on test pairs; 1 DeepSeek) re-sent once at temperature 1, scored by
+  the probe's own rule, budget $0.20. Read-out: how Gemini's memorised test-pair count (9 at
+  temperature 0) would move. C4 stays dropped whatever it shows: its 15-pair rule was applied to
+  the registered temperature-0 probe on 2026-10-16.
+  (2) **No-test-disease fine-tunes.** Does allowing test and practice diseases (with other genes)
+  in training explain our fine-tunes' gains? The chosen recipe (silver-n3: train_silver, 3 hard
+  negatives, seed 42, settings as `scripts/gcp_jobs/hs-ft.txt`) retrained on
+  `data/finetune_gd/no_test_disease/` (no training pair uses a test or practice disease or its
+  twin), for bge-base-en-v1.5 (test haystack) and the MedCPT cross-encoder (reranking the C1 first
+  pass's top 100 on test); jobs in `scripts/gcp_jobs/hs-ntd.txt`. Their new top-10 items are
+  graded by both judges with `llm/judge_pool.py`, as for runs added later. Read-out, against the
+  matching seed-42 model: graded nDCG@10 (both judges; for the cross-encoder also on DeepSeek's
+  grades, beside the Gemini rerank as in C8) and curator-only nDCG@10, each with a paired
+  bootstrap 95% interval over pairs (10,000 resamples, seed 0). No p-values. A gap of 0.02 or
+  less on graded nDCG@10 is read as "the gain does not depend on test diseases"; a larger drop is
+  reported as a limitation of C5, C6 and C8.

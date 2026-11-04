@@ -53,7 +53,8 @@ DEPTH = 100
 CHUNK_QUERIES = 10  # cache part size
 PAIR_MODELS = ["ncbi/MedCPT-Cross-Encoder", "BAAI/bge-reranker-v2-m3", "BAAI/bge-reranker-base"]
 FINETUNED = {"bioembed/medcpt-ce-gd-s42": "ncbi/MedCPT-Cross-Encoder",  # fine-tune -> base
-             "bioembed/bge-reranker-base-gd-s42": "BAAI/bge-reranker-base"}
+             "bioembed/bge-reranker-base-gd-s42": "BAAI/bge-reranker-base",
+             "bioembed/medcpt-ce-gd-ntd-s42": "ncbi/MedCPT-Cross-Encoder"}  # no-test-disease check (PREREG 2026-11-04)
 QWEN_MODELS = ["Qwen/Qwen3-Reranker-0.6B", "Qwen/Qwen3-Reranker-4B"]
 QWEN_INSTRUCTION = "Given a web search query, retrieve relevant passages that answer the query"
 QWEN_PREFIX = ("<|im_start|>system\nJudge whether the Document meets the requirements based on "
