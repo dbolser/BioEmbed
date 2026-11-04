@@ -32,3 +32,10 @@ data/tasks/**/cache-*.arrow
 
 # Paper build output (scripts/build_paper.sh)
 docs/paper/build/
+
+# Third-party text: PubMed abstracts and LLM prompts that contain them stay local (purged from history 2026-11-04)
+data/tasks/*/corpus/
+!data/tasks/R2MEDBiologyPooled/corpus/
+data/tasks/BioMeSHClassification/train/
+data/tasks/BioMeSHClassification/test/
+labeller/items_*.parquet
