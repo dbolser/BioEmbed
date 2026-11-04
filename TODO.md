@@ -33,8 +33,19 @@ So: two papers, one tool. New ideas go under a paper or wait in "Later".
 - [ ] A static version of the MedEmbed map on GitHub Pages: background image, cluster names, and per-gene dots from
       precomputed files (the full search needs the server).
 - [ ] Clean the gene tags (from step 2), then rebuild the corpus, maps and scores.
+- [ ] genesearch, disease specificity: rank down papers tagged with many diseases, e.g. an information-content
+      weight (fewer diseases tagged = more specific), next to the yes/no "named in the title or abstract" filter.
+- [ ] genesearch, review filter: show only (or hide) review papers. Europe PMC gives a publication type
+      (`pubTypeList`, e.g. "review") and PubMed has the "Review" publication type.
+- [ ] genesearch, hybrid ranking: show the semantic similarity (and BM25 score) as well as the two ranks. Today
+      semantic mode shows "semantic match 0.79" but hybrid mode only "semantic rank 5", so the strength is hidden.
 
 ## Later (not now)
 
+- genesearch, design question: can a reader tell "a tenuous link supported by a couple of papers" from "core
+  disease biology"? A ranked list always has a top paper, whatever the query. Options: how many of the disease's
+  papers match well (above a similarity threshold), compared with the same query's rate over all papers (an
+  enrichment, like the specificity weight above); or a clear "few matches" message. Raised while linking the
+  IUK-IPF term labeller to genesearch with a term's name and definition as the query.
 - Cross-model geometry (E) beyond PubMedBERT; Leiden and 384-D cosine HDBSCAN baselines; seeds and error bars
   (all in `geometry/TODO.md`).
