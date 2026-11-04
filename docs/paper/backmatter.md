@@ -16,7 +16,7 @@ git-ignored.
 fine-tuned models are released; PubMed abstract texts are not (NLM and
 publisher terms). Each released file lists PMIDs, so the texts can be
 fetched from PubMed. Code is cited at commit
-`67e649c6b8379613ec2dfa2681c7d4a29cf546ec` <!-- git rev-parse HEAD on main, 2026-11-03 -->
+`e5a90adb8185e0c438abd36799fc9a88ed19d5e1` <!-- git rev-parse HEAD on main, 2026-11-03 -->
 of <https://github.com/dbolser/BioEmbed> (public) <!-- gh repo view: visibility PUBLIC -->.
 When this was written the working tree held uncommitted edits, so the commit
 to cite is the one that holds the final paper: TODO(check). An archived copy
@@ -51,7 +51,7 @@ quote abstracts, in `input_text` <!-- git ls-files llm/llm_results -->.
 R2MEDBiologyPooled holds non-PubMed passages, not abstracts <!-- data/tasks/R2MEDBiologyPooled/corpus: _id values are file paths, titles empty; manifest.json: from R2MED/Biology -->.
 `items_calibration.parquet` also holds each item's stratum (curator, silver
 or unlabelled) and repeat flag. It has been in the public repo since commit
-157de0f (2026-10-17) <!-- git log --diff-filter=A -- labeller/items_calibration.parquet; git branch -r --contains 157de0f: origin/main; gh repo view: PUBLIC -->,
+70d23ff (2026-10-17) <!-- git log --diff-filter=A -- labeller/items_calibration.parquet; git branch -r --contains 70d23ff: origin/main; gh repo view: PUBLIC -->,
 so the calibration design is already public. Removing these files from the
 current tree does not remove them from git history.
 
@@ -77,7 +77,7 @@ and confirm each one consents to being named.
 TODO(check): compute and credits to acknowledge (Google Cloud, OpenRouter).
 
 TODO(check): AI-assistance statement. 112 of the 120 commits up to
-`67e649c` carry a `Co-Authored-By: Claude` trailer <!-- git log --format=%B | grep -c "^Co-Authored-By: Claude"; git rev-list --count HEAD -->;
+`e5a90ad` carry a `Co-Authored-By: Claude` trailer <!-- git log --format=%B | grep -c "^Co-Authored-By: Claude"; git rev-list --count HEAD -->;
 code and drafts were written with Claude Code (Anthropic). Wording, and
 whether the journal or bioRxiv asks for it in a set place: TODO(check).
 
@@ -159,10 +159,10 @@ is not a model.
 
 | Model | Used in | API id (route) | Parameters | Licence or terms | Reference |
 |---|---|---|---|---|---|
-| DeepSeek-V4-Flash | R S P J B | `deepseek/deepseek-v4-flash` (OpenRouter; pinned to provider Baidu, no fallback, for R, S, P and J; the suite run B was not pinned) <!-- pin: llm/judge_pool.py, rerank_haystack_llm.py, run_gdv2_llm.py, closed_book_probe.py; none in llm/run_bio_llm.py, llm_common.py, tasks_bio.py; pin first added in 2d0d111 (2026-10-15), suite results committed 2026-09-12 (4ad513c, d2cb569) -->; weights `deepseek-ai/DeepSeek-V4-Flash` | 284B total, 13B active (MoE) | Weights MIT; API use under OpenRouter's terms: TODO(check) <!-- ids: llm/judge_pool.py JUDGES, llm/rerank_haystack_llm.py MODELS; OpenRouter /api/v1/models hugging_face_id; params and licence: HF card --> | TODO(ref) |
+| DeepSeek-V4-Flash | R S P J B | `deepseek/deepseek-v4-flash` (OpenRouter; pinned to provider Baidu, no fallback, for R, S, P and J; the suite run B was not pinned) <!-- pin: llm/judge_pool.py, rerank_haystack_llm.py, run_gdv2_llm.py, closed_book_probe.py; none in llm/run_bio_llm.py, llm_common.py, tasks_bio.py; pin first added in be59e8f (2026-10-15), suite results committed 2026-09-12 (4ad513c, f65a723) -->; weights `deepseek-ai/DeepSeek-V4-Flash` | 284B total, 13B active (MoE) | Weights MIT; API use under OpenRouter's terms: TODO(check) <!-- ids: llm/judge_pool.py JUDGES, llm/rerank_haystack_llm.py MODELS; OpenRouter /api/v1/models hugging_face_id; params and licence: HF card --> | TODO(ref) |
 | Gemini 3.1 Flash-Lite | R S P J B (C1, C3a, C3b, C8) | `google/gemini-3.1-flash-lite` (OpenRouter) | not disclosed | Proprietary, no released weights; API terms: TODO(check) <!-- ids: llm/judge_pool.py JUDGES; OpenRouter /api/v1/models: no hugging_face_id --> | TODO(ref) |
 | Gemini 3.1 Pro (preview) | B (C9) | `google/gemini-3.1-pro-preview` (Vertex AI, OpenAI-compatible endpoint) | not disclosed | Proprietary, no released weights; Google Cloud terms: TODO(check) <!-- id: llm/.env.vertex model; C9: results/claims.csv arm_a; OpenRouter /api/v1/models: no hugging_face_id --> | TODO(ref) |
-| Qwen3.6-35B-A3B | B (our run of 4 of its 11 tasks) | `qwen/qwen3.6-35b-a3b`; weights `Qwen/Qwen3.6-35B-A3B` | 35B total, 3B active (MoE) | Apache-2.0 <!-- runs: results/bio_scores.csv source=ours (4 rows); params and licence: HF card; route via OpenRouter inferred from commit d2cb569 message, not recorded: TODO(check) --> | TODO(ref) |
+| Qwen3.6-35B-A3B | B (our run of 4 of its 11 tasks) | `qwen/qwen3.6-35b-a3b`; weights `Qwen/Qwen3.6-35B-A3B` | 35B total, 3B active (MoE) | Apache-2.0 <!-- runs: results/bio_scores.csv source=ours (4 rows); params and licence: HF card; route via OpenRouter inferred from commit f65a723 message, not recorded: TODO(check) --> | TODO(ref) |
 
 Qwen3.6-35B-A3B appears in the suite figure but not in `methods.md`. Keep
 it in the paper or drop it: TODO(check).

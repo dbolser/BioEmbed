@@ -205,11 +205,11 @@ def run(short: str, batches: list[int], limit: int | None, budget: float) -> Non
         scores = asyncio.run(ev.evaluate_async())
         rows = []
         for qid in queries:
-            ranked, raw = ev.records[qid]
+            ranked, _raw = ev.records[qid]  # raw reply stays in raw_path (git-ignored): it quotes abstracts
             gold = next(d for d, s in task._qrels[qid].items() if s > 0)
             path = proxy.paths[qid]
             rows.append({"task": task_name(b), "batch": b, "qid": qid, "gold": gold, "ranked_ids": ranked,
-                         "hit1": bool(ranked) and ranked[0] == gold, **usage_row(path), "raw": raw,
+                         "hit1": bool(ranked) and ranked[0] == gold, **usage_row(path),
                          "raw_path": str(path.relative_to(REPO_ROOT))})
         df = pd.DataFrame(rows)
         u = scores["usage_stats"]

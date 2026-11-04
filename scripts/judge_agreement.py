@@ -5,13 +5,13 @@ Exact = same 0/1/2 grade. Relevant = same answer to "grade >= 1?" (PREREG); only
 "grade == 2?" (the check PREREG reports alongside). Pass-0 labels only (the first look);
 "dan, repeat" is Dan's pass 1 vs pass 0. Item ENSG00000008853|MONDO_0800491|29276004 is left out
 (PREREG 2026-10-19 12:31). Unsure labels are left out. Dan's labels are also split at the change to
-the human guide's wording (commit fde21fc, 2026-10-19 14:32 BST; PREREG 2026-10-19 14:32): "dan, old
+the human guide's wording (commit d7f7080, 2026-10-19 14:32 BST; PREREG 2026-10-19 14:32): "dan, old
 wording" is his first 16 labels, "dan, new wording" the rest.
 
 Also -> judge_agreement_overlap.csv (same labels, exclusions and pass-0 rule):
 - overlap: on the abstracts Dan and at least one colleague graded, how often a colleague matches Dan,
   next to how often the merged judge grade matches Dan. Counted per (abstract, colleague) pair, as in
-  the first computation (commit 3cb0969): an abstract two colleagues graded gives two pairs, and the
+  the first computation (commit ad7ede0): an abstract two colleagues graded gives two pairs, and the
   judges' match with Dan is counted once per pair too, so both rates use the same rows. The interval
   on judges minus colleague is a paired bootstrap over abstracts (all of an abstract's pairs move
   together), 10,000 resamples, seed 0, percentile 95%.

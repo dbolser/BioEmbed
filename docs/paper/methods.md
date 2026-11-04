@@ -249,7 +249,7 @@ The later runs' 6,917 new items, and Gemini's 4 missing ones, were graded on
 The test key holds 33,531 items, all graded by both judges (merged grade 0:
 20,564; 1: 5,755; 2: 7,212) <!-- data/haystack/GeneDiseaseHaystack/judgments.parquet, judgments_merged.parquet -->.
 Practice: 7,190 items over all 200 pairs, 7,189 merged, by 2026-10-16 22:00
-<!-- count recorded in commit 32ff6b1 (21:57); the request cache now gives 7,199 (DeepSeek) and 7,198 (Gemini) first grades before then: TODO(check) -->;
+<!-- count recorded in commit ba86db4 (21:57); the request cache now gives 7,199 (DeepSeek) and 7,198 (Gemini) first grades before then: TODO(check) -->;
 12,417 items, all graded by both judges, by 2026-10-17 06:43 <!-- data/haystack/GeneDiseaseHaystackDev/judgments.parquet: rows, mtime -->.
 The 4 test items and 1 practice item first left without a Gemini grade are
 all non-gold.
@@ -263,7 +263,7 @@ over curation label (gold, silver, unlabelled) by best pooled rank (1–3,
 <!-- labeller/items_calibration.parquet: stratum -->; the stratum is hidden.
 Choices of rubric, prompt or judges could be tuned on practice items only;
 the test items were built after the protocol was committed
-<!-- labeller/items_calibration.parquet: file mtime 2026-10-16 20:59 as recorded in the methods draft of commit 32ff6b1 (2026-10-16 21:57); the mtime is now 2026-10-26 (files re-touched); first in git at 157de0f, 2026-10-17 10:38; protocol commit d11cc65 20:58:27 -->.
+<!-- labeller/items_calibration.parquet: file mtime 2026-10-16 20:59 as recorded in the methods draft of commit ba86db4 (2026-10-16 21:57); the mtime is now 2026-10-26 (files re-touched); first in git at 70d23ff, 2026-10-17 10:38; protocol commit 7bc0897 20:58:27 -->.
 D.B. graded all 200 items and the 30 repeats; three colleagues graded
 overlapping blocks of whole rounds, with no repeats, 120 labels in all (50, 50
 and 20) <!-- docs/PREREG.md: change log 2026-10-19 16:00, 2026-11-03 -->.
@@ -336,7 +336,7 @@ MiniLM, e5-small, bge-small/base, MedEmbed-small/base, PubMedBERT and
 Qwen3-Embedding-0.6B have test runs (also bge-small-gaf and bge-base-gaf),
 picked when those runs were made on 2026-10-15 <!-- data/haystack/GeneDiseaseHaystack/runs/ -->.
 MedCPT, MedCPT by cosine, BiCA-small/base, embeddinggemma-300m,
-BMRetriever-410M and BioLORD-2023 were added on 2026-10-16 (commit cd52d2c)
+BMRetriever-410M and BioLORD-2023 were added on 2026-10-16 (commit 2f07fc5)
 and run on 2026-10-16 and 17, practice before test; the eight earlier models
 got their practice runs in the same days <!-- scripts/gcp_jobs/hs-q1.txt, hs-q2.txt, hs-q3.txt; data/gcp_logs/hs-q1, hs-q2, hs-q3/runner.log -->.
 bge-large, MedEmbed-large, snowflake-arctic-embed-l-v2.0 and F2LLM-v2-0.6B
@@ -646,7 +646,7 @@ TODO(prereg), TODO(result).
 selected on curator-only nDCG@10 <!-- docs/PREREG.md: change log 2026-10-15 22:45 -->,
 in its raw variant: BM25 and the fine-tune recipe were picked on raw. Graded
 practice labels existed by 2026-10-16 22:00 (about 7,190 merged grades over
-all 200 practice pairs; exact count TODO(check), see Grading done) <!-- docs/paper/methods.md as of commit 32ff6b1 -->, and
+all 200 practice pairs; exact count TODO(check), see Grading done) <!-- docs/paper/methods.md as of commit ba86db4 -->, and
 PREREG then registered graded practice nDCG@10 for the remaining picks, each
 made after the new runs' top 10 had been graded: the best embedder (C1, C2,
 C6, C7) and the best off-the-shelf reranker (C8, and from 2026-10-17 C1). The
@@ -692,7 +692,7 @@ general arm: bge-base-en-v1.5. C1 first pass: tuned BM25 fused with
 bge-base-en-v1.5. C1 reranker and C8 comparator: the Gemini 3.1 Flash-Lite
 rerank of the first pass's top 20. C8 fine-tuned arm: our fine-tuned MedCPT
 cross-encoder. No test claim result had been computed when these were
-recorded <!-- docs/paper/selections.md; commits 73a39df 05:19, 6a56101 06:44 -->.
+recorded <!-- docs/paper/selections.md; commits b1d1dbf 05:19, 0582604 06:44 -->.
 
 **Tests.** Haystack claims: two-sided paired sign-flip permutation test on
 per-pair nDCG@10, 10,000 random sign vectors (seed 0), exact over all 2^n
@@ -714,8 +714,8 @@ C4 dropped the family is nine tests: C1, C2, C3a, C3b, C5–C9 <!-- docs/PREREG.
 Comparisons with LLM-reranked runs use the no-self-grading grades. The
 family was run by `scripts/claims.py` from `docs/paper/claims_config.yaml`,
 which refuses to run while any claim lacks an arm, so the one run is the one
-look: 2026-10-17 10:36 (commit 1b7259d), after the config was filled from the
-practice picks (0eb60a9, 10:35) <!-- scripts/claims.py: docstring; git log -->.
+look: 2026-10-17 10:36 (commit b9d1e49), after the config was filled from the
+practice picks (8f29c05, 10:35) <!-- scripts/claims.py: docstring; git log -->.
 Results: Table 1 (`results/claims.csv`).
 
 **Uncertainty.** 95% percentile bootstrap intervals for each system and
@@ -737,7 +737,7 @@ TODO(result).
 
 **Disclosures.** The change log records results seen before a rule was
 fixed; commit times are the record. Draft 2 (2026-10-15 20:37, commit
-bbb9a7b) has no recorded sign-off as a whole; the two points PREREG left to
+4ebe0d6) has no recorded sign-off as a whole; the two points PREREG left to
 D.B., the rubric and the relevance threshold, were signed off on 2026-11-03,
 unchanged <!-- docs/PREREG.md: sign-off; change log 2026-11-03 -->. Before
 draft 2, the bug-fix reruns, the BM25 selection with one BM25 test run, and
@@ -747,37 +747,37 @@ also computed and looked at before the rules that use them:
 - Curator-only (condensed) test recall@10, recall@100 and nDCG@10 for ten
   dense runs (the eight above plus bge-small-gaf and bge-base-gaf), the
   mean-pooled MedCPT run and BM25 v1.3 were in RESULTS.md by 2026-10-15
-  16:59 (commits 9631d7f, 40e8b48), before draft 1 (18:18).
+  16:59 (commits 21f0bc5, e42cb81), before draft 1 (18:18).
 - Test bootstrap intervals and Holm-vs-best p-values for those runs and
-  tuned BM25 were committed at 22:37 (2d0d111) <!-- results/haystack/stats.csv, stats_pairs.csv; computed 2026-10-15 19:19 (mtime as recorded in commit 32ff6b1; now 2026-10-26) -->,
-  before the "similar size" rule (cdf1ff1, 22:38) and the C6 list (cd52d2c,
+  tuned BM25 were committed at 22:37 (be59e8f) <!-- results/haystack/stats.csv, stats_pairs.csv; computed 2026-10-15 19:19 (mtime as recorded in commit ba86db4; now 2026-10-26) -->,
+  before the "similar size" rule (c369f4e, 22:38) and the C6 list (2f07fc5,
   2026-10-16 20:47). The size rule excludes Qwen3-Embedding-0.6B, the best
   of these on test.
 - Ten fusion runs (made 2026-10-15 22:54) and the two LLM reranks of tuned
-  BM25 were scored curator-only on test by 2026-10-16 12:41 <!-- results/haystack/scores.csv mtime as recorded in commit 32ff6b1; now 2026-10-26; in git from cd52d2c, 2026-10-16 20:47 -->.
+  BM25 were scored curator-only on test by 2026-10-16 12:41 <!-- results/haystack/scores.csv mtime as recorded in commit ba86db4; now 2026-10-26; in git from 2f07fc5, 2026-10-16 20:47 -->.
 
 These touch C1 (first-pass candidates and best single embedder), C2, C5
 (bge-base), C6 (MedEmbed-base, PubMedBERT) and C7. Practice dense and fusion
 runs were made only afterwards, on 2026-10-16 and 17 <!-- data/gcp_logs/hs-q1, hs-q2, hs-q3/runner.log -->,
 and every "best" was picked on them (`selections.md`). The candidate sets,
-the tie rule and the C8 arms were registered on 2026-10-17 05:16 (540ef36),
+the tie rule and the C8 arms were registered on 2026-10-17 05:16 (842666d),
 after many test runs had been made <!-- data/gcp_logs/hs-q2, hs-q3, hs-ft/runner.log -->.
 On the small task, the test batches had been scored for all embedders, and
 both LLMs' test answers collected with their hit@1 printed (2026-10-15
 22:45–22:53; DeepSeek 0.817, Gemini 0.740) <!-- llm/llm_results/llm_v2/*/; llm/llm_results/logs/gdv2_*.log -->,
-before the practice tie was resolved (1540a28, 2026-10-16 16:29). So no
+before the practice tie was resolved (1090f3b, 2026-10-16 16:29). So no
 tie-break could be blind; hence C3a and C3b. The LLM pick (Gemini, best on
 practice) stands although DeepSeek scored higher on test.
 
 The test pool was graded on 2026-10-16 20:58–21:14, seconds after the
-protocol commit (d11cc65, 20:58:27), and the later runs' items on 2026-10-17
-10:27–10:35. The claims were then tested (10:36, 1b7259d), and graded test
-precision@10 and bpref at both thresholds were committed at 10:38 (8ba9f34)
+protocol commit (7bc0897, 20:58:27), and the later runs' items on 2026-10-17
+10:27–10:35. The claims were then tested (10:36, b9d1e49), and graded test
+precision@10 and bpref at both thresholds were committed at 10:38 (6c359f6)
 <!-- results/haystack/graded/stats.csv: p@10_ge1, p@10_ge2, bpref_ge1, bpref_ge2 -->.
 All of this came before the rubric and the relevance threshold were signed
 off. The 2026-10-16 draft required the threshold to be fixed before any
 graded test precision or bpref was computed; it was not, but the sign-off
-kept the default PREREG listed at the time, grade ≥ 1 <!-- git show 8ba9f34:docs/PREREG.md: Waiting on Dan -->.
+kept the default PREREG listed at the time, grade ≥ 1 <!-- git show 6c359f6:docs/PREREG.md: Waiting on Dan -->.
 Changes to the human labelling guide during labelling are under Human
 calibration. Departures from the PREREG rule that every setting is chosen on
 practice: model instructions are mteb's default and the fine-tune checkpoint

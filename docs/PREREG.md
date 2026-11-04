@@ -307,3 +307,8 @@ bge-base-gaf − bge-base +0.015 (p = 0.11, 7/12).
   labeller/index.html). Read-out: judges-vs-Dan exact agreement and the lower/higher split,
   (b) against (a). This does not change the answer key; whether to re-judge the pool on the
   human wording is a separate decision and would get its own entry first.
+- 2026-11-04 (record keeping, no rule changes): **git history rewritten** to remove third-party
+  text (PubMed abstract corpora, the labeller item files, LLM prompts and replies that quote
+  abstracts), which stays local. Every commit hash changed; author and commit dates did not.
+  Hashes cited in the docs were updated; the full old → new map is
+  `docs/history/commit-map-20261104.txt`.
