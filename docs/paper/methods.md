@@ -453,10 +453,10 @@ The probe ran on the test haystack, v1 and all v2 batches. C4 needed at least 15
 Gemini had 9, so C4 is dropped <!-- docs/PREREG.md: change log 2026-10-16; results/memorisation_probe.parquet -->.
 The 13 v2 probe replies that did not stop (12 Gemini, 10 of them on test
 pairs; 1 DeepSeek) <!-- llm/probe_loop_recheck.py; results/llm_v2/summary.csv: n_probe_cut -->
-were to be re-sent at temperature 1 as a sensitivity check
-(`llm/probe_loop_recheck.py`); this has not been run, as
-`results/llm_v2/probe_loop_recheck.parquet` does not exist: TODO(result). The
-registered label stands.
+were re-sent once at temperature 1 as a sensitivity check registered before it ran
+(`llm/probe_loop_recheck.py`; PREREG 2026-11-04). 12 of 13 stopped; none was scored memorised,
+so Gemini's memorised test pairs stay at 9 <!-- results/llm_v2/probe_loop_recheck.parquet; run 2026-11-04, $0.007 -->.
+The registered label stands.
 
 ## Fine-tuning
 
