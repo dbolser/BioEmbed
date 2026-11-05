@@ -18,6 +18,7 @@ import json
 import os
 import re
 import symtable
+import sys
 import threading
 import time
 import unicodedata
@@ -559,15 +560,16 @@ def naming_code() -> str:
 
 
 def named_stamp(diseases: bool = False) -> dict[str, str]:
-    """What a named table is valid for: a hash of naming_code(), whether it has the diseases, and the size and
-    modification time (whole seconds) of each index file naming reads, as make and rsync judge a file unchanged
-    (hashing 50 GB at every start is too slow). Kept in the table's metadata by build_named.py. Copy the index
-    files with their times (rsync -a, tar, scp -p): a new time makes the table stale, and the app counts live."""
+    """What a named table is valid for: a hash of naming_code() and the Python version (ast.dump's text changes
+    between versions: 3.13 leaves out empty fields), whether it has the diseases, and the size and modification time
+    (whole seconds) of each index file naming reads, as make and rsync judge a file unchanged (hashing 50 GB at every
+    start is too slow). Kept in the table's metadata by build_named.py. Copy the index files with their times
+    (rsync -a, tar, scp -p): a new time makes the table stale, and the app counts live."""
     def stat(f: str) -> str:
         return f"{(s := (IDX / f).stat()).st_size} bytes, {s.st_mtime_ns // 10**9}" if (IDX / f).exists() else "missing"
     files = NAMED_INPUTS + (("disease_pmids.parquet",) if diseases else ())
-    return {"code": hashlib.sha256(naming_code().encode()).hexdigest()[:16], "diseases": str(int(diseases)),
-            **{f: stat(f) for f in files}}
+    return {"code": hashlib.sha256(naming_code().encode()).hexdigest()[:16], "python": "%d.%d" % sys.version_info[:2],
+            "diseases": str(int(diseases)), **{f: stat(f) for f in files}}
 
 
 def load_named() -> tuple[dict[str, np.ndarray], str]:
@@ -924,7 +926,9 @@ def facet_names(*ids: str) -> dict[str, str]:
 
 @app.get("/api/paper")
 def api_paper(subject: str, pmid: int, term: str = ""):
-    """One paper as in the list (the map's click-through)."""
+    """One paper as in the list (the map's click-through): one of the subject's papers."""
+    if not (paper_set(subject).pmid.to_numpy() == pmid).any():
+        raise HTTPException(404, f"PMID {pmid} is not one of {subject}'s papers.")
     df = pd.DataFrame({"pmid": [pmid], "row": rows_for(np.array([pmid])), "bm25": np.nan, "sim": np.nan,
                        "kw_rank": np.nan, "sem_rank": np.nan})
     return describe(df, subject, term)[0]

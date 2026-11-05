@@ -10,9 +10,9 @@ axes you choose. `/about` lists the data and how the map is made.
    Then `uv run python build_named.py` (~4 min on the 754 GB box, 54 MB): 'Named in the abstract' for every gene,
    so a search reads no abstracts for it (on a cloud disk the live count took up to 2 min and held up the next
    search). Build it on a big machine and copy it to a server (with any index file that changed, keeping file
-   times: `rsync -a`): its 16 workers take up to ~5 GB each. Rerun it after changing the naming code or rewriting an
-   index file it reads (a new size or time): until then the app counts live, and its startup line and `/api/about`
-   say why (`named_stamp` in `app.py`).
+   times: `rsync -a`), with the server's Python version: its 16 workers take up to ~5 GB each. Rerun it after
+   changing the naming code or rewriting an index file it reads (a new size or time): until then the app counts
+   live, and its startup line and `/api/about` say why (`named_stamp` in `app.py`).
 2. Run: `cd genesearch && uv run python app.py --port 8766 --host 0.0.0.0`, then open http://localhost:8766
 3. Type a symbol, alias, old symbol or name (`/` jumps to the box); pick from the list if several genes match.
    Disease search (click the box's label): Open Targets diseases by name, synonym or PubTator3 wording
@@ -60,9 +60,9 @@ How it works
   'aquaporin 4' where papers write 'aquaporin-4', and a few names keep the letter ('β-actin'): a Greek letter and its
   name match each other, and any run of dashes and spaces matches any other (`loose` in `app.py` and in
   `index.html`). Each name's pattern goes to RE2 for the common ones and to Python's `re` for the long tail of rare
-  spellings (`word_re`), so both find the same papers. Before the Greek fix IFNG, TGFB1 and IL1B had about half
-  their naming papers missed; before the HGNC names, papers linked only by MeSH or curation that wrote
-  'aquaporin-4' counted as not naming AQP4.
+  spellings (`word_re`), so both find the same papers (but for a few with the Turkish ı or İ, which Python's `re`
+  takes for i). Before the Greek fix IFNG, TGFB1 and IL1B had about half their naming papers missed; before the HGNC
+  names, papers linked only by MeSH or curation that wrote 'aquaporin-4' counted as not naming AQP4.
 - A paper that does not name it says why it is listed, one sentence per source: PubTator3 tagged it in the full
   text (its words not being in the title or abstract), a curated source PubTator3 merges in (MeSH indexing,
   gene2pubmed, GeneRIF, CTD, BioGRID...: the `resource` column of `gene_pmids`/`disease_pmids`, `tag_sources` in

@@ -980,7 +980,7 @@ async function loadMap(push = true) {
     syncYear();
   }
   if (explore) wireAxes();
-  if (S.pmid) showMapPaper(S.pmid, !push);
+  openURLPaper(r.pmid, push);
   loadMapFacets(r);
   if (explore && S.ax && S.ay) await loadAxes(false);
   else drawMap();
@@ -1334,6 +1334,13 @@ function wirePlot(el) {  // once per plot element; the handlers read the current
 }
 
 // A dot clicked on any map: its paper opens under the map, and goes in the URL (pmid=), so the link reopens it.
+// A pmid= that isn't a dot on this map (a link edited by hand, or from another map) is dropped.
+function openURLPaper(pmids, push) {
+  if (!S.pmid) return;
+  if (pmids.includes(+S.pmid)) return showMapPaper(S.pmid, !push);
+  S.pmid = "";
+  writeURL(false);
+}
 function pickMapPaper(pmid) {
   S.pmid = String(pmid);
   writeURL(false);
@@ -1425,7 +1432,7 @@ async function loadLand(push = true) {
     $("plot").scrollIntoView({behavior: "smooth", block: "nearest"});
   });
   landZoom = 1;
-  if (S.pmid) showMapPaper(S.pmid, !push);
+  openURLPaper(L.pmid, push);
   return drawLand();
 }
 
