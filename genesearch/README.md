@@ -7,10 +7,12 @@ axes you choose. `/about` lists the data and how the map is made.
 
 1. Build the index once (~10-15 min, 61 GB in `index/`; needs `data/gold/ot_curated_gene_disease_pmid.parquet`
    from the gene-disease work): `cd genesearch && uv run python build_index.py`.
-   Then `uv run python build_named.py` (~4 min on the 754 GB box, 54 MB): 'Named in the abstract' for every gene,
-   so a search reads no abstracts for it (on a cloud disk the live count took up to 2 min and held up the next
-   search). Build it on a big machine and copy it to a server (with any index file that changed, keeping file
-   times: `rsync -a`), with the server's Python version: its 16 workers take up to ~5 GB each. Rerun it after
+   Then `uv run python build_named.py` (~1 h on the 754 GB box, 369 MB; ~0.9 GB in the app's memory): 'Named in
+   the abstract' for every gene and disease, so a search reads no abstracts for it (on a cloud disk the live count
+   took up to 2 min for a gene and held up the next search; breast cancer took 18 s of CPU). `--genes-only`: the
+   genes alone in ~4 min (54 MB), diseases then counted live. Build it on a big machine and copy it to a server
+   (with any index file that changed, keeping file times: `rsync -a`), with the server's Python version: its 16
+   workers take up to ~5 GB each for a gene, more for the biggest diseases (neoplasm: 4.4M papers). Rerun it after
    changing the naming code or rewriting an index file it reads (a new size or time): until then the app counts
    live, and its startup line and `/api/about` say why (`named_stamp` in `app.py`).
 2. Run: `cd genesearch && uv run python app.py --port 8766 --host 0.0.0.0`, then open http://localhost:8766
