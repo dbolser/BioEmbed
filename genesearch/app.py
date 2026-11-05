@@ -155,6 +155,7 @@ def gene_info(row: int) -> dict:
     return {
         "hgnc_id": g["hgnc_id"], "symbol": g["symbol"], "name": g["name"],
         "aliases": _split(g["alias_symbol"]), "prev": _split(g["prev_symbol"]),
+        "alias_names": _split(g["alias_name"]), "prev_names": _split(g["prev_name"]),
         "entrez": None if pd.isna(g["entrez_id"]) else int(g["entrez_id"]),
         "ensembl": g["ensembl_gene_id"] if isinstance(g["ensembl_gene_id"], str) else None,
         "location": _str(g["location"]), "locus_group": _str(g["locus_group"]), "n_papers": int(g["n_papers"]),
@@ -341,11 +342,23 @@ def paper_set(subject: str, ot: str = "", ep: str = "") -> pd.DataFrame:
 
 
 def subject_names(s: dict) -> list[str]:
-    """Names looked for in every paper of a gene: its symbol, HGNC aliases and previous symbols (a
-    disease: its name and Open Targets synonyms). Of 3 letters or more but the symbol: shorter ones hit
-    other things (CF, CFTR's old symbol, is everywhere in cystic fibrosis papers)."""
-    more = [*s["aliases"], *s["prev"]] if s["kind"] == "gene" else s["synonyms"]
+    """Names looked for in every paper of a gene: its symbol, HGNC aliases and previous symbols, and its
+    HGNC names (gene_names); a disease: its name and Open Targets synonyms. Of 3 letters or more but the
+    symbol: shorter ones hit other things (CF, CFTR's old symbol, is everywhere in cystic fibrosis papers)."""
+    more = [*s["aliases"], *s["prev"], *gene_names(s)] if s["kind"] == "gene" else s["synonyms"]
     return [w for w in dict.fromkeys([s["label"], *(m for m in more if len(m) >= 3)]) if len(w) > 1]
+
+
+DISEASE_WORDS = re.compile(r"syndrome|disease|deficiency|disorder|an(?:a)?emia|dystroph|dysplasia|ataxia|"
+                           r"susceptib|complementation group|cancer|carcinoma|leuka?emia|tumou?r", re.IGNORECASE)
+
+
+def gene_names(s: dict) -> list[str]:
+    """A gene's HGNC names: its approved name ('aquaporin 4'), and its alias and previous names that
+    aren't a disease's (TP53's alias name 'Li-Fraumeni syndrome' names the disease, not the gene)."""
+    def disease(n):
+        return n.upper() in D_NAME or n.upper() in D_SYNONYM or DISEASE_WORDS.search(n)
+    return [s["name"], *(n for n in [*s["alias_names"], *s["prev_names"]] if not disease(n))]
 
 
 def subject_words(s: dict, mentions) -> list[str]:
@@ -364,23 +377,23 @@ def any_case(word: str) -> bool:
 
 
 # PubTator3 writes Greek letters as names ('TGF-beta1' for TGF-β1, 'TNFalpha') and Unicode dashes and spaces as
-# plain ones: a word's RE2 pattern lets each of them match what the paper wrote (loose; index.html's loose() is the
-# same), and the long tail of rare words is matched in text folded to PubTator3's spelling (fold).
+# plain ones, and HGNC writes 'aquaporin 4' where papers write 'aquaporin-4': a word's RE2 pattern lets each Greek
+# name match its letter, and any run of dashes and spaces match any other (loose; index.html's loose() is the same).
+# The long tail of rare words is matched in text folded the same way (fold).
 GREEK = {"alpha": "αΑ", "beta": "βϐΒ", "gamma": "γΓ", "delta": "δΔ", "epsilon": "εϵΕ", "zeta": "ζΖ", "eta": "ηΗ",
          "theta": "θϑΘ", "iota": "ιΙ", "kappa": "κϰΚ", "lambda": "λΛ", "mu": "μµΜ", "nu": "νΝ", "xi": "ξΞ",
          "omicron": "οΟ", "pi": "πϖΠ", "rho": "ρϱΡ", "sigma": "σςΣ", "tau": "τΤ", "upsilon": "υΥ", "phi": "φϕΦ",
          "chi": "χΧ", "psi": "ψΨ", "omega": "ωΩ"}
-DASH, SPACE = "[-\u2010-\u2015\u2212]", "[\\s\u00a0\u2000-\u200a\u202f\u205f\u3000]+"
-LOOSE = re.compile(rf"({'|'.join(sorted(GREEK, key=len, reverse=True))})|(-)|(\s+)", re.IGNORECASE)
+SEP = "[-\u2010-\u2015\u2212\\s\u00a0\u2000-\u200a\u202f\u205f\u3000]+"  # (RE2's \s is ASCII only)
+LOOSE = re.compile(rf"({'|'.join(sorted(GREEK, key=len, reverse=True))})|([-\s]+)", re.IGNORECASE)
 
 
 def loose(word: str) -> str:
-    """Regex for a word as PubTator3 wrote it: its Greek letter names, hyphens and spaces also match their
-    Unicode forms."""
+    """Regex for a word as PubTator3 or HGNC wrote it: its Greek letter names also match the letters, and
+    each run of hyphens and spaces any run of dashes and spaces."""
     parts, last = [], 0
     for m in LOOSE.finditer(word):
-        parts += [re.escape(word[last:m.start()]),
-                  f"(?:{re.escape(m[1])}|[{GREEK[m[1].lower()]}])" if m[1] else DASH if m[2] else SPACE]
+        parts += [re.escape(word[last:m.start()]), f"(?:{re.escape(m[1])}|[{GREEK[m[1].lower()]}])" if m[1] else SEP]
         last = m.end()
     return "".join(parts) + re.escape(word[last:])
 
@@ -391,15 +404,18 @@ def names_re(words) -> str:
     return rf"(?:^|[^\pL\pN])(?:{alts})(?:[^\pL\pN]|$)"
 
 
-FOLD = {**{c: name for name, cs in GREEK.items() for c in cs}, **dict.fromkeys("\u2010\u2011\u2012\u2013\u2014\u2015\u2212", "-")}
-TO_FOLD = re.compile(f"[{''.join(FOLD)}]|\\s{{2,}}|[^\\S ]")  # a run of spaces, or one that isn't ' '
+FOLD = {c: name for name, cs in GREEK.items() for c in cs}
+DASHES = "-\u2010\u2011\u2012\u2013\u2014\u2015\u2212"
+TO_FOLD = re.compile(f"[{''.join(FOLD)}]|[{DASHES}\\s]{{2,}}|[{DASHES}]|[^\\S ]")  # (not a lone ' ': most matches)
 
 
 def fold(text: str) -> str:
-    """Text in PubTator3's spelling, for plain matching (what loose() does in a pattern): Greek letters as names,
-    Unicode dashes as '-', each run of spaces as one space."""
-    if text.isascii() and text.isprintable() and "  " not in text:  # most texts: nothing to fold (fast checks)
-        return text
+    """Text for plain matching, as loose() matches in a pattern: Greek letters as names, each run of dashes and
+    spaces as one space."""
+    if text.isascii():
+        text = text.replace("-", " ")
+        if text.isprintable() and "  " not in text:  # most texts: nothing more to fold (fast checks)
+            return text
     return TO_FOLD.sub(lambda m: FOLD.get(m[0], " "), text)
 
 
@@ -1056,6 +1072,9 @@ def api_about():
     source paths build_index.py read."""
     rows = lambda f: pq.ParquetFile(IDX / f).metadata.num_rows
     full = semantic.full_index()
+    by_source = CURATED.explode("sources")
+    sizes = lambda d: {"links": len(d), "papers": int(d.pmid.nunique()), "pairs": int(d[["ensembl", "disease_id"]].drop_duplicates().shape[0])}
+    ep_papers, ep_pairs = db().execute(f"SELECT count(DISTINCT pmid), count(DISTINCT (ensembl, disease_id)) FROM '{IDX}/epmc.parquet'").fetchone()
     llm = litmap._llm_config()
     return {
         "pubmed": {"n": len(PMIDS)},
@@ -1065,7 +1084,8 @@ def api_about():
         "opentargets": {"version": Path(build_index.OT).name, "curated_links": len(CURATED),
                         "curated_papers": int(CURATED.pmid.nunique()),
                         "curated_pairs": int(CURATED[["ensembl", "disease_id"]].drop_duplicates().shape[0]),
-                        "epmc_links": rows("epmc.parquet")},
+                        "by_source": {k: sizes(d) for k, d in by_source.groupby("sources")},
+                        "epmc_links": rows("epmc.parquet"), "epmc_papers": ep_papers, "epmc_pairs": ep_pairs},
         "diseases": {"n": len(DISEASES), "n_pubtator_only": int(DISEASES.disease_id.str.match(r"MESH:|OMIM:").sum())},
         "embeddings": {"model": semantic.MODEL, "revision": semantic.REVISION, "dim": semantic.DIM,
                        "n": None if full is None else len(full.pmids)},

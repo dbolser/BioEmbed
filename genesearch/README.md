@@ -24,7 +24,7 @@ axes you choose. `/about` lists the data and how the map is made.
    topic, Esc clears; "Drill in" re-maps one topic's papers. **Map Explorer**: each axis is closeness in meaning to
    your words or to a topic's centre (cosine of the MedEmbed vectors). "Download CSV" saves the whole list. URLs are
    shareable (`?gene=CFTR&q=sweat+chloride&rank=hybrid`, `?disease=cystic+fibrosis`, `&ot=any`, `&ep=<id>`, `&named=1`, `&view=map&topic=3`,
-   `&view=explore&ax=cancer&ay=topic:2`).
+   `&view=explore&ax=cancer&ay=topic:2`, `&view=map&pmid=27083884`: the paper clicked on a map, opened under it).
 7. **PubMedBERT map** tab (`&view=landscape`): the current list (facets applied) on the published map of PubMed by
    González-Márquez et al. (Patterns 2024): PubMedBERT embeddings of 23.4M abstracts, t-SNE to 2-D, fields from the
    journal. Behind the dots: its 6.26M human-gene papers (PubTator3 tags of HGNC genes) in their field colours. The map
@@ -46,11 +46,15 @@ How it works
 - Semantic: `abhinand/MedEmbed-small-v0.1` (loaded as `eval/run_embedders.py` does: CLS pooling, normalised,
   no query prompt). Query = the ranking words; papers = `title\n\nabstract`; cosine similarity (`semantic.py`).
   Hybrid = reciprocal-rank fusion, 1/(60 + keyword rank) + 1/(60 + semantic rank).
-- Named in the abstract: the paper's PubTator3 mentions of the gene (or disease) plus its symbol (name), found
-  whole in the title or abstract, as the page highlights them (`named_pmids` in `app.py`). PubTator3 writes Greek
-  letters as names and Unicode dashes and spaces as plain ones ('TGF-beta1' for TGF-β1): both spellings match
-  (`loose`/`fold` in `app.py`, `loose` in `index.html`). Before this, IFNG, TGFB1 and IL1B had about half their
-  naming papers missed.
+- Named in the abstract: the paper's PubTator3 mentions of the gene (or disease) plus its symbol, aliases,
+  previous symbols and HGNC names (a disease: name and synonyms), found whole in the title or abstract, as the page
+  highlights them (`named_pmids` in `app.py`). HGNC names: the approved name ('aquaporin 4') and the alias and
+  previous names that aren't disease names (`gene_names`: TP53's alias name is 'Li-Fraumeni syndrome'). PubTator3
+  writes Greek letters as names and Unicode dashes and spaces as plain ones ('TGF-beta1' for TGF-β1), and HGNC
+  writes 'aquaporin 4' where papers write 'aquaporin-4': Greek names match their letters, and any run of dashes and
+  spaces matches any other (`loose`/`fold` in `app.py`, `loose` in `index.html`). Before the Greek fix IFNG, TGFB1
+  and IL1B had about half their naming papers missed; before the HGNC names, papers linked only by MeSH or
+  curation that wrote 'aquaporin-4' counted as not naming AQP4.
 - A paper that does not name it says why it is listed, one sentence per source: PubTator3 tagged it in the full
   text (its words not being in the title or abstract), a curated source PubTator3 merges in (MeSH indexing,
   gene2pubmed, GeneRIF, CTD, BioGRID...: the `resource` column of `gene_pmids`/`disease_pmids`, `tag_sources` in

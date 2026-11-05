@@ -7,7 +7,7 @@
 <style>
   :root {
     --bg: #ffffff; --fg: #1d1d1f; --muted: #555; --line: #d8d8d8; --panel: #f4f5f7;
-    --gene: #005a8c; --term-bg: #ffe39a; --term-line: #9a4a00; --cur: #00664a; --ep: #5b3a96; --focus: #0072b2;
+    --gene: #005a8c; --gene-bg: #d3e6f5; --term-bg: #ffe39a; --term-line: #9a4a00; --cur: #00664a; --ep: #5b3a96; --focus: #0072b2;
   }
   body.cream { --bg: #fbf5e6; --panel: #f1e9d4; --line: #d9cfb6; }
   * { box-sizing: border-box; }
@@ -119,7 +119,7 @@
   details.tags > summary { display: inline; cursor: pointer; color: var(--muted); font-size: .9rem; margin-left: .2rem; }
   details.tags[open] > summary { display: block; }
   .abstract { white-space: pre-line; max-width: 70ch; margin: .4rem 0 0; }
-  mark.g { background: none; color: var(--gene); font-weight: bold; text-decoration: underline 2px solid; text-underline-offset: 3px; }
+  mark.g { background: var(--gene-bg); color: inherit; font-weight: bold; border-radius: 3px; padding: 0 .1em; }
   mark.t { background: var(--term-bg); color: inherit; text-decoration: underline 2px dashed var(--term-line); text-underline-offset: 3px; }
   nav.pager { display: flex; gap: .6rem; align-items: center; margin-top: 1rem; }
   /* map */
@@ -216,7 +216,7 @@ let S = {};
 let G = null;    // the current gene or disease, from /api/subject: id, kind ("gene", "disease"), label, ...
 let MODE = "gene";  // what the first box searches for
 let reqNo = 0;   // bumps on every new request; stale answers and polls are dropped
-const KEYS = ["gene", "disease", "q", "ot", "ep", "named", "ymin", "ymax", "sort", "match", "rank", "view", "topic", "ax", "ay"];
+const KEYS = ["gene", "disease", "q", "ot", "ep", "named", "ymin", "ymax", "sort", "match", "rank", "view", "topic", "ax", "ay", "pmid"];
 const DN = {};   // facet id -> name (from the facets, paper chips and the server)
 const dname = (id) => DN[id] || id;
 const rank = () => S.rank || "semantic";
@@ -226,6 +226,7 @@ function readURL() {
   const p = new URLSearchParams(location.search);
   S = Object.fromEntries(KEYS.map((k) => [k, p.get(k) || ""]));
   S.page = +(p.get("page") || 1);
+  S.pmid = S.pmid.replace(/\D/g, "");  // (the paper open under a map; "PMID_123" works too)
   // Older links: rank=meaning (now semantic, the default; so are old links with words and no rank,
   // which meant keywords then); src=curated|epmc + disease (+ dname) for a gene's disease facet,
   // cur=1 (curated papers only)
@@ -280,7 +281,7 @@ function progressHTML(p, n) {  // n = how many papers the work is on, when the s
   </div>`;
 }
 
-// ---- highlighting: gene mentions (blue, solid underline) and search words (yellow, dashed underline)
+// ---- highlighting: gene mentions (bold, pale blue) and search words (yellow, dashed underline)
 // Gene symbol and short or all-caps mentions match case-sensitively (WAS must not mark "was",
 // IMPACT not "impact"); longer mixed-case mentions ("tumor protein p53") and search words ignore case.
 const anyCase = (w) => [...w].map((c) => {
@@ -288,15 +289,16 @@ const anyCase = (w) => [...w].map((c) => {
   return l === u || l.length > 1 || u.length > 1 ? reEsc(c) : `[${l}${u}]`;
 }).join("");
 // PubTator3 writes Greek letters as names ("TGF-beta1" for TGF-β1, "TNFalpha") and Unicode dashes and spaces as
-// plain ones: let each of them match what the paper wrote (as app.py's loose()). f: the case rule for the rest.
+// plain ones, and HGNC writes "aquaporin 4" where papers write "aquaporin-4": each Greek name also matches its letter,
+// and any run of dashes and spaces any other (as app.py's loose()). f: the case rule for the rest.
 const GREEK = {alpha: "αΑ", beta: "βϐΒ", gamma: "γΓ", delta: "δΔ", epsilon: "εϵΕ", zeta: "ζΖ", eta: "ηΗ", theta: "θϑΘ",
                iota: "ιΙ", kappa: "κϰΚ", lambda: "λΛ", mu: "μµΜ", nu: "νΝ", xi: "ξΞ", omicron: "οΟ", pi: "πϖΠ", rho: "ρϱΡ",
                sigma: "σςΣ", tau: "τΤ", upsilon: "υΥ", phi: "φϕΦ", chi: "χΧ", psi: "ψΨ", omega: "ωΩ"};
-const LOOSE = new RegExp(`(${Object.keys(GREEK).sort((a, b) => b.length - a.length).join("|")})|(-)|(\\s+)`, "gi");
+const LOOSE = new RegExp(`(${Object.keys(GREEK).sort((a, b) => b.length - a.length).join("|")})|([-\\s]+)`, "gi");
 function loose(w, f) {
   let out = "", last = 0;
   for (const m of w.matchAll(LOOSE)) {
-    out += f(w.slice(last, m.index)) + (m[1] ? `(?:${f(m[1])}|[${GREEK[m[1].toLowerCase()]}])` : m[2] ? "[-\u2010-\u2015\u2212]" : "\\s+");
+    out += f(w.slice(last, m.index)) + (m[1] ? `(?:${f(m[1])}|[${GREEK[m[1].toLowerCase()]}])` : "[-\u2010-\u2015\u2212\\s]+");
     last = m.index + m[0].length;
   }
   return out + f(w.slice(last));
@@ -317,7 +319,7 @@ function highlighter(geneWords, termWords) {
 }
 // PubTator sometimes tags plain words as the gene ("was" for WAS, "clock" for CLOCK): skip
 // lower-case, digit-free spellings of the symbol ("tp53", zebrafish, is kept). Plus G.names: the
-// symbol, aliases and previous symbols (a disease: name and synonyms). (app.py's named_pmids finds
+// symbol, aliases, previous symbols and HGNC names (a disease: name and synonyms). (app.py's named_pmids finds
 // the papers naming the gene or disease the same way.)
 const realMention = (m) => G.kind !== "gene" || !(m === m.toLowerCase() && !/\d/.test(m) && m.toUpperCase() === G.label.toUpperCase());
 const hl = (p) => highlighter([...p.mentions.filter(realMention), ...G.names], p.term_words);
@@ -345,7 +347,7 @@ function showMode() {
 $("mode").onclick = () => {
   MODE = MODE === "gene" ? "disease" : "gene";
   Object.assign(S, {gene: "", disease: "", ot: "", ep: "", named: "", ymin: "", ymax: "", sort: "", match: "", topic: "",
-                    ax: "", ay: "", page: 1});
+                    ax: "", ay: "", pmid: "", page: 1});
   $("subject").value = ""; $("choices").innerHTML = ""; $("msg").innerHTML = "";
   showMode(); clearGene(); writeURL(true);
   $("subject").focus();
@@ -678,6 +680,7 @@ function scopeText(n, facets = true) {  // facets: false for the map, which is o
 }
 
 async function loadPapers(push = true) {
+  S.pmid = "";
   writeURL(push);
   const my = ++reqNo, t0 = performance.now();
   const head = () => tabsHTML() + filtersHTML();
@@ -871,7 +874,10 @@ async function loadMap(push = true) {
   if (M !== r) {  // a different map
     // Topic axes name this map's topics: drop them when you move to another map, but not on
     // Back/Forward (push false), where the URL's axes go with the URL's map.
-    if (M && push && M.key !== r.key) for (const k of ["ax", "ay"]) if (S[k].startsWith("topic:")) S[k] = "";
+    if (M && push && M.key !== r.key) {
+      for (const k of ["ax", "ay"]) if (S[k].startsWith("topic:")) S[k] = "";
+      S.pmid = "";
+    }
     writeURL(false);
     M = r; EX = null; MORPH = null;
     mapFocus = hoverFocus = 0; mapYear = null;
@@ -946,6 +952,7 @@ async function loadMap(push = true) {
     syncYear();
   }
   if (explore) wireAxes();
+  if (S.pmid) showMapPaper(S.pmid, !push);
   loadMapFacets(r);
   if (explore && S.ax && S.ay) await loadAxes(false);
   else drawMap();
@@ -1292,15 +1299,26 @@ function wirePlot(el) {  // once per plot element; the handlers read the current
     if (i >= 0 && !(q.data.name === "curated" && q.pointNumber === j)) Plotly.Fx.hover(el, [{curveNumber: hit, pointNumber: j}]);
   });
   el.on("plotly_unhover", () => { lastHoverC = 0; });
-  let clicks = 0;  // the newest click wins; a late answer for an older one, or after leaving the map, is dropped
-  el.on("plotly_click", async (ev) => {
-    const j = curatedAt(ev.event), pmid = j >= 0 ? M.pmid[j] : ev.points[0].customdata[4], my = ++clicks, req = reqNo;
-    const p = await getJSON(`/api/paper?subject=${encodeURIComponent(G.id)}&pmid=${pmid}&term=${encodeURIComponent(S.q)}`);
-    if (my !== clicks || req !== reqNo || !$("mappaper")) return;
-    $("mappaper").innerHTML = `<ol class="papers">${paperHTML(p, hl(p))}</ol>`;
-    $("mappaper").querySelector("details.abs")?.setAttribute("open", "");
-    $("mappaper").scrollIntoView({behavior: "smooth", block: "nearest"});
+  el.on("plotly_click", (ev) => {
+    const j = curatedAt(ev.event);
+    pickMapPaper(j >= 0 ? M.pmid[j] : ev.points[0].customdata[4]);
   });
+}
+
+// A dot clicked on any map: its paper opens under the map, and goes in the URL (pmid=), so the link reopens it.
+function pickMapPaper(pmid) {
+  S.pmid = String(pmid);
+  writeURL(false);
+  return showMapPaper(S.pmid);
+}
+let paperNo = 0;  // the newest paper asked for wins; a late answer for an older one, or after leaving the map, is dropped
+async function showMapPaper(pmid, scroll = true) {
+  const my = ++paperNo, req = reqNo;
+  const p = await getJSON(`/api/paper?subject=${encodeURIComponent(G.id)}&pmid=${pmid}&term=${encodeURIComponent(S.q)}`);
+  if (my !== paperNo || req !== reqNo || !$("mappaper")) return;
+  $("mappaper").innerHTML = `<ol class="papers">${paperHTML(p, hl(p))}</ol>`;
+  $("mappaper").querySelector("details.abs")?.setAttribute("open", "");
+  if (scroll) $("mappaper").scrollIntoView({behavior: "smooth", block: "nearest"});
 }
 
 // ---- PubMedBERT map and MedEmbed map: the list's papers placed on a fixed map of the literature
@@ -1379,6 +1397,7 @@ async function loadLand(push = true) {
     $("plot").scrollIntoView({behavior: "smooth", block: "nearest"});
   });
   landZoom = 1;
+  if (S.pmid) showMapPaper(S.pmid, !push);
   return drawLand();
 }
 
@@ -1471,15 +1490,7 @@ function wireLand(el) {  // once per plot element
     placeLandLabels();
     if (Math.abs(k - landZoom) > 0.05) { landZoom = k; clearTimeout(resizing); resizing = setTimeout(drawLand, 120); }
   });
-  let clicks = 0;
-  el.on("plotly_click", async (ev) => {
-    const pmid = ev.points[0].customdata[4], my = ++clicks, req = reqNo;
-    const p = await getJSON(`/api/paper?subject=${encodeURIComponent(G.id)}&pmid=${pmid}&term=${encodeURIComponent(S.q)}`);
-    if (my !== clicks || req !== reqNo || !$("mappaper")) return;
-    $("mappaper").innerHTML = `<ol class="papers">${paperHTML(p, hl(p))}</ol>`;
-    $("mappaper").querySelector("details.abs")?.setAttribute("open", "");
-    $("mappaper").scrollIntoView({behavior: "smooth", block: "nearest"});
-  });
+  el.on("plotly_click", (ev) => pickMapPaper(ev.points[0].customdata[4]));
 }
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && isLand() && landFocus >= 0 && !document.querySelector("#how:popover-open")) setLandFocus(-1);
@@ -1494,7 +1505,7 @@ $("f").onsubmit = (e) => {
   document.activeElement?.blur();
   const text = $("subject").value.trim(), q = $("term").value.trim();
   const same = G && G.kind === MODE && [S[MODE], G.label].some((t) => t.toUpperCase() === text.toUpperCase());
-  S = {...S, gene: "", disease: "", [MODE]: same ? S[MODE] : text, q, rank: $("rank").value, page: 1, sort: "", match: "", topic: ""};
+  S = {...S, gene: "", disease: "", [MODE]: same ? S[MODE] : text, q, rank: $("rank").value, page: 1, sort: "", match: "", topic: "", pmid: ""};
   if (same) { renderDiseases(); show(); }
   else { Object.assign(S, {ot: "", ep: "", named: "", ymin: "", ymax: ""}); searchGene(); }
 };
