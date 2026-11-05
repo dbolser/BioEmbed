@@ -791,19 +791,21 @@ const quoted = (ms) => {
   const uniq = [...new Map(ms.map((m) => [m.toLowerCase(), m])).values()];
   return andList([...uniq.slice(0, 3).map((m) => `“${esc(m)}”`), ...(uniq.length > 3 ? [`${uniq.length - 3} more`] : [])]);
 };
+// A paper not in the local PubMed copy (no title here) says so instead, as the page can't look in its text.
 function notNamedHTML(p) {
   // A word PubTator3 tagged that the page looks for and did not find in the title or abstract is in the full text.
   // It does not look for one-letter words, or lower-case spellings of a gene's symbol ("clock" for CLOCK).
   const looked = (m) => realMention(m) && m.length > 1;
   const why = [], via = p.via || [], words = p.mentions.filter(looked), other = p.mentions.filter((m) => !looked(m));
-  if (words.length) why.push(`It was tagged in the full text by PubTator3 (as ${quoted(words)}).`);
+  if (words.length) why.push(`It was tagged ${p.title ? "in the full text " : ""}by PubTator3 (as ${quoted(words)}).`);
   else if (other.length) why.push(`PubTator3 tagged ${quoted(other)} as ${esc(G.label)}.`);
   if (via.length) why.push(`It was linked by ${andList(via.map((v) => esc(VIA[v] || v)))} (via PubTator3).`);
   if (p.curated.length) why.push(`It was linked by Open Targets curation (${esc(sources([...new Set(p.curated.flatMap((c) => c.sources))]))}).`);
   if (p.epmc.length) why.push(`It was linked to ${p.epmc.length === 1 ? esc(p.epmc[0].name)
     : `${p.epmc.length} ${G.kind === "gene" ? "diseases" : "genes"}`} by Europe PMC text mining.`);
   if (!why.length) why.push("It was linked by curation or MeSH indexing (via PubTator3).");  // (a server without p.via)
-  return `<div class="hint">${esc(G.label)} is not named in the title or abstract. ${why.join(" ")}</div>`;
+  const lead = p.title ? `${esc(G.label)} is not named in the title or abstract.` : "Its title and abstract are not in the local PubMed copy.";
+  return `<div class="hint">${lead} ${why.join(" ")}</div>`;
 }
 
 const EP_SHOWN = 6;  // text-mined chips shown per paper before "+N more"
@@ -833,7 +835,7 @@ function paperHTML(p, h) {
     ${meta ? `<div class="meta">${meta}</div>` : ""}
     ${links ? `<div>${links}</div>` : ""}
     ${chips ? `<div>${chips}</div>` : ""}
-    ${p.title && !named ? notNamedHTML(p) : ""}
+    ${named ? "" : notNamedHTML(p)}
     ${abs ? `<details class="abs"><summary>Abstract</summary><p class="abstract">${abs}</p></details>` : ""}
   </li>`;
 }
