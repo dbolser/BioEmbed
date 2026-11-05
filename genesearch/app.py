@@ -11,9 +11,13 @@ other side of Open Targets' gene-disease links (diseases for a gene, genes for a
 """
 
 import argparse
+import ast
+import builtins
+import hashlib
 import json
 import os
 import re
+import symtable
 import threading
 import time
 import unicodedata
@@ -43,6 +47,7 @@ import semantic
 from semantic import Pending
 
 HERE = Path(__file__).resolve().parent
+SOURCE = Path(__file__).read_text()  # this code as started, for the named table's stamp (not the file as edited since)
 IDX = HERE / "index"
 PAGE = 50
 K1, B = 1.5, 0.75  # BM25 parameters (bm25s defaults)
@@ -432,10 +437,18 @@ def has_word(text: str, low: str, word: str) -> bool:
     return False
 
 
-@lru_cache(maxsize=32)
 def named_pmids(subject: str) -> np.ndarray:
-    """The subject's papers (also the text-mined ones) whose title or abstract names it, sorted:
-    subject_names in all of them (one RE2 scan), each paper's own PubTator mentions (subject_words)
+    """The subject's papers (also the text-mined ones) whose title or abstract names it, sorted: looked up in
+    the precomputed table (NAMED, build_named.py) while it is current, else computed here (named_live)."""
+    if (pm := NAMED.get(info(subject)["id"])) is not None:
+        return pm
+    return named_live(subject)
+
+
+@lru_cache(maxsize=32)
+def named_live(subject: str) -> np.ndarray:
+    """named_pmids, computed: reads every title and abstract of the subject (on a cloud disk, minutes for the
+    biggest genes when not cached). subject_names in all of them (one RE2 scan), each paper's own PubTator mentions (subject_words)
     in that paper. Mentions go commonest first, in the papers not yet matched. While a mention is in
     many papers: one RE2 scan of all the titles and abstracts (32 threads). The long tail of rare
     spellings (a disease has thousands) in Python: RE2 takes ~6 ms to compile a pattern with Unicode
@@ -484,6 +497,89 @@ def matches(text: pa.Array, pattern: str) -> np.ndarray:
     parts = POOL.map(lambda i: pc.match_substring_regex(text.slice(i, step), pattern).to_numpy(zero_copy_only=False),
                      range(0, len(text), step))
     return np.concatenate([np.zeros(0, bool), *parts])
+
+
+# ---------------------------------------------------------------- named: precomputed
+# build_named.py runs named_live for every gene (with --diseases also every disease) into NAMED_FILE: one row per
+# subject, its sorted named pmids. Held in memory, so the 'Named in the abstract' count reads no abstracts. Used
+# only while it matches the code that decides naming (naming_code, hashed) and the index files it reads (by size).
+NAMED_FILE = IDX / "named_pmids.parquet"
+NAMED_INPUTS = ("abstracts.arrow", "gene_pmids.parquet", "epmc.parquet", "curated.parquet", "genes.parquet",
+                "diseases.parquet")  # (and disease_pmids.parquet for a table with diseases)
+
+
+def naming_code() -> str:
+    """The code that decides naming, as this process loaded it (SOURCE; parsed, so comments, layout and docstrings
+    don't count): named_live, every top-level function and global it reads, directly or through another, and every
+    top-level statement that mentions such a global (e.g. the loop that fills D_NAME, which gene_names reads).
+    Found with Python's own scoping (symtable), so a new helper or lookup counts without being listed, wherever it
+    is in the file. Imported modules and builtins don't lead further (else every statement using re would count)."""
+    tree = ast.parse(SOURCE)
+    defs = {n.name: n for n in tree.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))}
+    stmts = [n for n in tree.body if not isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))]
+
+    def reads(t: symtable.SymbolTable) -> set[str]:  # the module-level names a function reads, also in its lambdas
+        return {y.get_name() for y in t.get_symbols() if y.is_global()}.union(*(reads(c) for c in t.get_children()))
+
+    def names(stmt) -> set[str]:  # the names a top-level statement mentions, but not its loop variables
+        loops = {n.id for t in ast.walk(stmt) if isinstance(t, (ast.For, ast.comprehension))
+                 for n in ast.walk(t.target) if isinstance(n, ast.Name)}
+        return {n.id for n in ast.walk(stmt) if isinstance(n, ast.Name)} - loops
+
+    def bare(node) -> str:  # dumped without docstrings
+        for n in ast.walk(node):
+            if (isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and isinstance(n.body[0], ast.Expr)
+                    and isinstance(n.body[0].value, ast.Constant) and isinstance(n.body[0].value.value, str)):
+                n.body = n.body[1:] or [ast.Pass()]
+        return ast.dump(node)
+
+    uses = {t.get_name(): reads(t) for t in symtable.symtable(SOURCE, "app.py", "exec").get_children()}
+    said = [names(st) for st in stmts]
+    skip = set(dir(builtins)) | {a.asname or a.name.split(".")[0] for st in stmts
+                                 if isinstance(st, (ast.Import, ast.ImportFrom)) for a in st.names}
+    seen, kept, todo = set(), set(), ["named_live"]
+    while todo:
+        name = todo.pop()
+        if name in seen or name in skip:
+            continue
+        seen.add(name)
+        todo += uses.get(name, ())
+        for i, mentioned in enumerate(said):
+            if name in mentioned and i not in kept:
+                kept.add(i)
+                todo += mentioned
+    return "\n".join([bare(defs[n]) for n in sorted(seen & defs.keys())] + [ast.dump(stmts[i]) for i in sorted(kept)])
+
+
+def named_stamp(diseases: bool = False) -> dict[str, str]:
+    """What a named table is valid for: a hash of naming_code(), whether it has the diseases, and the sizes of the
+    index files naming reads. Kept in the table's metadata by build_named.py."""
+    files = NAMED_INPUTS + (("disease_pmids.parquet",) if diseases else ())
+    return {"code": hashlib.sha256(naming_code().encode()).hexdigest()[:16], "diseases": str(int(diseases)),
+            **{f: str((IDX / f).stat().st_size) if (IDX / f).exists() else "missing" for f in files}}
+
+
+def load_named() -> tuple[dict[str, np.ndarray], str]:
+    """({subject id: its sorted named pmids}, what was loaded or why not). Nothing if NAMED_FILE is missing,
+    unreadable or stale: named_pmids then counts live."""
+    try:
+        t = pq.read_table(NAMED_FILE)
+    except FileNotFoundError:
+        return {}, f"no {NAMED_FILE.name}: counting live (build it with build_named.py)"
+    except (OSError, pa.ArrowException) as e:
+        return {}, f"{NAMED_FILE.name} unreadable ({e}): counting live"
+    built = {k.decode(): v.decode() for k, v in (t.schema.metadata or {}).items()}
+    if stale := [f"{k} {built.get(k)} -> {v}" for k, v in named_stamp(built.get("diseases") == "1").items()
+                 if built.get(k) != v]:
+        return {}, f"{NAMED_FILE.name} is stale ({'; '.join(stale)}): counting live (rebuild it with build_named.py)"
+    pmids = t["pmids"].combine_chunks()
+    ends = np.cumsum(pc.list_value_length(pmids).to_numpy())
+    named = dict(zip(t["subject"].to_pylist(), np.split(pmids.flatten().to_numpy().astype(np.int64), ends[:-1])))
+    return named, f"{len(named):,} subjects precomputed ({int(ends[-1]) if len(ends) else 0:,} papers)"
+
+
+NAMED, NAMED_STATUS = load_named()
+print(f"named: {NAMED_STATUS}", flush=True)
 
 
 def query_words(term: str) -> dict[str, str]:
@@ -1087,6 +1183,7 @@ def api_about():
                         "by_source": {k: sizes(d) for k, d in by_source.groupby("sources")},
                         "epmc_links": rows("epmc.parquet"), "epmc_papers": ep_papers, "epmc_pairs": ep_pairs},
         "diseases": {"n": len(DISEASES), "n_pubtator_only": int(DISEASES.disease_id.str.match(r"MESH:|OMIM:").sum())},
+        "named": {"n_precomputed": len(NAMED), "status": NAMED_STATUS},  # 'named in the abstract' lookups (build_named.py)
         "embeddings": {"model": semantic.MODEL, "revision": semantic.REVISION, "dim": semantic.DIM,
                        "n": None if full is None else len(full.pmids)},
         "topic_names": llm.get("model", "google/gemini-3.1-flash-lite") if llm else None,
