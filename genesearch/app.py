@@ -507,7 +507,7 @@ def matches(text: pa.Array, pattern: str) -> np.ndarray:
 
 
 # ---------------------------------------------------------------- named: precomputed
-# build_named.py runs named_live for every gene (with --diseases also every disease) into NAMED_FILE: one row per
+# build_named.py runs named_live for every gene and disease (--genes-only: the genes) into NAMED_FILE: one row per
 # subject, its sorted named pmids. Held in memory, so the 'Named in the abstract' count reads no abstracts. Used
 # only while it matches the code that decides naming (naming_code, hashed) and the index files it reads (by size).
 NAMED_FILE = IDX / "named_pmids.parquet"

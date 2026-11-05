@@ -1,9 +1,9 @@
-"""Precompute 'Named in the abstract' (app.named_live) for every gene, and with --diseases every disease, into
-index/named_pmids.parquet: one row per subject, its sorted named pmids. The app looks them up instead of reading
-every abstract of the subject at search time (minutes for the biggest genes on a cloud disk, and it evicts the
-other genes from the page cache).
+"""Precompute 'Named in the abstract' (app.named_live) for every gene and every disease (with --genes-only just the
+genes), into index/named_pmids.parquet: one row per subject, its sorted named pmids. The app looks them up instead of
+reading every abstract of the subject at search time (minutes for the biggest genes on a cloud disk, and it evicts
+the other subjects from the page cache; ~20 s of CPU for breast cancer).
 
-Run:  uv run python build_named.py [--diseases] [--workers N]
+Run:  uv run python build_named.py [--genes-only] [--workers N]
 
 Build it where the index is in memory (~4 min for the genes on the 754 GB box, 16 workers of up to ~5 GB each),
 then copy the file to a server along with any index files that changed, keeping their times (rsync -a). Rebuild
@@ -50,15 +50,16 @@ def default_workers() -> int:
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    ap.add_argument("--diseases", action="store_true", help="every disease too (genes only by default)")
+    ap.add_argument("--genes-only", action="store_true", help="just the genes (diseases are then counted live)")
     ap.add_argument("--workers", type=int, default=default_workers(),
                     help="processes, forked after the index is loaded (default: 16, fewer if memory is short)")
     a = ap.parse_args()
     if app.SOURCE != APP_SOURCE:
         sys.exit("app.py changed while it was being imported: run again.")
-    t0, stamp = time.time(), app.named_stamp(a.diseases)
+    diseases = not a.genes_only
+    t0, stamp = time.time(), app.named_stamp(diseases)
     subjects = list(zip(app.GENES.n_papers, app.GENES.hgnc_id))
-    if a.diseases:
+    if diseases:
         subjects += list(zip(app.DISEASES.n_papers, app.DISEASES.disease_id))
     subjects = [s for _, s in sorted(subjects, reverse=True)]  # biggest first: no straggler at the end
     assert len(set(subjects)) == len(subjects), "duplicate subject ids"
@@ -78,7 +79,7 @@ def main():
                     print(f"{i:,}/{len(subjects):,} subjects, {time.time() - t0:.0f} s", flush=True)
     except BrokenProcessPool as e:
         sys.exit(f"A worker died ({e}); nothing written. Fewer --workers?")
-    if Path(app.__file__).read_text(encoding="utf-8") != app.SOURCE or app.named_stamp(a.diseases) != stamp:
+    if Path(app.__file__).read_text(encoding="utf-8") != app.SOURCE or app.named_stamp(diseases) != stamp:
         sys.exit("The naming code or an index file changed during the build: nothing written, run it again.")
     order = sorted(out)
     table = pa.table({"subject": order, "pmids": pa.array([out[s] for s in order], pa.list_(pa.int32()))})
