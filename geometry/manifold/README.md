@@ -30,7 +30,7 @@ complete an analogy, or route between topics.
 | 11 | Does geometry predict new gene-disease links? | Yes: among pairs never co-mentioned up to 2015, closeness adds to popularity and common neighbours (AUC 0.934 → 0.953, average precision 0.152 → 0.169), though it lowers precision of the top 1,000 (0.636 → 0.578); moving genes and diseases along their own time vectors restores that and adds a little average precision (0.173) | The two graph baselines |
 | 12 | ForeSCITE's move: shift a topic's papers along its time vector | Right direction, small effect: at the topic's own past rate over the real 8-year gap, the shift brings 68% of 776 topics closer to the real 2019-23 papers (another topic's vector 41%, backwards 1%, random 1%); a quarter of that step: 90% (79%, 3%, 22%). Gains are about +0.001 cosine | The same steps in placebo directions |
 | 13 | Does a topic's time vector say which MeSH headings rise in it? | A little: median Spearman 0.08 with the actual change (positive in 71% of topics), 0.07 beyond what trend extrapolation predicts (trend alone: 0.13) | Trend extrapolation |
-| 14 | Is it MedEmbed only? | Running: Qwen3-Embedding-8B (best embedder on BioScore) on 100 papers per topic | |
+| 14 | Is it MedEmbed only? | No: in Qwen3-Embedding-8B (best embedder on BioScore, 4,096-D) the same analogy pairs are as parallel (z 17/13/14 vs MedEmbed 15/11/14), the time vector is stronger (year r 0.65 vs 0.49) and concepts are placed better (66% vs 57% top-1); 100 papers per topic | The same 78k papers in MedEmbed |
 
 ## 1. The papers sit in a narrow cone
 
@@ -61,13 +61,14 @@ corpus rate of 0.21%), but most retracted papers are elsewhere: neighbouring ncR
 
 ## 3. Between-topic vectors and analogy themes
 
-**Clustering them directly does not work.** `directions.py` links each topic to its 10 nearest, takes the unit
+**Clustering them directly finds one coarse axis, nothing finer.** `directions.py` links each topic to its 10 nearest, takes the unit
 difference of the two centroids per edge, and clusters the 5,355 edges with HDBSCAN on 1 − |cos| (an edge has no
 direction, so v and −v are one axis). In 384-D one loose cluster (coherence 0.18) takes 3,107 edges: mostly the
 centroids' second principal axis, B1 (cos 0.73; with the first 0.55): surgery, cardiology, nursing ↔ nuclear
 transport, splicing, cell cycle. Centroids drawn from a Gaussian with the same covariance give 36 small clusters
 (largest 112 edges) and no blob, so this is real: neighbouring topics most often differ along hospital care ↔ basic
-science. But it swallows everything finer, and in whitened spaces the clustering gives noise (as does the null).
+science. But it swallows everything finer. Whitening the top axes does not rescue it: on 64 whitened axes one blob
+again (3,238 edges; the null gives one half that size), on 32 a few dozen small local clusters.
 
 **But the vectors do repeat.** Allow two edges to vouch for each other only if they share no topic and no
 endpoint region (20 k-means regions of the map), and use mutual neighbours only (no hub topics). Then 10.9% of
@@ -158,7 +159,8 @@ toward + the papers with a heading sit, in sd), and `concept_axes.py` independen
 W and the between-topic axes B share a lot (top-20 subspace overlap 0.72, chance 0.05): the directions that
 separate topics also run through them. The B axes are the map's regions (B0 autonomic physiology ↔ cancer biology,
 B1 hospital care ↔ basic science in model organisms, …): all 47 axes with names, poles and confidence are in
-`eom_mcs200_ms3_axes_named.json`; the skeptic marked W4 and W7 low confidence.
+`eom_mcs200_ms3_axes_named.json`; the skeptic marked 7 low confidence (W4, W7 and the small analogy themes A4, A12,
+A13, A15, A17).
 
 ## 5. Concepts as coordinates
 
@@ -287,6 +289,11 @@ the centred 384-D space, never on the 2-D map; the map only shows where results 
   nearest real paper still is (so leaving the literature shows).
 - **Analogy**: a : b :: start : ?, with the start alone shown as the baseline.
 - **Path**: shortest chain of neighbouring topics.
+- **Ideas in this point**: the strongest of the sparse autoencoder's 4,096 features, named by MeSH. They compose:
+  "ferroptosis in neurodegeneration" = ferroptosis / iron / ROS + brain / neurons + neurodegeneration + iron / ferritin;
+  "gut microbiome and depression" = depression + gut microbiome + intestinal mucosa + brain.
+- The 20 fine analogy themes (F0-F19) are walkable too: "Bone and cartilage tissue engineering" along body → mouth
+  goes to Dental materials and endodontics, then Periodontitis.
 - Colour the map by any axis (blue − end, red + end).
 
 Examples: "insulin signalling" walked toward "X in cancer" goes Insulin receptor binding → Insulin signalling and
@@ -295,9 +302,32 @@ and circulating androgens (the start alone gives Androgen receptor in prostate c
 
 Run: `uv run --with fastapi --with uvicorn python geometry/manifold/explorer.py --port 8768` (about 1 minute to load).
 
-## 8. Model check
+## 8. Model check: is it MedEmbed only?
 
-(Running: Qwen3-Embedding-8B on 100 papers per topic and all concepts, two GCP Spot L4s, `gcp_embed.sh`.)
+Qwen3-Embedding-8B (the best embedder on BioEmbed's BioScore, 0.662 against MedEmbed-base 0.592; 4,096 numbers per
+paper) on 100 random papers per topic (78,000) and all 71,324 concept texts, on two GCP Spot L4s (about 100 minutes,
+`gcp_embed.sh`; the VMs delete themselves). `modelcheck.py` measures both models on the same 78k papers, with the
+topics and analogy pairs found in MedEmbed (so every Qwen number is an independent replication):
+
+| | MedEmbed-small (384-D) | Qwen3-Embedding-8B (4,096-D) |
+|---|---|---|
+| Cone: length of the mean paper vector | 0.79 | 0.52 |
+| Analogy themes' pairs, parallel against random topic pairs (z): A0 cancer, A1 clinic → genetics, A2 brain, A3 microRNAs | 15 / 11 / 14 / 9 | **17 / 13 / 14 / 10** |
+| A0 backwards applied to the other topics: Neoplasms (z against steps along random topic pairs) | +26 points (z 6) | +22 points (z 7) |
+| Time vector shared across topics (mean pairwise cos of per-topic slopes) | 0.17 | **0.28** |
+| Within-topic position on it against year (r) | 0.49 | **0.65** |
+| Concept text finds its own papers' centroid first / in top 10 (5,065 headings) | 57% / 87% | **66% / 92%** |
+| Within-topic axes: share of topics where each of the top 6 lies mostly in its own top-20 directions | 69, 51, 33, 22, 11, 9% | 58, 24, 10, 2, 4, 0% |
+
+The two spaces agree broadly (linear CKA 0.72) but not paper by paper (48% of the 10 nearest neighbours shared).
+Their within-topic axes match when paired by papers' scores: MedEmbed's W0 (drug treatment ↔ gene mapping) with
+Qwen's W2 at r 0.83, W1 (population ↔ mechanism) with Qwen's W1 at 0.71, W4, W5 and W2 at 0.58-0.66; W3 only 0.37.
+(The within-topic shares are lower in Qwen because 20 directions are a much smaller part of 4,096 than of 384.)
+
+**So the structure is not a MedEmbed quirk**: the analogy themes are as parallel in a model 230x larger, the time
+vector is stronger, and concepts are placed better. 100 papers per topic give noisier centroids than the full data
+(e.g. MedEmbed's own numbers above are lower than in sections 3-6), so compare across the columns, not with the
+rest of the write-up. (5 of the 71,324 Qwen concept vectors came back NaN from fp16 on the GPU and are left out.)
 
 ## Running it
 

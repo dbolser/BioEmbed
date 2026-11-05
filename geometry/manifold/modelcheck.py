@@ -67,7 +67,9 @@ def measure(X, lab, year, k, mesh_F, br_share, edges_by_theme, C_txt, mesh_cols_
     # analogy themes: coherence of the MedEmbed-found topic pairs in this model, vs random topic pairs
     rng = np.random.default_rng(0); r["themes"] = []
     def coh(E):
-        Vv = unit(cen[E[:, 1]] - cen[E[:, 0]]); ax = np.linalg.eigh(Vv.T @ Vv)[1][:, -1]
+        # top eigenvector of V^T V via the small (edges x edges) Gram matrix: same axis, no d x d eigenproblem
+        Vv = unit(cen[E[:, 1]] - cen[E[:, 0]]); u = np.linalg.eigh(Vv @ Vv.T)[1][:, -1]
+        ax = Vv.T @ u; ax /= np.linalg.norm(ax)
         return float(np.abs(Vv @ ax).mean()), ax
     for ti, E in enumerate(edges_by_theme):
         c, _ = coh(E)
@@ -83,14 +85,16 @@ def measure(X, lab, year, k, mesh_F, br_share, edges_by_theme, C_txt, mesh_cols_
         return dd.argmin(1)
     neo = br_share
     delta = float((neo[land(-ax)] - neo[start]).mean())
-    rnd = []
+    rnd = []  # placebo: the same step along real between-topic directions (random pairs of topics)
     for _ in range(200):
-        q = rng.standard_normal(d); q -= (q @ ax) * ax; q /= np.linalg.norm(q); rnd.append((neo[land(q)] - neo[start]).mean())
+        i_, j_ = rng.choice(k, 2, replace=False); q = cen[j_] - cen[i_]; q /= np.linalg.norm(q)
+        rnd.append((neo[land(q)] - neo[start]).mean())
     r["A0_backward_neoplasms"] = dict(delta=round(delta, 3), z=round(float((delta - np.mean(rnd)) / np.std(rnd)), 1))
     # concepts: MeSH texts vs their subset paper centroids
-    cnt = np.asarray(mesh_F.sum(0)).ravel(); keep = np.flatnonzero(cnt >= 20)
+    ok_txt = np.isfinite(C_txt).all(1)  # a few fp16 GPU vectors can come back NaN: one would poison the mean
+    cnt = np.asarray(mesh_F.sum(0)).ravel(); keep = np.flatnonzero((cnt >= 20) & ok_txt[mesh_cols_idx])
     Pc = unit(np.asarray((mesh_F[:, keep].T @ Xc)) / cnt[keep][:, None])
-    T = C_txt[mesh_cols_idx[keep]]; T = unit(T - C_txt.mean(0))
+    T = C_txt[mesh_cols_idx[keep]]; T = unit(T - C_txt[ok_txt].mean(0))
     S = T @ Pc.T; own = S[np.arange(len(keep)), np.arange(len(keep))]
     rank = (S > own[:, None]).sum(1)
     r["concepts"] = dict(n=int(len(keep)), top1=round(float(np.mean(rank == 0)), 3), top10=round(float(np.mean(rank < 10)), 3))
