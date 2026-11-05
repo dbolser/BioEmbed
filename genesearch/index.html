@@ -679,6 +679,22 @@ function scopeText(n, facets = true) {  // facets: false for the map, which is o
   return `paper${n === 1 ? "" : "s"} for ${esc(G.label)}${conds.length ? ", " + conds.join(" and ") : ""}`;
 }
 
+// A year box: empty shows the subject's first or last year greyed (placeholder), and the arrow keys and spinner
+// step from that year (browsers step an empty box from 0). A step's input event has no inputType; typing's has.
+// The list is redrawn after each change, so the box gets the focus back for the next step (unless the user moved on).
+function yearBox(el, set) {
+  let was = el.value;
+  el.oninput = (e) => {
+    if (!e.inputType && was === "" && el.placeholder) el.value = +el.placeholder + Math.sign(+el.value || 1);
+    was = el.value;
+  };
+  el.onchange = () => { yearFocus = document.activeElement === el ? el.id : null; set(el.value); };  // (not after a click away)
+  // Left before the redraw: no focus back. (A redraw blurs the box too, as it removes it: still in the page then, gone after.)
+  el.onblur = () => queueMicrotask(() => { if (el.isConnected) yearFocus = null; });
+  if (yearFocus === el.id) { yearFocus = null; if (document.activeElement === document.body) el.focus(); }  // (nothing else took it)
+}
+let yearFocus = null;  // the year box to focus again once the list is redrawn
+
 async function loadPapers(push = true) {
   S.pmid = "";
   writeURL(push);
@@ -728,6 +744,7 @@ async function loadPapers(push = true) {
     <div class="bar">
       <label>From year <input type="number" id="ymin" value="${esc(S.ymin)}" placeholder="${G.year_min ?? ""}"></label>
       <label>To year <input type="number" id="ymax" value="${esc(S.ymax)}" placeholder="${G.year_max ?? ""}"></label>
+      ${S.ymin || S.ymax ? `<button type="button" id="yclear" title="Clear the years: papers from every year">All years</button>` : ""}
       <label>Sort <select id="sort">
         ${term ? `<option value="relevance">Best match</option>` : ""}
         <option value="newest">Newest first</option><option value="oldest">Oldest first</option></select></label>
@@ -740,7 +757,8 @@ async function loadPapers(push = true) {
   $("sort").value = r.sort;
   $("sort").onchange = (e) => { S.sort = e.target.value; S.page = 1; loadPapers(); };
   document.querySelectorAll("#list [data-match]").forEach((b) => b.onclick = () => { S.match = b.dataset.match; S.page = 1; renderDiseases(); loadPapers(); });
-  for (const k of ["ymin", "ymax"]) $(k).onchange = (e) => { S[k] = e.target.value; S.page = 1; S.topic = ""; renderDiseases(); loadPapers(); };
+  for (const k of ["ymin", "ymax"]) yearBox($(k), (v) => { S[k] = v; S.page = 1; S.topic = ""; renderDiseases(); loadPapers(); });
+  if ($("yclear")) $("yclear").onclick = () => clearFilter("years");
   document.querySelectorAll("nav.pager button").forEach((b) => b.onclick = () => {
     S.page = +b.dataset.p; loadPapers().then(() => $("list").scrollIntoView({behavior: "smooth"}));
   });
