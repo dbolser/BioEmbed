@@ -863,9 +863,9 @@ const topicColour = (c) => c < 1 ? NOISE : SLOTS[(c - 1) % SLOTS.length];
 const DRILL_MIN = 30;  // smallest topic offered a map of its own
 // Map Explorer's plot margins: fixed (no growing for the year colour bar), so a glide starts and ends where the dots draw
 const exMargin = () => ({l: 74, r: mapColour === "year" ? 96 : 12, t: 12, b: 64, autoexpand: false});
-const AXES_HINT = "Each axis: how close each paper is in meaning to your words, or to a topic’s centre. Short words work best, e.g. “mouse model”.";
+const AXES_HINT = "Across: how close each paper is in meaning to your words, or to a topic’s centre. Up: how close to the second, beyond the first. Short words work best, e.g. “mouse model”.";
 let M = null;          // the map from /api/map (+ params, secs)
-let EX = null;         // Map Explorer positions for M: {id, ax, ay, x, y, r, range}
+let EX = null;         // Map Explorer positions for M: {id, ax, ay, x, y, angle, range}
 let MORPH = null;      // in-between positions (in EX's units) while the dots glide onto new axes
 let mapColour = "topic", mapFocus = 0, hoverFocus = 0, lastHoverC = 0, shiftHeld = false, mapYear = null, playing = false, zoomK = 1;
 let drawn = {rev: "", cur: [], big: 11, annotations: []};  // what drawMap drew last
@@ -1114,8 +1114,9 @@ async function loadAxes(animate) {
   } catch (e) { if (mine()) { note.textContent = `Error: ${e.message}`; drawMap(); } return; }
   if (!r || !mine()) return;
   const from = animate && M.pmid.length <= 12000 ? onScreen() : null;
-  EX = {id, ax, ay, x: r.x, y: r.y, r: r.r, range: {x: padded(r.x), y: padded(r.y)},
-        note: r.r == null ? AXES_HINT : `r = ${r.r.toFixed(2)} between the two axes (0 = unrelated, 1 = the same).`};
+  EX = {id, ax, ay, x: r.x, y: r.y, angle: r.angle, range: {x: padded(r.x), y: padded(r.y)},
+        note: `${axisName(ax)} and ${axisName(ay)} are ${r.angle}° apart in meaning (90° = unrelated). ` +
+              `Up shows how much closer each paper is to the second, beyond the first.`};
   note.textContent = EX.note;
   if (from) await morph(from, mine);
   if (mine()) return drawMap();
@@ -1282,7 +1283,8 @@ function drawMap() {
     traces.push(trace(cur, {name: "curated", marker: {size: big, opacity: 1, line: {width: 2, color: INK}, ...colourOf(cur)}}));
     traces.push(trace(cur, {name: "curated", type: "scatter", marker: {size: big + 2, opacity: 0}}));
   }
-  const axis = (k, range) => ({title: {text: pesc(`closer in meaning to ${axisName(EX[k])} →`), font: {size: 16, family: FONT, color: INK}, standoff: 8},
+  const axis = (k, range) => ({title: {text: pesc(`closer in meaning to ${axisName(EX[k])}${k === "ay" ? `, beyond ${axisName(EX.ax)}` : ""} →`),
+                                         font: {size: 16, family: FONT, color: INK}, standoff: 8},
     range: [...range], zeroline: false, gridcolor: "#e6e6e6", tickfont: {size: 14, family: FONT}, automargin: false});
   const layout = {
     showlegend: false, hovermode: "closest", dragmode: "pan", uirevision: rev,

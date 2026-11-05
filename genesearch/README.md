@@ -29,8 +29,9 @@ axes you choose. `/about` lists the data and how the map is made.
    Active filters are listed above the results, each with a ✕. "How this search works" is under the (i).
 6. **Map** tab: the current list as a topic map (without the facet boxes: picking or hovering over one greys out
    the papers it leaves out; `/api/map_facets`). Play years steps through time; Shift over a dot picks out its
-   topic, Esc clears; "Drill in" re-maps one topic's papers. **Map Explorer**: each axis is closeness in meaning to
-   your words or to a topic's centre (cosine of the MedEmbed vectors). "Download CSV" saves the whole list. URLs are
+   topic, Esc clears; "Drill in" re-maps one topic's papers. **Map Explorer**: across is closeness in meaning to
+   your words or to a topic's centre (cosine of the MedEmbed vectors); up is closeness to the second thing beyond the
+   first (its part along the first taken out, so the axes are at right angles). "Download CSV" saves the whole list. URLs are
    shareable (`?gene=CFTR&q=sweat+chloride&rank=hybrid`, `?disease=cystic+fibrosis`, `&ot=any`, `&ep=<id>`, `&named=1`, `&view=map&topic=3`,
    `&view=explore&ax=cancer&ay=topic:2`, `&view=map&pmid=27083884`: the paper clicked on a map, opened under it).
 7. **PubMedBERT map** tab (`&view=landscape`): the current list (facets applied) on the published map of PubMed by
