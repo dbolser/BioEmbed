@@ -13,6 +13,9 @@ axes you choose. `/about` lists the data and how the map is made.
    times: `rsync -a`), with the server's Python version: its 16 workers take up to ~5 GB each. Rerun it after
    changing the naming code or rewriting an index file it reads (a new size or time): until then the app counts
    live, and its startup line and `/api/about` say why (`named_stamp` in `app.py`).
+   Then, optionally, `uv run python build_maps.py` (a few hours with 14 workers on the 112-core box, ~16 GB, ~$12 of
+   LLM topic names): every gene's and disease's map, so the Map tab opens at once. Copy `index/cache/maps` (and
+   `maps_manifest.jsonl`) to a server with the index. Rerun it after an index rebuild or a `MAP_VERSION` bump.
 2. Run: `cd genesearch && uv run python app.py --port 8766 --host 0.0.0.0`, then open http://localhost:8766
 3. Type a symbol, alias, old symbol or name (`/` jumps to the box); pick from the list if several genes match.
    Disease search (click the box's label): Open Targets diseases by name, synonym or PubTator3 wording
