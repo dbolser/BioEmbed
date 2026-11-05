@@ -47,7 +47,7 @@ import semantic
 from semantic import Pending
 
 HERE = Path(__file__).resolve().parent
-SOURCE = Path(__file__).read_text()  # this code as started, for the named table's stamp (not the file as edited since)
+SOURCE = Path(__file__).read_text(encoding="utf-8")  # this code as started, for the named table's stamp (not the file as edited since)
 IDX = HERE / "index"
 PAGE = 50
 K1, B = 1.5, 0.75  # BM25 parameters (bm25s defaults)
@@ -513,7 +513,8 @@ def naming_code() -> str:
     don't count): named_live, every top-level function and global it reads, directly or through another, and every
     top-level statement that mentions such a global (e.g. the loop that fills D_NAME, which gene_names reads).
     Found with Python's own scoping (symtable), so a new helper or lookup counts without being listed, wherever it
-    is in the file. Imported modules and builtins don't lead further (else every statement using re would count)."""
+    is in the file. Imported modules, builtins and __file__ don't lead further (else every statement using re would
+    count)."""
     tree = ast.parse(SOURCE)
     defs = {n.name: n for n in tree.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))}
     stmts = [n for n in tree.body if not isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))]
@@ -535,7 +536,7 @@ def naming_code() -> str:
 
     uses = {t.get_name(): reads(t) for t in symtable.symtable(SOURCE, "app.py", "exec").get_children()}
     said = [names(st) for st in stmts]
-    skip = set(dir(builtins)) | {a.asname or a.name.split(".")[0] for st in stmts
+    skip = set(dir(builtins)) | {"__file__"} | {a.asname or a.name.split(".")[0] for st in stmts
                                  if isinstance(st, (ast.Import, ast.ImportFrom)) for a in st.names}
     seen, kept, todo = set(), set(), ["named_live"]
     while todo:
@@ -552,11 +553,15 @@ def naming_code() -> str:
 
 
 def named_stamp(diseases: bool = False) -> dict[str, str]:
-    """What a named table is valid for: a hash of naming_code(), whether it has the diseases, and the sizes of the
-    index files naming reads. Kept in the table's metadata by build_named.py."""
+    """What a named table is valid for: a hash of naming_code(), whether it has the diseases, and the size and
+    modification time (whole seconds) of each index file naming reads, as make and rsync judge a file unchanged
+    (hashing 50 GB at every start is too slow). Kept in the table's metadata by build_named.py. Copy the index
+    files with their times (rsync -a, tar, scp -p): a new time makes the table stale, and the app counts live."""
+    def stat(f: str) -> str:
+        return f"{(s := (IDX / f).stat()).st_size} bytes, {s.st_mtime_ns // 10**9}" if (IDX / f).exists() else "missing"
     files = NAMED_INPUTS + (("disease_pmids.parquet",) if diseases else ())
     return {"code": hashlib.sha256(naming_code().encode()).hexdigest()[:16], "diseases": str(int(diseases)),
-            **{f: str((IDX / f).stat().st_size) if (IDX / f).exists() else "missing" for f in files}}
+            **{f: stat(f) for f in files}}
 
 
 def load_named() -> tuple[dict[str, np.ndarray], str]:

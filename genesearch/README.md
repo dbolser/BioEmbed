@@ -9,9 +9,10 @@ axes you choose. `/about` lists the data and how the map is made.
    from the gene-disease work): `cd genesearch && uv run python build_index.py`.
    Then `uv run python build_named.py` (~4 min on the 754 GB box, 54 MB): 'Named in the abstract' for every gene,
    so a search reads no abstracts for it (on a cloud disk the live count took up to 2 min and held up the next
-   search). Build it on a big machine and copy it to a server (with any index file that changed): its 16 workers
-   take up to ~5 GB each. Rerun it after changing the naming code or rebuilding an index file it reads: until then
-   the app counts live, and its startup line and `/api/about` say why (`named_stamp` in `app.py`).
+   search). Build it on a big machine and copy it to a server (with any index file that changed, keeping file
+   times: `rsync -a`): its 16 workers take up to ~5 GB each. Rerun it after changing the naming code or rewriting an
+   index file it reads (a new size or time): until then the app counts live, and its startup line and `/api/about`
+   say why (`named_stamp` in `app.py`).
 2. Run: `cd genesearch && uv run python app.py --port 8766 --host 0.0.0.0`, then open http://localhost:8766
 3. Type a symbol, alias, old symbol or name (`/` jumps to the box); pick from the list if several genes match.
    Disease search (click the box's label): Open Targets diseases by name, synonym or PubTator3 wording

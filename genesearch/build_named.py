@@ -6,9 +6,9 @@ other genes from the page cache).
 Run:  uv run python build_named.py [--diseases] [--workers N]
 
 Build it where the index is in memory (~4 min for the genes on the 754 GB box, 16 workers of up to ~5 GB each),
-then copy the file to a server along with any index files that changed. Rebuild after a change to the naming code
-(app.naming_code) or to an index file it reads (app.NAMED_INPUTS): until then the app counts live, and its startup
-line and /api/about say why.
+then copy the file to a server along with any index files that changed, keeping their times (rsync -a). Rebuild
+after a change to the naming code (app.naming_code) or to an index file it reads (app.NAMED_INPUTS, by size and
+time): until then the app counts live, and its startup line and /api/about say why.
 """
 
 import argparse
@@ -20,13 +20,13 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from concurrent.futures.process import BrokenProcessPool
 from pathlib import Path
 
-APP_SOURCE = (Path(__file__).parent / "app.py").read_text()  # (before importing it: an edit since shows below)
+APP_SOURCE = (Path(__file__).parent / "app.py").read_text(encoding="utf-8")  # (before importing it: an edit since shows below)
 
-import numpy as np  # noqa: E402
-import pyarrow as pa  # noqa: E402
-import pyarrow.parquet as pq  # noqa: E402
+import numpy as np
+import pyarrow as pa
+import pyarrow.parquet as pq
 
-import app  # noqa: E402
+import app
 
 
 def named(subject: str) -> tuple[str, np.ndarray | None, str]:
@@ -34,7 +34,7 @@ def named(subject: str) -> tuple[str, np.ndarray | None, str]:
     otherwise keep the biggest genes' paper sets."""
     try:
         return subject, app.named_live.__wrapped__(subject).astype(np.int32), ""
-    except Exception as e:  # left out of the table, so the app computes it live
+    except Exception as e:  # noqa: BLE001 (any error: left out of the table, so the app computes it live)
         return subject, None, f"{type(e).__name__}: {e}"
     finally:
         for f in (app.subject_tags, app.paper_set, app.epmc_links):
@@ -43,7 +43,8 @@ def named(subject: str) -> tuple[str, np.ndarray | None, str]:
 
 def default_workers() -> int:
     """16, or fewer where memory is short: a worker can take ~5 GB on the biggest subjects."""
-    avail = next(int(line.split()[1]) for line in open("/proc/meminfo") if line.startswith("MemAvailable:")) / 2**20
+    avail = next(int(line.split()[1]) for line in Path("/proc/meminfo").read_text().splitlines()
+                 if line.startswith("MemAvailable:")) / 2**20
     return max(1, min(16, os.cpu_count() or 1, int(avail // 6)))
 
 
@@ -77,7 +78,7 @@ def main():
                     print(f"{i:,}/{len(subjects):,} subjects, {time.time() - t0:.0f} s", flush=True)
     except BrokenProcessPool as e:
         sys.exit(f"A worker died ({e}); nothing written. Fewer --workers?")
-    if Path(app.__file__).read_text() != app.SOURCE or app.named_stamp(a.diseases) != stamp:
+    if Path(app.__file__).read_text(encoding="utf-8") != app.SOURCE or app.named_stamp(a.diseases) != stamp:
         sys.exit("The naming code or an index file changed during the build: nothing written, run it again.")
     order = sorted(out)
     table = pa.table({"subject": order, "pmids": pa.array([out[s] for s in order], pa.list_(pa.int32()))})
