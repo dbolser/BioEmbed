@@ -56,15 +56,19 @@ How it works
   previous symbols and HGNC names (a disease: name and synonyms), found whole in the title or abstract, as the page
   highlights them (`named_pmids` in `app.py`). HGNC names: the approved name ('aquaporin 4') and the alias and
   previous names that aren't disease names (`gene_names`: TP53's alias name is 'Li-Fraumeni syndrome'). PubTator3
-  writes Greek letters as names and Unicode dashes and spaces as plain ones ('TGF-beta1' for TGF-β1), and HGNC
-  writes 'aquaporin 4' where papers write 'aquaporin-4': Greek names match their letters, and any run of dashes and
-  spaces matches any other (`loose`/`fold` in `app.py`, `loose` in `index.html`). Before the Greek fix IFNG, TGFB1
-  and IL1B had about half their naming papers missed; before the HGNC names, papers linked only by MeSH or
-  curation that wrote 'aquaporin-4' counted as not naming AQP4.
+  writes Greek letters as names and Unicode dashes and spaces as plain ones ('TGF-beta1' for TGF-β1), HGNC writes
+  'aquaporin 4' where papers write 'aquaporin-4', and a few names keep the letter ('β-actin'): a Greek letter and its
+  name match each other, and any run of dashes and spaces matches any other (`loose` in `app.py` and in
+  `index.html`). Each name's pattern goes to RE2 for the common ones and to Python's `re` for the long tail of rare
+  spellings (`word_re`), so both find the same papers. Before the Greek fix IFNG, TGFB1 and IL1B had about half
+  their naming papers missed; before the HGNC names, papers linked only by MeSH or curation that wrote
+  'aquaporin-4' counted as not naming AQP4.
 - A paper that does not name it says why it is listed, one sentence per source: PubTator3 tagged it in the full
   text (its words not being in the title or abstract), a curated source PubTator3 merges in (MeSH indexing,
   gene2pubmed, GeneRIF, CTD, BioGRID...: the `resource` column of `gene_pmids`/`disease_pmids`, `tag_sources` in
-  `app.py`), Open Targets curation, or Europe PMC text mining.
+  `app.py`), Open Targets curation, or Europe PMC text mining. With an index built before that column, papers don't
+  name the curated source (the app says so at startup): rebuild the two files with
+  `uv run python build_index.py gene_pmids disease_pmids`.
 - Paper vectors: from `index/emb_medembed_small/` (whole PubMed: float16 `.npy` shards + `pmids.npy`,
   memory-mapped) once that exists and is complete. Until then they are computed on CPU for one gene's papers
   when first needed (~50-130 papers/s, shown as a progress bar), capped at the 30,000 best keyword matches,

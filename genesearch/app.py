@@ -284,11 +284,18 @@ def subject_tags(subject: str) -> tuple[dict[int, str], pd.DataFrame]:
 # PubTator3's sources that tag words in the paper (its own text mining, older taggers, the CRAFT and BC5CDR
 # hand-annotated corpora); the rest link papers by curation or indexing (MESH, gene2pubmed, GeneRIF, CTD...)
 IN_TEXT = ("PubTator3", "GNormPlus", "PolySearch", "CRAFT", "BC5CDR")
+# An index built before build_index.py kept the sources ('resource') lacks them: its papers then name no source.
+SOURCED = all("resource" in pq.read_schema(IDX / f).names for f in ("gene_pmids.parquet", "disease_pmids.parquet"))
+if not SOURCED:
+    print("sources: gene_pmids.parquet or disease_pmids.parquet has no 'resource' column, so papers won't say which "
+          "curated source linked them (rebuild both with build_index.py gene_pmids disease_pmids)", flush=True)
 
 
 def tag_sources(s: dict, pmids) -> dict[int, list[str]]:
     """The curated sources PubTator3 merges into its tags of the subject, for a page of papers:
     {pmid: e.g. ['MESH', 'gene2pubmed']}, papers with none left out. (One small query per page.)"""
+    if not SOURCED:
+        return {}
     pm = [int(p) for p in pmids]
     if s["kind"] == "gene":
         q = f"SELECT pmid, resource FROM '{IDX}/gene_pmids.parquet' WHERE ncbi = ? AND pmid IN (SELECT unnest(?))"
@@ -382,59 +389,54 @@ def any_case(word: str) -> bool:
 
 
 # PubTator3 writes Greek letters as names ('TGF-beta1' for TGF-β1, 'TNFalpha') and Unicode dashes and spaces as
-# plain ones, and HGNC writes 'aquaporin 4' where papers write 'aquaporin-4': a word's RE2 pattern lets each Greek
-# name match its letter, and any run of dashes and spaces match any other (loose; index.html's loose() is the same).
-# The long tail of rare words is matched in text folded the same way (fold).
+# plain ones, HGNC writes 'aquaporin 4' where papers write 'aquaporin-4', and a few names keep the letter or a Unicode
+# dash ('β-actin', 'MYC‐modulating lncRNA'): in a word's pattern each Greek letter or its name matches either, and any
+# run of dashes and spaces any other (loose; index.html's loose() is the same). The same pattern, in its case rule
+# (word_re), goes to RE2 (names_re) and to Python's re (the long tail in named_live), so both find the same papers.
+# (Python's re, unlike RE2, also takes the Turkish ı and İ for i in any case: the long tail's prefilter rules out most.)
 GREEK = {"alpha": "αΑ", "beta": "βϐΒ", "gamma": "γΓ", "delta": "δΔ", "epsilon": "εϵΕ", "zeta": "ζΖ", "eta": "ηΗ",
          "theta": "θϑΘ", "iota": "ιΙ", "kappa": "κϰΚ", "lambda": "λΛ", "mu": "μµΜ", "nu": "νΝ", "xi": "ξΞ",
          "omicron": "οΟ", "pi": "πϖΠ", "rho": "ρϱΡ", "sigma": "σςΣ", "tau": "τΤ", "upsilon": "υΥ", "phi": "φϕΦ",
          "chi": "χΧ", "psi": "ψΨ", "omega": "ωΩ"}
-SEP = "[-\u2010-\u2015\u2212\\s\u00a0\u2000-\u200a\u202f\u205f\u3000]+"  # (RE2's \s is ASCII only)
-LOOSE = re.compile(rf"({'|'.join(sorted(GREEK, key=len, reverse=True))})|([-\s]+)", re.IGNORECASE)
+GREEK_NAME = {c: name for name, cs in GREEK.items() for c in cs}  # 'β': 'beta'
+DASHES = "-\u2010-\u2015\u2212"  # (a character-class range)
+SPACES = "".join(c for c in map(chr, range(0x3001)) if c.isspace())  # what Python's \s matches (none above U+3000)
+SEP = {"re2": f"[{DASHES}{SPACES}]+", "re": f"[{DASHES}\\s]+"}  # the same in each (RE2's \s is ASCII only,
+# and Python compiles the long class slowly)
+NAMES = sorted(GREEK, key=len, reverse=True)
 
 
-def loose(word: str) -> str:
-    """Regex for a word as PubTator3 or HGNC wrote it: its Greek letter names also match the letters, and
-    each run of hyphens and spaces any run of dashes and spaces."""
+def greek_names(form) -> str:
+    """Regex: the Greek names in a form (str, str.upper or str.capitalize: PubTator3's 'TNFalpha', 'IL1BETA',
+    'EGFRDeltaIII', but not 'ETa' in 'FETalpha'), longest first, each not where its tail starts a longer name:
+    'Psi' not in 'RPTPsigma' (P + sigma)."""
+    return "|".join(form(x) + "".join(f"(?!{form(y)[len(x) - k:]})" for k in range(1, len(x)) for y in NAMES
+                                      if y.startswith(x[k:]) and len(y) > len(x) - k) for x in NAMES)
+
+
+LOOSE = re.compile(rf"({greek_names(str)}|{greek_names(str.upper)}|{greek_names(str.capitalize)}|"
+                   rf"[{''.join(GREEK_NAME)}])|[{DASHES}\s]+")
+
+
+def loose(word: str, engine: str = "re2") -> str:
+    """Regex for a word as PubTator3 or HGNC wrote it, for RE2 or Python's re: each Greek letter or letter name also
+    matches the other, and each run of dashes and spaces any run of dashes and spaces."""
     parts, last = [], 0
     for m in LOOSE.finditer(word):
-        parts += [re.escape(word[last:m.start()]), f"(?:{re.escape(m[1])}|[{GREEK[m[1].lower()]}])" if m[1] else SEP]
+        name = GREEK_NAME.get(m[1], m[1])
+        parts += [re.escape(word[last:m.start()]), f"(?:{re.escape(name)}|[{GREEK[name.lower()]}])" if m[1] else SEP[engine]]
         last = m.end()
     return "".join(parts) + re.escape(word[last:])
 
 
+def word_re(word: str, engine: str = "re2") -> str:
+    """A word's pattern (loose) in its case rule (any_case)."""
+    return f"(?i:{loose(word, engine)})" if any_case(word) else loose(word, engine)
+
+
 def names_re(words) -> str:
     """RE2 pattern: any of the words, whole (no letter or digit either side), each in its case rule."""
-    alts = "|".join(f"(?i:{loose(w)})" if any_case(w) else loose(w) for w in sorted(words, key=len, reverse=True))
-    return rf"(?:^|[^\pL\pN])(?:{alts})(?:[^\pL\pN]|$)"
-
-
-FOLD = {c: name for name, cs in GREEK.items() for c in cs}
-DASHES = "-\u2010\u2011\u2012\u2013\u2014\u2015\u2212"
-TO_FOLD = re.compile(f"[{''.join(FOLD)}]|[{DASHES}\\s]{{2,}}|[{DASHES}]|[^\\S ]")  # (not a lone ' ': most matches)
-
-
-def fold(text: str) -> str:
-    """Text for plain matching, as loose() matches in a pattern: Greek letters as names, each run of dashes and
-    spaces as one space."""
-    if text.isascii():
-        text = text.replace("-", " ")
-        if text.isprintable() and "  " not in text:  # most texts: nothing more to fold (fast checks)
-            return text
-    return TO_FOLD.sub(lambda m: FOLD.get(m[0], " "), text)
-
-
-def has_word(text: str, low: str, word: str) -> bool:
-    """Whether the text (low: lower-cased) has the word whole: no letter or digit either side. Both folded."""
-    if any_case(word):
-        text, word = low, word.lower()
-    i = text.find(word)
-    while i >= 0:
-        j = i + len(word)
-        if not (i and text[i - 1].isalnum()) and not (j < len(text) and text[j].isalnum()):
-            return True
-        i = text.find(word, i + 1)
-    return False
+    return rf"(?:^|[^\pL\pN])(?:{'|'.join(map(word_re, sorted(words, key=len, reverse=True)))})(?:[^\pL\pN]|$)"
 
 
 def named_pmids(subject: str) -> np.ndarray:
@@ -451,8 +453,8 @@ def named_live(subject: str) -> np.ndarray:
     biggest genes when not cached). subject_names in all of them (one RE2 scan), each paper's own PubTator mentions (subject_words)
     in that paper. Mentions go commonest first, in the papers not yet matched. While a mention is in
     many papers: one RE2 scan of all the titles and abstracts (32 threads). The long tail of rare
-    spellings (a disease has thousands) in Python: RE2 takes ~6 ms to compile a pattern with Unicode
-    classes. (Title and abstract are matched apart: joining them took 4 s for 875k papers.)"""
+    spellings (a disease has thousands) with Python's re, in the same patterns (word_re): RE2 takes ~6 ms to
+    compile one. (Title and abstract are matched apart: joining them took 4 s for 875k papers.)"""
     s = info(subject)
     tagged, _ = subject_tags(subject)
     pm = np.union1d(paper_set(subject).pmid.to_numpy(), epmc_links(subject).pmid.to_numpy())
@@ -483,11 +485,15 @@ def named_live(subject: str) -> np.ndarray:
         return pm[named]
     rest = [(word, idx[~named[idx]]) for word, idx in groups[n:]]
     todo = np.unique(np.concatenate([idx for _, idx in rest]))
-    texts = {i: f"{fold(a)}\n{fold(b)}" for i, a, b in zip(todo.tolist(), title.take(todo).to_pylist(), abstract.take(todo).to_pylist())}
-    lows = {i: x.lower() for i, x in texts.items()}
+    texts = dict(zip(todo.tolist(), zip(title.take(todo).to_pylist(), abstract.take(todo).to_pylist())))
+    folded = {i: f"{a}\n{b}".casefold() for i, (a, b) in texts.items()}
     for word, idx in rest:
-        word = fold(word)
-        named[[i for i in idx.tolist() if not named[i] and has_word(texts[i], lows[i], word)]] = True
+        # Only a paper with every plain piece of the word in it (in any case) can match: most papers lack one, and
+        # compiling costs more than searching. (Python's [^\W_] is RE2's [\pL\pN]: a letter or digit.)
+        pieces = [p.casefold() for p in LOOSE.split(word)[::2] if p]
+        if idx := [i for i in idx.tolist() if not named[i] and all(p in folded[i] for p in pieces)]:
+            has = re.compile(rf"(?<![^\W_]){word_re(word, 're')}(?![^\W_])").search
+            named[[i for i in idx if has(texts[i][0]) or has(texts[i][1])]] = True
     return pm[named]
 
 

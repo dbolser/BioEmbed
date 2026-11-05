@@ -289,16 +289,26 @@ const anyCase = (w) => [...w].map((c) => {
   return l === u || l.length > 1 || u.length > 1 ? reEsc(c) : `[${l}${u}]`;
 }).join("");
 // PubTator3 writes Greek letters as names ("TGF-beta1" for TGF-β1, "TNFalpha") and Unicode dashes and spaces as
-// plain ones, and HGNC writes "aquaporin 4" where papers write "aquaporin-4": each Greek name also matches its letter,
-// and any run of dashes and spaces any other (as app.py's loose()). f: the case rule for the rest.
+// plain ones, HGNC writes "aquaporin 4" where papers write "aquaporin-4", and a few names keep the letter or a
+// Unicode dash ("β-actin"): each Greek letter or its name matches either, and any run of dashes and spaces any other
+// (as app.py's loose()). f: the case rule for the rest.
 const GREEK = {alpha: "αΑ", beta: "βϐΒ", gamma: "γΓ", delta: "δΔ", epsilon: "εϵΕ", zeta: "ζΖ", eta: "ηΗ", theta: "θϑΘ",
                iota: "ιΙ", kappa: "κϰΚ", lambda: "λΛ", mu: "μµΜ", nu: "νΝ", xi: "ξΞ", omicron: "οΟ", pi: "πϖΠ", rho: "ρϱΡ",
                sigma: "σςΣ", tau: "τΤ", upsilon: "υΥ", phi: "φϕΦ", chi: "χΧ", psi: "ψΨ", omega: "ωΩ"};
-const LOOSE = new RegExp(`(${Object.keys(GREEK).sort((a, b) => b.length - a.length).join("|")})|([-\\s]+)`, "gi");
+const GREEK_NAME = Object.fromEntries(Object.entries(GREEK).flatMap(([n, cs]) => [...cs].map((c) => [c, n])));  // "β": "beta"
+const DASHES = "-\u2010-\u2015\u2212";  // (a character-class range)
+// The Greek names in a form (as is, upper case or capitalized: not "ETa" in "FETalpha"), longest first, each not where
+// its tail starts a longer name: "Psi" not in "RPTPsigma" (as app.py's greek_names).
+const NAMES = Object.keys(GREEK).sort((a, b) => b.length - a.length);
+const greekNames = (form) => NAMES.map((x) => form(x) + [...x.slice(1)].map((_, k) => k + 1).flatMap((k) => NAMES
+  .filter((y) => y.startsWith(x.slice(k)) && y.length > x.length - k).map((y) => `(?!${form(y).slice(x.length - k)})`)).join("")).join("|");
+const LOOSE = new RegExp(`(${greekNames((n) => n)}|${greekNames((n) => n.toUpperCase())}|${greekNames((n) => n[0].toUpperCase() + n.slice(1))}|` +
+                         `[${Object.keys(GREEK_NAME).join("")}])|[${DASHES}\\s]+`, "g");
 function loose(w, f) {
   let out = "", last = 0;
   for (const m of w.matchAll(LOOSE)) {
-    out += f(w.slice(last, m.index)) + (m[1] ? `(?:${f(m[1])}|[${GREEK[m[1].toLowerCase()]}])` : "[-\u2010-\u2015\u2212\\s]+");
+    const name = GREEK_NAME[m[1]] ?? m[1];
+    out += f(w.slice(last, m.index)) + (m[1] ? `(?:${f(name)}|[${GREEK[name.toLowerCase()]}])` : `[${DASHES}\\s]+`);
     last = m.index + m[0].length;
   }
   return out + f(w.slice(last));
