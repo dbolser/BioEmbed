@@ -1062,7 +1062,10 @@ def get_map(subject: str, pm: np.ndarray, within: str = "") -> tuple[dict, str]:
 def api_axes(subject: str, key: str, a: str, b: str):
     """Map Explorer: the papers of a map placed by how close each is in meaning to two things (the
     axes): words, embedded as a query, or a topic's centre ('topic:3', the mean of its papers'
-    vectors). Closeness = cosine similarity, i.e. the paper vectors projected onto each axis."""
+    vectors). Across = closeness to a (cosine similarity); up = closeness to b beyond a: b with its
+    part along a taken out, so the axes are at right angles and the plot is the papers' shadow on the
+    plane of a and b (two similar axes would otherwise put every paper on the diagonal). angle = how
+    far apart a and b are, in degrees (90 = unrelated in meaning)."""
     if not re.fullmatch(r"[0-9a-f]{20}", key) or (m := cached_map(key)) is None:
         raise HTTPException(404, "That map is gone: open the map again.")
     pm = np.asarray(m["pmid"], np.int64)
@@ -1072,23 +1075,25 @@ def api_axes(subject: str, key: str, a: str, b: str):
         return {"pending": p.job.status(), "n": len(pm)}
     labels = np.asarray(m["c"])
 
-    def axis(spec: str) -> np.ndarray:
+    def axis(spec: str) -> np.ndarray:  # a unit vector
         if t := re.fullmatch(r"topic:(-?\d+)", spec.strip()):
             members = vecs[(labels == int(t[1])) & ok]
             if not len(members):
                 raise HTTPException(400, f"no topic {t[1]} in this map")
             v = members.mean(0)
-            v /= np.linalg.norm(v)
         elif spec.strip():
             v = semantic.query_vector(spec.strip())
         else:
             raise HTTPException(400, "Give both axes some words or a topic.")
-        return np.where(ok, vecs @ v, np.nan)
+        return v / np.linalg.norm(v)
 
-    x, y = axis(a), axis(b)
-    r = np.corrcoef(x[ok], y[ok])[0, 1] if ok.sum() > 2 else np.nan
-    as_list = lambda v: [None if np.isnan(s) else round(float(s), 4) for s in v]
-    return {"x": as_list(x), "y": as_list(y), "r": _num(r, 2)}
+    va, vb = axis(a), axis(b)
+    up = vb - (cos := float(va @ vb)) * va  # (Gram-Schmidt)
+    if np.linalg.norm(up) < 1e-3:
+        raise HTTPException(400, "The two axes mean the same: pick something different for one of them.")
+    up /= np.linalg.norm(up)
+    as_list = lambda v: [None if np.isnan(s) else round(float(s), 4) for s in np.where(ok, vecs @ v, np.nan)]
+    return {"x": as_list(va), "y": as_list(up), "angle": round(float(np.degrees(np.arccos(np.clip(cos, -1, 1)))))}
 
 
 MAPS = semantic.CACHE_DIR / "maps"
