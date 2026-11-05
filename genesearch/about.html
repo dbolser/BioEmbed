@@ -75,6 +75,8 @@
 const fmt = (n) => n == null ? "?" : n.toLocaleString("en-GB");
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
 const ext = (url, text) => `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(text)}</a>`;
+const OT_DOCS = "https://platform-docs.opentargets.org/evidence";  // (each source's section: #europe-pmc...)
+const sizes = (s) => s ? `${fmt(s.links)} links<br>${fmt(s.pairs)} gene–disease pairs<br>${fmt(s.papers)} papers` : "";
 try { if (localStorage.getItem("cream")) document.body.classList.add("cream"); } catch {}  // (storage may be blocked)
 fetch("/api/about").then((r) => r.json()).then((a) => {
   const rows = [
@@ -82,17 +84,21 @@ fetch("/api/about").then((r) => r.json()).then((a) => {
      "Titles, abstracts, years and journals: the papers. Searched and ranked here.",
      `${fmt(a.pubmed.n)} papers`],
     [ext("https://www.ncbi.nlm.nih.gov/research/pubtator3/", "PubTator3") + ` (NCBI), release ${esc(a.pubtator.version)}`,
-     "Which papers mention which genes and diseases: text mining of all PubMed abstracts and open-access PubMed Central full texts, plus links with no text mention that PubTator3 carries over (NCBI’s gene2pubmed, GeneRIF and CTD; MeSH indexing). This makes a gene’s or disease’s list of papers, and gives the grey disease tags on each paper.",
+     `Which papers mention which genes and diseases: text mining of all PubMed abstracts and open-access PubMed Central full texts, plus links with no text mention that PubTator3 carries over: NCBI’s ${ext("https://ftp.ncbi.nlm.nih.gov/gene/README", "gene2pubmed")}, ${ext("https://www.ncbi.nlm.nih.gov/gene/about-generif", "GeneRIFs")} and gene interactions, ${ext("https://ctdbase.org/", "CTD")}, ${ext("https://thebiogrid.org/", "BioGRID")} and ${ext("https://www.nlm.nih.gov/mesh/meshhome.html", "MeSH")} indexing. This makes a gene’s or disease’s list of papers, and gives the grey disease tags on each paper.`,
      `${fmt(a.pubtator.gene_links)} gene–paper links (human genes)<br>${fmt(a.pubtator.disease_links)} disease–paper links`],
     [ext("https://www.genenames.org/", "HGNC") + `, ${esc(a.hgnc.version)}`,
      "Approved human gene symbols, aliases, previous symbols, names and locations: the gene search.",
      `${fmt(a.hgnc.n)} genes<br>${fmt(a.hgnc.n_with_papers)} with papers`],
     [ext("https://platform.opentargets.org/", "Open Targets Platform") + ` ${esc(a.opentargets.version)}: curated evidence`,
-     "Gene–disease–paper links from Orphanet, Gene2Phenotype, Genomics England and UniProt: the OT boxes, OT chips and the curated papers (ringed on the map). Their papers are added to each gene’s and disease’s list.",
+     `Gene–disease–paper links from ${ext("https://www.orpha.net/", "Orphanet")}, ${ext("https://www.ebi.ac.uk/gene2phenotype/", "Gene2Phenotype")}, ${ext("https://panelapp.genomicsengland.co.uk/", "Genomics England PanelApp")} and UniProt (next row): the OT boxes, OT chips and the curated papers (ringed on the map). Their papers are added to each gene’s and disease’s list.`,
      `${fmt(a.opentargets.curated_links)} links<br>${fmt(a.opentargets.curated_pairs)} gene–disease pairs<br>${fmt(a.opentargets.curated_papers)} papers`],
-    [`Open Targets ${esc(a.opentargets.version)}: Europe PMC evidence`,
-     "Text-mined gene–disease–paper links (Europe PMC): the ePMC boxes and chips.",
-     `${fmt(a.opentargets.epmc_links)} links`],
+    [ext("https://www.uniprot.org/", "UniProt") + `, via ${ext(OT_DOCS + "#uniprot-literature", `Open Targets ${a.opentargets.version}`)}`,
+     "UniProt’s curators link each human protein to the diseases it is involved in, citing the papers that show it. Part of the curated evidence above: “UniProt” in the OT chips.",
+     sizes(a.opentargets.by_source?.uniprot_literature)],  // (?.: a server older than this page)
+    [ext("https://europepmc.org/", "Europe PMC") + ` (EMBL-EBI), via ${ext(OT_DOCS + "#europe-pmc", `Open Targets ${a.opentargets.version}`)}`,
+     "Text-mined gene–disease–paper links: Europe PMC’s deep-learning text mining finds a gene and a disease named in the same sentence of a paper. The ePMC boxes and chips. Their papers are added to each list.",
+     a.opentargets.epmc_pairs == null ? `${fmt(a.opentargets.epmc_links)} links`
+       : sizes({links: a.opentargets.epmc_links, pairs: a.opentargets.epmc_pairs, papers: a.opentargets.epmc_papers})],
     [`Open Targets ${esc(a.opentargets.version)}: diseases`,
      `Disease names, synonyms and MeSH/OMIM cross-references: the disease search. Each Open Targets disease covers the PubTator3 ids it cross-references, plus any whose most used wording is its name. PubTator3 ids no Open Targets disease covers are searchable on their own (no OT or ePMC boxes).`,
      `${fmt(a.diseases.n)} diseases<br>(${fmt(a.diseases.n_pubtator_only)} PubTator3 only)`],

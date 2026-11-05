@@ -6,7 +6,13 @@ by meaning (AI embeddings), or both. A Map tab groups the current list into topi
 axes you choose. `/about` lists the data and how the map is made.
 
 1. Build the index once (~10-15 min, 61 GB in `index/`; needs `data/gold/ot_curated_gene_disease_pmid.parquet`
-   from the gene-disease work): `cd genesearch && uv run python build_index.py`
+   from the gene-disease work): `cd genesearch && uv run python build_index.py`.
+   Then `uv run python build_named.py` (~4 min on the 754 GB box, 54 MB): 'Named in the abstract' for every gene,
+   so a search reads no abstracts for it (on a cloud disk the live count took up to 2 min and held up the next
+   search). Build it on a big machine and copy it to a server (with any index file that changed, keeping file
+   times: `rsync -a`), with the server's Python version: its 16 workers take up to ~5 GB each. Rerun it after
+   changing the naming code or rewriting an index file it reads (a new size or time): until then the app counts
+   live, and its startup line and `/api/about` say why (`named_stamp` in `app.py`).
 2. Run: `cd genesearch && uv run python app.py --port 8766 --host 0.0.0.0`, then open http://localhost:8766
 3. Type a symbol, alias, old symbol or name (`/` jumps to the box); pick from the list if several genes match.
    Disease search (click the box's label): Open Targets diseases by name, synonym or PubTator3 wording
@@ -24,7 +30,7 @@ axes you choose. `/about` lists the data and how the map is made.
    topic, Esc clears; "Drill in" re-maps one topic's papers. **Map Explorer**: each axis is closeness in meaning to
    your words or to a topic's centre (cosine of the MedEmbed vectors). "Download CSV" saves the whole list. URLs are
    shareable (`?gene=CFTR&q=sweat+chloride&rank=hybrid`, `?disease=cystic+fibrosis`, `&ot=any`, `&ep=<id>`, `&named=1`, `&view=map&topic=3`,
-   `&view=explore&ax=cancer&ay=topic:2`).
+   `&view=explore&ax=cancer&ay=topic:2`, `&view=map&pmid=27083884`: the paper clicked on a map, opened under it).
 7. **PubMedBERT map** tab (`&view=landscape`): the current list (facets applied) on the published map of PubMed by
    González-Márquez et al. (Patterns 2024): PubMedBERT embeddings of 23.4M abstracts, t-SNE to 2-D, fields from the
    journal. Behind the dots: its 6.26M human-gene papers (PubTator3 tags of HGNC genes) in their field colours. The map
@@ -46,8 +52,23 @@ How it works
 - Semantic: `abhinand/MedEmbed-small-v0.1` (loaded as `eval/run_embedders.py` does: CLS pooling, normalised,
   no query prompt). Query = the ranking words; papers = `title\n\nabstract`; cosine similarity (`semantic.py`).
   Hybrid = reciprocal-rank fusion, 1/(60 + keyword rank) + 1/(60 + semantic rank).
-- Named in the abstract: the paper's PubTator3 mentions of the gene (or disease) plus its symbol (name), found
-  whole in the title or abstract, as the page highlights them (`named_pmids` in `app.py`).
+- Named in the abstract: the paper's PubTator3 mentions of the gene (or disease) plus its symbol, aliases,
+  previous symbols and HGNC names (a disease: name and synonyms), found whole in the title or abstract, as the page
+  highlights them (`named_pmids` in `app.py`). HGNC names: the approved name ('aquaporin 4') and the alias and
+  previous names that aren't disease names (`gene_names`: TP53's alias name is 'Li-Fraumeni syndrome'). PubTator3
+  writes Greek letters as names and Unicode dashes and spaces as plain ones ('TGF-beta1' for TGF-β1), HGNC writes
+  'aquaporin 4' where papers write 'aquaporin-4', and a few names keep the letter ('β-actin'): a Greek letter and its
+  name match each other, and any run of dashes and spaces matches any other (`loose` in `app.py` and in
+  `index.html`). Each name's pattern goes to RE2 for the common ones and to Python's `re` for the long tail of rare
+  spellings (`word_re`), so both find the same papers (but for a few with the Turkish ı or İ, which Python's `re`
+  takes for i). Before the Greek fix IFNG, TGFB1 and IL1B had about half their naming papers missed; before the HGNC
+  names, papers linked only by MeSH or curation that wrote 'aquaporin-4' counted as not naming AQP4.
+- A paper that does not name it says why it is listed, one sentence per source: PubTator3 tagged it in the full
+  text (its words not being in the title or abstract), a curated source PubTator3 merges in (MeSH indexing,
+  gene2pubmed, GeneRIF, CTD, BioGRID...: the `resource` column of `gene_pmids`/`disease_pmids`, `tag_sources` in
+  `app.py`), Open Targets curation, or Europe PMC text mining. With an index built before that column, papers don't
+  name the curated source (the app says so at startup): rebuild the two files with
+  `uv run python build_index.py gene_pmids disease_pmids`.
 - Paper vectors: from `index/emb_medembed_small/` (whole PubMed: float16 `.npy` shards + `pmids.npy`,
   memory-mapped) once that exists and is complete. Until then they are computed on CPU for one gene's papers
   when first needed (~50-130 papers/s, shown as a progress bar), capped at the 30,000 best keyword matches,

@@ -11,9 +11,14 @@ other side of Open Targets' gene-disease links (diseases for a gene, genes for a
 """
 
 import argparse
+import ast
+import builtins
+import hashlib
 import json
 import os
 import re
+import symtable
+import sys
 import threading
 import time
 import unicodedata
@@ -43,6 +48,7 @@ import semantic
 from semantic import Pending
 
 HERE = Path(__file__).resolve().parent
+SOURCE = Path(__file__).read_text(encoding="utf-8")  # this code as started, for the named table's stamp (not the file as edited since)
 IDX = HERE / "index"
 PAGE = 50
 K1, B = 1.5, 0.75  # BM25 parameters (bm25s defaults)
@@ -155,6 +161,7 @@ def gene_info(row: int) -> dict:
     return {
         "hgnc_id": g["hgnc_id"], "symbol": g["symbol"], "name": g["name"],
         "aliases": _split(g["alias_symbol"]), "prev": _split(g["prev_symbol"]),
+        "alias_names": _split(g["alias_name"]), "prev_names": _split(g["prev_name"]),
         "entrez": None if pd.isna(g["entrez_id"]) else int(g["entrez_id"]),
         "ensembl": g["ensembl_gene_id"] if isinstance(g["ensembl_gene_id"], str) else None,
         "location": _str(g["location"]), "locus_group": _str(g["locus_group"]), "n_papers": int(g["n_papers"]),
@@ -275,6 +282,37 @@ def subject_tags(subject: str) -> tuple[dict[int, str], pd.DataFrame]:
     return dict(zip(tagged["pmid"].tolist(), tagged["mentions"].tolist())), cur[["pmid", "fid", "fname", "sources"]]
 
 
+# PubTator3's sources that tag words in the paper (its own text mining, older taggers, the CRAFT and BC5CDR
+# hand-annotated corpora); the rest link papers by curation or indexing (MESH, gene2pubmed, GeneRIF, CTD...)
+IN_TEXT = ("PubTator3", "GNormPlus", "PolySearch", "CRAFT", "BC5CDR")
+# An index built before build_index.py kept the sources ('resource') lacks them: its papers then name no source.
+SOURCED = all("resource" in pq.read_schema(IDX / f).names for f in ("gene_pmids.parquet", "disease_pmids.parquet"))
+if not SOURCED:
+    print("sources: gene_pmids.parquet or disease_pmids.parquet has no 'resource' column, so papers won't say which "
+          "curated source linked them (rebuild both with build_index.py gene_pmids disease_pmids)", flush=True)
+
+
+def tag_sources(s: dict, pmids) -> dict[int, list[str]]:
+    """The curated sources PubTator3 merges into its tags of the subject, for a page of papers:
+    {pmid: e.g. ['MESH', 'gene2pubmed']}, papers with none left out. (One small query per page.)"""
+    if not SOURCED:
+        return {}
+    pm = [int(p) for p in pmids]
+    if s["kind"] == "gene":
+        q = f"SELECT pmid, resource FROM '{IDX}/gene_pmids.parquet' WHERE ncbi = ? AND pmid IN (SELECT unnest(?))"
+        args = [s["entrez"] or -1, pm]
+    else:
+        q = f"""SELECT pmid, string_agg(resource, '|') AS resource FROM '{IDX}/disease_pmids.parquet'
+                WHERE pmid IN (SELECT unnest(?)) AND list_contains(?, disease_id) GROUP BY pmid"""
+        args = [pm, s["pubtator"]]
+    out = {}
+    for pmid, res in db().execute(q, args).fetchall():
+        via = sorted({r for r in _split(res) if r not in IN_TEXT})
+        if via:
+            out[pmid] = via
+    return out
+
+
 @lru_cache(maxsize=128)
 def epmc_links(subject: str) -> pd.DataFrame:
     """Europe PMC text-mined gene-disease links (Open Targets evidence) of a gene or disease: pmid,
@@ -317,11 +355,23 @@ def paper_set(subject: str, ot: str = "", ep: str = "") -> pd.DataFrame:
 
 
 def subject_names(s: dict) -> list[str]:
-    """Names looked for in every paper of a gene: its symbol, HGNC aliases and previous symbols (a
-    disease: its name and Open Targets synonyms). Of 3 letters or more but the symbol: shorter ones hit
-    other things (CF, CFTR's old symbol, is everywhere in cystic fibrosis papers)."""
-    more = [*s["aliases"], *s["prev"]] if s["kind"] == "gene" else s["synonyms"]
+    """Names looked for in every paper of a gene: its symbol, HGNC aliases and previous symbols, and its
+    HGNC names (gene_names); a disease: its name and Open Targets synonyms. Of 3 letters or more but the
+    symbol: shorter ones hit other things (CF, CFTR's old symbol, is everywhere in cystic fibrosis papers)."""
+    more = [*s["aliases"], *s["prev"], *gene_names(s)] if s["kind"] == "gene" else s["synonyms"]
     return [w for w in dict.fromkeys([s["label"], *(m for m in more if len(m) >= 3)]) if len(w) > 1]
+
+
+DISEASE_WORDS = re.compile(r"syndrome|disease|deficiency|disorder|an(?:a)?emia|dystroph|dysplasia|ataxia|"
+                           r"susceptib|complementation group|cancer|carcinoma|leuka?emia|tumou?r", re.IGNORECASE)
+
+
+def gene_names(s: dict) -> list[str]:
+    """A gene's HGNC names: its approved name ('aquaporin 4'), and its alias and previous names that
+    aren't a disease's (TP53's alias name 'Li-Fraumeni syndrome' names the disease, not the gene)."""
+    def disease(n):
+        return n.upper() in D_NAME or n.upper() in D_SYNONYM or DISEASE_WORDS.search(n)
+    return [s["name"], *(n for n in [*s["alias_names"], *s["prev_names"]] if not disease(n))]
 
 
 def subject_words(s: dict, mentions) -> list[str]:
@@ -339,33 +389,73 @@ def any_case(word: str) -> bool:
     return len(word) > 5 and word != word.upper()
 
 
+# PubTator3 writes Greek letters as names ('TGF-beta1' for TGF-β1, 'TNFalpha') and Unicode dashes and spaces as
+# plain ones, HGNC writes 'aquaporin 4' where papers write 'aquaporin-4', and a few names keep the letter or a Unicode
+# dash ('β-actin', 'MYC‐modulating lncRNA'): in a word's pattern each Greek letter or its name matches either, and any
+# run of dashes and spaces any other (loose; index.html's loose() is the same). The same pattern, in its case rule
+# (word_re), goes to RE2 (names_re) and to Python's re (the long tail in named_live), so both find the same papers.
+# (Python's re, unlike RE2, also takes the Turkish ı and İ for i in any case: the long tail's prefilter rules out most.)
+GREEK = {"alpha": "αΑ", "beta": "βϐΒ", "gamma": "γΓ", "delta": "δΔ", "epsilon": "εϵΕ", "zeta": "ζΖ", "eta": "ηΗ",
+         "theta": "θϑΘ", "iota": "ιΙ", "kappa": "κϰΚ", "lambda": "λΛ", "mu": "μµΜ", "nu": "νΝ", "xi": "ξΞ",
+         "omicron": "οΟ", "pi": "πϖΠ", "rho": "ρϱΡ", "sigma": "σςΣ", "tau": "τΤ", "upsilon": "υΥ", "phi": "φϕΦ",
+         "chi": "χΧ", "psi": "ψΨ", "omega": "ωΩ"}
+GREEK_NAME = {c: name for name, cs in GREEK.items() for c in cs}  # 'β': 'beta'
+DASHES = "-\u2010-\u2015\u2212"  # (a character-class range)
+SPACES = "".join(c for c in map(chr, range(0x3001)) if c.isspace())  # what Python's \s matches (none above U+3000)
+SEP = {"re2": f"[{DASHES}{SPACES}]+", "re": f"[{DASHES}\\s]+"}  # the same in each (RE2's \s is ASCII only,
+# and Python compiles the long class slowly)
+NAMES = sorted(GREEK, key=len, reverse=True)
+
+
+def greek_names(form) -> str:
+    """Regex: the Greek names in a form (str, str.upper or str.capitalize: PubTator3's 'TNFalpha', 'IL1BETA',
+    'EGFRDeltaIII', but not 'ETa' in 'FETalpha'), longest first, each not where its tail starts a longer name:
+    'Psi' not in 'RPTPsigma' (P + sigma)."""
+    return "|".join(form(x) + "".join(f"(?!{form(y)[len(x) - k:]})" for k in range(1, len(x)) for y in NAMES
+                                      if y.startswith(x[k:]) and len(y) > len(x) - k) for x in NAMES)
+
+
+LOOSE = re.compile(rf"({greek_names(str)}|{greek_names(str.upper)}|{greek_names(str.capitalize)}|"
+                   rf"[{''.join(GREEK_NAME)}])|[{DASHES}\s]+")
+
+
+def loose(word: str, engine: str = "re2") -> str:
+    """Regex for a word as PubTator3 or HGNC wrote it, for RE2 or Python's re: each Greek letter or letter name also
+    matches the other, and each run of dashes and spaces any run of dashes and spaces."""
+    parts, last = [], 0
+    for m in LOOSE.finditer(word):
+        name = GREEK_NAME.get(m[1], m[1])
+        parts += [re.escape(word[last:m.start()]), f"(?:{re.escape(name)}|[{GREEK[name.lower()]}])" if m[1] else SEP[engine]]
+        last = m.end()
+    return "".join(parts) + re.escape(word[last:])
+
+
+def word_re(word: str, engine: str = "re2") -> str:
+    """A word's pattern (loose) in its case rule (any_case)."""
+    return f"(?i:{loose(word, engine)})" if any_case(word) else loose(word, engine)
+
+
 def names_re(words) -> str:
     """RE2 pattern: any of the words, whole (no letter or digit either side), each in its case rule."""
-    alts = "|".join(f"(?i:{re.escape(w)})" if any_case(w) else re.escape(w) for w in sorted(words, key=len, reverse=True))
-    return rf"(?:^|[^\pL\pN])(?:{alts})(?:[^\pL\pN]|$)"
+    return rf"(?:^|[^\pL\pN])(?:{'|'.join(map(word_re, sorted(words, key=len, reverse=True)))})(?:[^\pL\pN]|$)"
 
 
-def has_word(text: str, low: str, word: str) -> bool:
-    """Whether the text (low: lower-cased) has the word whole: no letter or digit either side."""
-    if any_case(word):
-        text, word = low, word.lower()
-    i = text.find(word)
-    while i >= 0:
-        j = i + len(word)
-        if not (i and text[i - 1].isalnum()) and not (j < len(text) and text[j].isalnum()):
-            return True
-        i = text.find(word, i + 1)
-    return False
+def named_pmids(subject: str) -> np.ndarray:
+    """The subject's papers (also the text-mined ones) whose title or abstract names it, sorted: looked up in
+    the precomputed table (NAMED, build_named.py) while it is current, else computed here (named_live)."""
+    if (pm := NAMED.get(info(subject)["id"])) is not None:
+        return pm
+    return named_live(subject)
 
 
 @lru_cache(maxsize=32)
-def named_pmids(subject: str) -> np.ndarray:
-    """The subject's papers (also the text-mined ones) whose title or abstract names it, sorted:
-    subject_names in all of them (one RE2 scan), each paper's own PubTator mentions (subject_words)
+def named_live(subject: str) -> np.ndarray:
+    """named_pmids, computed: reads every title and abstract of the subject (on a cloud disk, minutes for the
+    biggest genes when not cached). subject_names in all of them (one RE2 scan), each paper's own PubTator mentions (subject_words)
     in that paper. Mentions go commonest first, in the papers not yet matched. While a mention is in
     many papers: one RE2 scan of all the titles and abstracts (32 threads). The long tail of rare
-    spellings (a disease has thousands) in Python: RE2 takes ~6 ms to compile a pattern with Unicode
-    classes. (Title and abstract are matched apart: joining them took 4 s for 875k papers.)"""
+    spellings (a disease has thousands) with Python's re, in the same patterns (word_re): RE2 takes ~6 ms to
+    compile one. (Title and abstract are matched apart: joining them took 4 s for 875k papers.)"""
     s = info(subject)
     tagged, _ = subject_tags(subject)
     pm = np.union1d(paper_set(subject).pmid.to_numpy(), epmc_links(subject).pmid.to_numpy())
@@ -396,10 +486,15 @@ def named_pmids(subject: str) -> np.ndarray:
         return pm[named]
     rest = [(word, idx[~named[idx]]) for word, idx in groups[n:]]
     todo = np.unique(np.concatenate([idx for _, idx in rest]))
-    texts = {i: f"{a}\n{b}" for i, a, b in zip(todo.tolist(), title.take(todo).to_pylist(), abstract.take(todo).to_pylist())}
-    lows = {i: x.lower() for i, x in texts.items()}
+    texts = dict(zip(todo.tolist(), zip(title.take(todo).to_pylist(), abstract.take(todo).to_pylist())))
+    folded = {i: f"{a}\n{b}".casefold() for i, (a, b) in texts.items()}
     for word, idx in rest:
-        named[[i for i in idx.tolist() if not named[i] and has_word(texts[i], lows[i], word)]] = True
+        # Only a paper with every plain piece of the word in it (in any case) can match: most papers lack one, and
+        # compiling costs more than searching. (Python's [^\W_] is RE2's [\pL\pN]: a letter or digit.)
+        pieces = [p.casefold() for p in LOOSE.split(word)[::2] if p]
+        if idx := [i for i in idx.tolist() if not named[i] and all(p in folded[i] for p in pieces)]:
+            has = re.compile(rf"(?<![^\W_]){word_re(word, 're')}(?![^\W_])").search
+            named[[i for i in idx if has(texts[i][0]) or has(texts[i][1])]] = True
     return pm[named]
 
 
@@ -409,6 +504,95 @@ def matches(text: pa.Array, pattern: str) -> np.ndarray:
     parts = POOL.map(lambda i: pc.match_substring_regex(text.slice(i, step), pattern).to_numpy(zero_copy_only=False),
                      range(0, len(text), step))
     return np.concatenate([np.zeros(0, bool), *parts])
+
+
+# ---------------------------------------------------------------- named: precomputed
+# build_named.py runs named_live for every gene (with --diseases also every disease) into NAMED_FILE: one row per
+# subject, its sorted named pmids. Held in memory, so the 'Named in the abstract' count reads no abstracts. Used
+# only while it matches the code that decides naming (naming_code, hashed) and the index files it reads (by size).
+NAMED_FILE = IDX / "named_pmids.parquet"
+NAMED_INPUTS = ("abstracts.arrow", "gene_pmids.parquet", "epmc.parquet", "curated.parquet", "genes.parquet",
+                "diseases.parquet")  # (and disease_pmids.parquet for a table with diseases)
+
+
+def naming_code() -> str:
+    """The code that decides naming, as this process loaded it (SOURCE; parsed, so comments, layout and docstrings
+    don't count): named_live, every top-level function and global it reads, directly or through another, and every
+    top-level statement that mentions such a global (e.g. the loop that fills D_NAME, which gene_names reads).
+    Found with Python's own scoping (symtable), so a new helper or lookup counts without being listed, wherever it
+    is in the file. Imported modules, builtins and __file__ don't lead further (else every statement using re would
+    count)."""
+    tree = ast.parse(SOURCE)
+    defs = {n.name: n for n in tree.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))}
+    stmts = [n for n in tree.body if not isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))]
+
+    def reads(t: symtable.SymbolTable) -> set[str]:  # the module-level names a function reads, also in its lambdas
+        return {y.get_name() for y in t.get_symbols() if y.is_global()}.union(*(reads(c) for c in t.get_children()))
+
+    def names(stmt) -> set[str]:  # the names a top-level statement mentions, but not its loop variables
+        loops = {n.id for t in ast.walk(stmt) if isinstance(t, (ast.For, ast.comprehension))
+                 for n in ast.walk(t.target) if isinstance(n, ast.Name)}
+        return {n.id for n in ast.walk(stmt) if isinstance(n, ast.Name)} - loops
+
+    def bare(node) -> str:  # dumped without docstrings
+        for n in ast.walk(node):
+            if (isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and isinstance(n.body[0], ast.Expr)
+                    and isinstance(n.body[0].value, ast.Constant) and isinstance(n.body[0].value.value, str)):
+                n.body = n.body[1:] or [ast.Pass()]
+        return ast.dump(node)
+
+    uses = {t.get_name(): reads(t) for t in symtable.symtable(SOURCE, "app.py", "exec").get_children()}
+    said = [names(st) for st in stmts]
+    skip = set(dir(builtins)) | {"__file__"} | {a.asname or a.name.split(".")[0] for st in stmts
+                                 if isinstance(st, (ast.Import, ast.ImportFrom)) for a in st.names}
+    seen, kept, todo = set(), set(), ["named_live"]
+    while todo:
+        name = todo.pop()
+        if name in seen or name in skip:
+            continue
+        seen.add(name)
+        todo += uses.get(name, ())
+        for i, mentioned in enumerate(said):
+            if name in mentioned and i not in kept:
+                kept.add(i)
+                todo += mentioned
+    return "\n".join([bare(defs[n]) for n in sorted(seen & defs.keys())] + [ast.dump(stmts[i]) for i in sorted(kept)])
+
+
+def named_stamp(diseases: bool = False) -> dict[str, str]:
+    """What a named table is valid for: a hash of naming_code() and the Python version (ast.dump's text changes
+    between versions: 3.13 leaves out empty fields), whether it has the diseases, and the size and modification time
+    (whole seconds) of each index file naming reads, as make and rsync judge a file unchanged (hashing 50 GB at every
+    start is too slow). Kept in the table's metadata by build_named.py. Copy the index files with their times
+    (rsync -a, tar, scp -p): a new time makes the table stale, and the app counts live."""
+    def stat(f: str) -> str:
+        return f"{(s := (IDX / f).stat()).st_size} bytes, {s.st_mtime_ns // 10**9}" if (IDX / f).exists() else "missing"
+    files = NAMED_INPUTS + (("disease_pmids.parquet",) if diseases else ())
+    return {"code": hashlib.sha256(naming_code().encode()).hexdigest()[:16], "python": "%d.%d" % sys.version_info[:2],
+            "diseases": str(int(diseases)), **{f: stat(f) for f in files}}
+
+
+def load_named() -> tuple[dict[str, np.ndarray], str]:
+    """({subject id: its sorted named pmids}, what was loaded or why not). Nothing if NAMED_FILE is missing,
+    unreadable or stale: named_pmids then counts live."""
+    try:
+        t = pq.read_table(NAMED_FILE)
+    except FileNotFoundError:
+        return {}, f"no {NAMED_FILE.name}: counting live (build it with build_named.py)"
+    except (OSError, pa.ArrowException) as e:
+        return {}, f"{NAMED_FILE.name} unreadable ({e}): counting live"
+    built = {k.decode(): v.decode() for k, v in (t.schema.metadata or {}).items()}
+    if stale := [f"{k} {built.get(k)} -> {v}" for k, v in named_stamp(built.get("diseases") == "1").items()
+                 if built.get(k) != v]:
+        return {}, f"{NAMED_FILE.name} is stale ({'; '.join(stale)}): counting live (rebuild it with build_named.py)"
+    pmids = t["pmids"].combine_chunks()
+    ends = np.cumsum(pc.list_value_length(pmids).to_numpy())
+    named = dict(zip(t["subject"].to_pylist(), np.split(pmids.flatten().to_numpy().astype(np.int64), ends[:-1])))
+    return named, f"{len(named):,} subjects precomputed ({int(ends[-1]) if len(ends) else 0:,} papers)"
+
+
+NAMED, NAMED_STATUS = load_named()
+print(f"named: {NAMED_STATUS}", flush=True)
 
 
 def query_words(term: str) -> dict[str, str]:
@@ -593,6 +777,7 @@ def describe(df: pd.DataFrame, subject: str, term: str) -> list[dict]:
     ep = epmc_links(subject)
     ep_by = {p: g.fid.tolist() for p, g in ep[ep.pmid.isin(df.pmid)].groupby("pmid")}
     ep_n = epmc_counts(subject)
+    via = tag_sources(s, df.pmid)
     own = set(s.get("pubtator", []))  # a disease's own PubTator tags are on every paper: not shown
     stems = set(query_words(term).values()) if term.strip() else set()
     rows = df.row.to_numpy()
@@ -609,6 +794,7 @@ def describe(df: pd.DataFrame, subject: str, term: str) -> list[dict]:
             "journal": a["journal"], "bm25": _num(bm, 2) if bm > 0 else None, "sim": _num(sim, 3),
             "kw_rank": _num(kw, 0), "sem_rank": _num(mn, 0),
             "mentions": _split(mentions.get(pmid)),
+            "via": via.get(pmid, []),  # PubTator3's curated sources (MESH, gene2pubmed...)
             "term_words": sorted({w for w in set(WORD.findall(text.lower())) if STEMMER.stemWord(w) in stems}),
             "curated": [] if c is None else [
                 {"id": f, "name": n, "sources": sorted({x for v in g.sources for x in v})}
@@ -740,7 +926,9 @@ def facet_names(*ids: str) -> dict[str, str]:
 
 @app.get("/api/paper")
 def api_paper(subject: str, pmid: int, term: str = ""):
-    """One paper as in the list (the map's click-through)."""
+    """One paper as in the list (the map's click-through): one of the subject's papers."""
+    if not (paper_set(subject).pmid.to_numpy() == pmid).any():
+        raise HTTPException(404, f"PMID {pmid} is not one of {subject}'s papers.")
     df = pd.DataFrame({"pmid": [pmid], "row": rows_for(np.array([pmid])), "bm25": np.nan, "sim": np.nan,
                        "kw_rank": np.nan, "sem_rank": np.nan})
     return describe(df, subject, term)[0]
@@ -995,6 +1183,9 @@ def api_about():
     source paths build_index.py read."""
     rows = lambda f: pq.ParquetFile(IDX / f).metadata.num_rows
     full = semantic.full_index()
+    by_source = CURATED.explode("sources")
+    sizes = lambda d: {"links": len(d), "papers": int(d.pmid.nunique()), "pairs": int(d[["ensembl", "disease_id"]].drop_duplicates().shape[0])}
+    ep_papers, ep_pairs = db().execute(f"SELECT count(DISTINCT pmid), count(DISTINCT (ensembl, disease_id)) FROM '{IDX}/epmc.parquet'").fetchone()
     llm = litmap._llm_config()
     return {
         "pubmed": {"n": len(PMIDS)},
@@ -1004,8 +1195,10 @@ def api_about():
         "opentargets": {"version": Path(build_index.OT).name, "curated_links": len(CURATED),
                         "curated_papers": int(CURATED.pmid.nunique()),
                         "curated_pairs": int(CURATED[["ensembl", "disease_id"]].drop_duplicates().shape[0]),
-                        "epmc_links": rows("epmc.parquet")},
+                        "by_source": {k: sizes(d) for k, d in by_source.groupby("sources")},
+                        "epmc_links": rows("epmc.parquet"), "epmc_papers": ep_papers, "epmc_pairs": ep_pairs},
         "diseases": {"n": len(DISEASES), "n_pubtator_only": int(DISEASES.disease_id.str.match(r"MESH:|OMIM:").sum())},
+        "named": {"n_precomputed": len(NAMED), "status": NAMED_STATUS},  # 'named in the abstract' lookups (build_named.py)
         "embeddings": {"model": semantic.MODEL, "revision": semantic.REVISION, "dim": semantic.DIM,
                        "n": None if full is None else len(full.pmids)},
         "topic_names": llm.get("model", "google/gemini-3.1-flash-lite") if llm else None,
