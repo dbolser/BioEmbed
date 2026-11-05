@@ -74,6 +74,9 @@
   .tabs button { border: 2px solid var(--line); border-bottom: none; border-radius: 8px 8px 0 0; padding: .35rem 1.2rem;
     background: var(--panel); margin-bottom: -2px; font-weight: bold; }
   .tabs button[aria-selected=true] { background: var(--bg); border-color: var(--line); border-bottom: 2px solid var(--bg); color: var(--gene); }
+  /* work-in-progress tabs: still clickable, but look provisional (a grey still over 4.5:1 contrast, cream too) */
+  .tabs button.wip { color: #6e6e6e; font-weight: normal; border-style: dashed; background: transparent; }
+  .tabs button.wip[aria-selected=true] { color: var(--muted); background: var(--bg); }
   /* active filters */
   .filters { display: flex; flex-wrap: wrap; gap: .5rem .7rem; align-items: center; margin: .9rem 0 0;
     padding: .5rem .8rem; border: 2px solid var(--cur); border-radius: 10px; background: var(--panel); }
@@ -640,8 +643,10 @@ function howHTML() {
 }
 
 function tabsHTML() {
-  const t = (v, label) => `<button type="button" role="tab" data-view="${v}" aria-selected="${S.view === v}">${label}</button>`;
-  return `<div class="tabs" role="tablist">${t("", "List")}${t("map", "Map")}${t("explore", "Map Explorer")}${t("landscape", "PubMedBERT map")}${t("medmap", "MedEmbed map")}</div>`;
+  const t = (v, label, wip = false) => `<button type="button" role="tab" data-view="${v}" aria-selected="${S.view === v}"${
+    wip ? ` class="wip" title="Work in progress"` : ""}>${label}</button>`;
+  return `<div class="tabs" role="tablist">${t("", "List")}${t("map", "Map")}${t("explore", "Map Explorer", true)}${
+    t("landscape", "PubMedBERT map", true)}${t("medmap", "MedEmbed map", true)}</div>`;
 }
 
 function wireTop() {
