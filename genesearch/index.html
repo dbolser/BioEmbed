@@ -681,7 +681,7 @@ function scopeText(n, facets = true) {  // facets: false for the map, which is o
 
 // A year box: empty shows the subject's first or last year greyed (placeholder), and the arrow keys and spinner
 // step from that year (browsers step an empty box from 0). A step's input event has no inputType; typing's has.
-// The list is redrawn after each change, so the box gets the focus back for the next step.
+// The list is redrawn after each change, so the box gets the focus back for the next step (unless the user moved on).
 function yearBox(el, set) {
   let was = el.value;
   el.oninput = (e) => {
@@ -689,7 +689,9 @@ function yearBox(el, set) {
     was = el.value;
   };
   el.onchange = () => { yearFocus = document.activeElement === el ? el.id : null; set(el.value); };  // (not after a click away)
-  if (yearFocus === el.id) { yearFocus = null; el.focus(); }
+  // Left before the redraw: no focus back. (A redraw blurs the box too, as it removes it: still in the page then, gone after.)
+  el.onblur = () => queueMicrotask(() => { if (el.isConnected) yearFocus = null; });
+  if (yearFocus === el.id) { yearFocus = null; if (document.activeElement === document.body) el.focus(); }  // (nothing else took it)
 }
 let yearFocus = null;  // the year box to focus again once the list is redrawn
 
