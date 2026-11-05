@@ -2,8 +2,8 @@
 
 Outputs (all sorted for fast lookup):
   abstracts.parquet      pmid, title, abstract, year, journal          (sorted by pmid)
-  gene_pmids.parquet     ncbi, pmid, mentions                          (sorted by ncbi, pmid)
-  disease_pmids.parquet  pmid, disease_id, mentions                    (sorted by pmid)
+  gene_pmids.parquet     ncbi, pmid, mentions, resource                (sorted by ncbi, pmid)
+  disease_pmids.parquet  pmid, disease_id, mentions, resource          (sorted by pmid)
   disease_names.parquet  disease_id, name, ot_name, n_papers  (PubTator MeSH/OMIM ids + Open Targets ids)
   genes.parquet          HGNC lookup table + n_papers
   curated.parquet        Open Targets curated gene-disease-PMID links (copy of the gold file)
@@ -50,6 +50,11 @@ def pubtator_csv(name: str) -> str:
             "columns={'pmid':'BIGINT','type':'VARCHAR','ids':'VARCHAR','mentions':'VARCHAR','resource':'VARCHAR'})")
 
 
+# A tag's sources, sorted and '|'-joined: PubTator3 (its text mining) and the curated ones it merges in
+# (MESH indexing, gene2pubmed, generifs_basic, CTD, BioGRID...). (res: one input row's list, repeated per mention.)
+RESOURCE = "array_to_string(list_sort(list_filter(list_distinct(flatten(list(res))), r -> r <> '')), '|') AS resource"
+
+
 def abstracts(con):
     # Some PMIDs were ingested twice; keep one per PMID by record_hash (repo convention).
     con.sql(f"""
@@ -70,12 +75,14 @@ def abstracts(con):
 def gene_pmids(con):
     # One row per (gene, pmid); multi-gene ids like '5595;5594' count for each gene. ~12M rows are
     # curated links (gene2pubmed, GeneRIF, CTD, MeSH) with no text mention: kept, mentions ''.
+    # resource: PubTator3's sources of the link, e.g. 'PubTator3' (its text mining), 'MESH|gene2pubmed'.
     con.sql(f"""
         COPY (
           SELECT CAST(ncbi AS BIGINT) AS ncbi, pmid,
-                 coalesce(string_agg(DISTINCT m, '|' ORDER BY m) FILTER (WHERE m <> ''), '') AS mentions
-          FROM (SELECT ncbi, pmid, unnest(string_split(coalesce(mentions, ''), '|')) AS m
-                FROM (SELECT pmid, unnest(string_split(ids, ';')) AS ncbi, mentions
+                 coalesce(string_agg(DISTINCT m, '|' ORDER BY m) FILTER (WHERE m <> ''), '') AS mentions,
+                 {RESOURCE}
+          FROM (SELECT ncbi, pmid, unnest(string_split(coalesce(mentions, ''), '|')) AS m, string_split(resource, '|') AS res
+                FROM (SELECT pmid, unnest(string_split(ids, ';')) AS ncbi, mentions, resource
                       FROM {pubtator_csv('gene2pubtator3.gz')}))
           WHERE try_cast(ncbi AS BIGINT) IS NOT NULL
           GROUP BY ALL
@@ -87,9 +94,10 @@ def disease_pmids(con):
     con.sql(f"""
         COPY (
           SELECT pmid, disease_id,
-                 coalesce(string_agg(DISTINCT m, '|' ORDER BY m) FILTER (WHERE m <> ''), '') AS mentions
-          FROM (SELECT disease_id, pmid, unnest(string_split(coalesce(mentions, ''), '|')) AS m
-                FROM (SELECT pmid, unnest(string_split(ids, ';')) AS disease_id, mentions
+                 coalesce(string_agg(DISTINCT m, '|' ORDER BY m) FILTER (WHERE m <> ''), '') AS mentions,
+                 {RESOURCE}
+          FROM (SELECT disease_id, pmid, unnest(string_split(coalesce(mentions, ''), '|')) AS m, string_split(resource, '|') AS res
+                FROM (SELECT pmid, unnest(string_split(ids, ';')) AS disease_id, mentions, resource
                       FROM {pubtator_csv('disease2pubtator3.gz')}))
           WHERE disease_id NOT IN ('', '-')
           GROUP BY ALL

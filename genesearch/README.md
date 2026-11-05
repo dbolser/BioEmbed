@@ -47,7 +47,14 @@ How it works
   no query prompt). Query = the ranking words; papers = `title\n\nabstract`; cosine similarity (`semantic.py`).
   Hybrid = reciprocal-rank fusion, 1/(60 + keyword rank) + 1/(60 + semantic rank).
 - Named in the abstract: the paper's PubTator3 mentions of the gene (or disease) plus its symbol (name), found
-  whole in the title or abstract, as the page highlights them (`named_pmids` in `app.py`).
+  whole in the title or abstract, as the page highlights them (`named_pmids` in `app.py`). PubTator3 writes Greek
+  letters as names and Unicode dashes and spaces as plain ones ('TGF-beta1' for TGF-β1): both spellings match
+  (`loose`/`fold` in `app.py`, `loose` in `index.html`). Before this, IFNG, TGFB1 and IL1B had about half their
+  naming papers missed.
+- A paper that does not name it says why it is listed, one sentence per source: PubTator3 tagged it in the full
+  text (its words not being in the title or abstract), a curated source PubTator3 merges in (MeSH indexing,
+  gene2pubmed, GeneRIF, CTD, BioGRID...: the `resource` column of `gene_pmids`/`disease_pmids`, `tag_sources` in
+  `app.py`), Open Targets curation, or Europe PMC text mining.
 - Paper vectors: from `index/emb_medembed_small/` (whole PubMed: float16 `.npy` shards + `pmids.npy`,
   memory-mapped) once that exists and is complete. Until then they are computed on CPU for one gene's papers
   when first needed (~50-130 papers/s, shown as a progress bar), capped at the 30,000 best keyword matches,

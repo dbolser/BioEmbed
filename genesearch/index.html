@@ -287,7 +287,21 @@ const anyCase = (w) => [...w].map((c) => {
   const l = c.toLowerCase(), u = c.toUpperCase();
   return l === u || l.length > 1 || u.length > 1 ? reEsc(c) : `[${l}${u}]`;
 }).join("");
-const geneCase = (w) => (w.length > 5 && w !== w.toUpperCase() ? anyCase(w) : reEsc(w));
+// PubTator3 writes Greek letters as names ("TGF-beta1" for TGF-β1, "TNFalpha") and Unicode dashes and spaces as
+// plain ones: let each of them match what the paper wrote (as app.py's loose()). f: the case rule for the rest.
+const GREEK = {alpha: "αΑ", beta: "βϐΒ", gamma: "γΓ", delta: "δΔ", epsilon: "εϵΕ", zeta: "ζΖ", eta: "ηΗ", theta: "θϑΘ",
+               iota: "ιΙ", kappa: "κϰΚ", lambda: "λΛ", mu: "μµΜ", nu: "νΝ", xi: "ξΞ", omicron: "οΟ", pi: "πϖΠ", rho: "ρϱΡ",
+               sigma: "σςΣ", tau: "τΤ", upsilon: "υΥ", phi: "φϕΦ", chi: "χΧ", psi: "ψΨ", omega: "ωΩ"};
+const LOOSE = new RegExp(`(${Object.keys(GREEK).sort((a, b) => b.length - a.length).join("|")})|(-)|(\\s+)`, "gi");
+function loose(w, f) {
+  let out = "", last = 0;
+  for (const m of w.matchAll(LOOSE)) {
+    out += f(w.slice(last, m.index)) + (m[1] ? `(?:${f(m[1])}|[${GREEK[m[1].toLowerCase()]}])` : m[2] ? "[-\u2010-\u2015\u2212]" : "\\s+");
+    last = m.index + m[0].length;
+  }
+  return out + f(w.slice(last));
+}
+const geneCase = (w) => loose(w, w.length > 5 && w !== w.toUpperCase() ? anyCase : reEsc);
 function highlighter(geneWords, termWords) {
   const alt = (ws, f) => [...new Set(ws.filter((w) => w && w.length > 1))].sort((a, b) => b.length - a.length).map(f).join("|") || "(?!)";
   const re = new RegExp(`(?<![\\p{L}\\p{N}])(?:(${alt(geneWords, geneCase)})|(${alt(termWords, anyCase)}))(?![\\p{L}\\p{N}])`, "gu");
@@ -736,6 +750,31 @@ function scoreText(p) {
   return p.bm25 != null ? `keyword score ${p.bm25}` : "";
 }
 
+// Why a paper whose title and abstract don't name the gene (or disease) is listed: each source that links it.
+// p.via: the curated sources PubTator3 merges into its tags (no words in the text).
+const VIA = {MESH: "MeSH indexing", gene2pubmed: "NCBI’s gene2pubmed", generifs_basic: "a GeneRIF",
+             gene_interactions: "NCBI’s gene interactions"};
+const andList = (xs) => xs.length < 2 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}`;
+// up to 3 words in quotes, one per spelling ignoring case: “AQP4”, “aquaporin-4” and 2 more
+const quoted = (ms) => {
+  const uniq = [...new Map(ms.map((m) => [m.toLowerCase(), m])).values()];
+  return andList([...uniq.slice(0, 3).map((m) => `“${esc(m)}”`), ...(uniq.length > 3 ? [`${uniq.length - 3} more`] : [])]);
+};
+function notNamedHTML(p) {
+  // A word PubTator3 tagged that the page looks for and did not find in the title or abstract is in the full text.
+  // It does not look for one-letter words, or lower-case spellings of a gene's symbol ("clock" for CLOCK).
+  const looked = (m) => realMention(m) && m.length > 1;
+  const why = [], via = p.via || [], words = p.mentions.filter(looked), other = p.mentions.filter((m) => !looked(m));
+  if (words.length) why.push(`It was tagged in the full text by PubTator3 (as ${quoted(words)}).`);
+  else if (other.length) why.push(`PubTator3 tagged ${quoted(other)} as ${esc(G.label)}.`);
+  if (via.length) why.push(`It was linked by ${andList(via.map((v) => esc(VIA[v] || v)))} (via PubTator3).`);
+  if (p.curated.length) why.push(`It was linked by Open Targets curation (${esc(sources([...new Set(p.curated.flatMap((c) => c.sources))]))}).`);
+  if (p.epmc.length) why.push(`It was linked to ${p.epmc.length === 1 ? esc(p.epmc[0].name)
+    : `${p.epmc.length} ${G.kind === "gene" ? "diseases" : "genes"}`} by Europe PMC text mining.`);
+  if (!why.length) why.push("It was linked by curation or MeSH indexing (via PubTator3).");  // (a server without p.via)
+  return `<div class="hint">${esc(G.label)} is not named in the title or abstract. ${why.join(" ")}</div>`;
+}
+
 const EP_SHOWN = 6;  // text-mined chips shown per paper before "+N more"
 function paperHTML(p, h) {
   const url = `https://pubmed.ncbi.nlm.nih.gov/${p.pmid}/`;
@@ -763,7 +802,7 @@ function paperHTML(p, h) {
     ${meta ? `<div class="meta">${meta}</div>` : ""}
     ${links ? `<div>${links}</div>` : ""}
     ${chips ? `<div>${chips}</div>` : ""}
-    ${p.title && !named ? `<div class="hint">${esc(G.label)} is not named in the title or abstract (tagged in the full text, or linked by curation or MeSH).</div>` : ""}
+    ${p.title && !named ? notNamedHTML(p) : ""}
     ${abs ? `<details class="abs"><summary>Abstract</summary><p class="abstract">${abs}</p></details>` : ""}
   </li>`;
 }

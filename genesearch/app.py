@@ -275,6 +275,30 @@ def subject_tags(subject: str) -> tuple[dict[int, str], pd.DataFrame]:
     return dict(zip(tagged["pmid"].tolist(), tagged["mentions"].tolist())), cur[["pmid", "fid", "fname", "sources"]]
 
 
+# PubTator3's sources that tag words in the paper (its own text mining, older taggers, the CRAFT and BC5CDR
+# hand-annotated corpora); the rest link papers by curation or indexing (MESH, gene2pubmed, GeneRIF, CTD...)
+IN_TEXT = ("PubTator3", "GNormPlus", "PolySearch", "CRAFT", "BC5CDR")
+
+
+def tag_sources(s: dict, pmids) -> dict[int, list[str]]:
+    """The curated sources PubTator3 merges into its tags of the subject, for a page of papers:
+    {pmid: e.g. ['MESH', 'gene2pubmed']}, papers with none left out. (One small query per page.)"""
+    pm = [int(p) for p in pmids]
+    if s["kind"] == "gene":
+        q = f"SELECT pmid, resource FROM '{IDX}/gene_pmids.parquet' WHERE ncbi = ? AND pmid IN (SELECT unnest(?))"
+        args = [s["entrez"] or -1, pm]
+    else:
+        q = f"""SELECT pmid, string_agg(resource, '|') AS resource FROM '{IDX}/disease_pmids.parquet'
+                WHERE pmid IN (SELECT unnest(?)) AND list_contains(?, disease_id) GROUP BY pmid"""
+        args = [pm, s["pubtator"]]
+    out = {}
+    for pmid, res in db().execute(q, args).fetchall():
+        via = sorted({r for r in _split(res) if r not in IN_TEXT})
+        if via:
+            out[pmid] = via
+    return out
+
+
 @lru_cache(maxsize=128)
 def epmc_links(subject: str) -> pd.DataFrame:
     """Europe PMC text-mined gene-disease links (Open Targets evidence) of a gene or disease: pmid,
@@ -339,14 +363,48 @@ def any_case(word: str) -> bool:
     return len(word) > 5 and word != word.upper()
 
 
+# PubTator3 writes Greek letters as names ('TGF-beta1' for TGF-β1, 'TNFalpha') and Unicode dashes and spaces as
+# plain ones: a word's RE2 pattern lets each of them match what the paper wrote (loose; index.html's loose() is the
+# same), and the long tail of rare words is matched in text folded to PubTator3's spelling (fold).
+GREEK = {"alpha": "αΑ", "beta": "βϐΒ", "gamma": "γΓ", "delta": "δΔ", "epsilon": "εϵΕ", "zeta": "ζΖ", "eta": "ηΗ",
+         "theta": "θϑΘ", "iota": "ιΙ", "kappa": "κϰΚ", "lambda": "λΛ", "mu": "μµΜ", "nu": "νΝ", "xi": "ξΞ",
+         "omicron": "οΟ", "pi": "πϖΠ", "rho": "ρϱΡ", "sigma": "σςΣ", "tau": "τΤ", "upsilon": "υΥ", "phi": "φϕΦ",
+         "chi": "χΧ", "psi": "ψΨ", "omega": "ωΩ"}
+DASH, SPACE = "[-\u2010-\u2015\u2212]", "[\\s\u00a0\u2000-\u200a\u202f\u205f\u3000]+"
+LOOSE = re.compile(rf"({'|'.join(sorted(GREEK, key=len, reverse=True))})|(-)|(\s+)", re.IGNORECASE)
+
+
+def loose(word: str) -> str:
+    """Regex for a word as PubTator3 wrote it: its Greek letter names, hyphens and spaces also match their
+    Unicode forms."""
+    parts, last = [], 0
+    for m in LOOSE.finditer(word):
+        parts += [re.escape(word[last:m.start()]),
+                  f"(?:{re.escape(m[1])}|[{GREEK[m[1].lower()]}])" if m[1] else DASH if m[2] else SPACE]
+        last = m.end()
+    return "".join(parts) + re.escape(word[last:])
+
+
 def names_re(words) -> str:
     """RE2 pattern: any of the words, whole (no letter or digit either side), each in its case rule."""
-    alts = "|".join(f"(?i:{re.escape(w)})" if any_case(w) else re.escape(w) for w in sorted(words, key=len, reverse=True))
+    alts = "|".join(f"(?i:{loose(w)})" if any_case(w) else loose(w) for w in sorted(words, key=len, reverse=True))
     return rf"(?:^|[^\pL\pN])(?:{alts})(?:[^\pL\pN]|$)"
 
 
+FOLD = {**{c: name for name, cs in GREEK.items() for c in cs}, **dict.fromkeys("\u2010\u2011\u2012\u2013\u2014\u2015\u2212", "-")}
+TO_FOLD = re.compile(f"[{''.join(FOLD)}]|\\s{{2,}}|[^\\S ]")  # a run of spaces, or one that isn't ' '
+
+
+def fold(text: str) -> str:
+    """Text in PubTator3's spelling, for plain matching (what loose() does in a pattern): Greek letters as names,
+    Unicode dashes as '-', each run of spaces as one space."""
+    if text.isascii() and text.isprintable() and "  " not in text:  # most texts: nothing to fold (fast checks)
+        return text
+    return TO_FOLD.sub(lambda m: FOLD.get(m[0], " "), text)
+
+
 def has_word(text: str, low: str, word: str) -> bool:
-    """Whether the text (low: lower-cased) has the word whole: no letter or digit either side."""
+    """Whether the text (low: lower-cased) has the word whole: no letter or digit either side. Both folded."""
     if any_case(word):
         text, word = low, word.lower()
     i = text.find(word)
@@ -396,9 +454,10 @@ def named_pmids(subject: str) -> np.ndarray:
         return pm[named]
     rest = [(word, idx[~named[idx]]) for word, idx in groups[n:]]
     todo = np.unique(np.concatenate([idx for _, idx in rest]))
-    texts = {i: f"{a}\n{b}" for i, a, b in zip(todo.tolist(), title.take(todo).to_pylist(), abstract.take(todo).to_pylist())}
+    texts = {i: f"{fold(a)}\n{fold(b)}" for i, a, b in zip(todo.tolist(), title.take(todo).to_pylist(), abstract.take(todo).to_pylist())}
     lows = {i: x.lower() for i, x in texts.items()}
     for word, idx in rest:
+        word = fold(word)
         named[[i for i in idx.tolist() if not named[i] and has_word(texts[i], lows[i], word)]] = True
     return pm[named]
 
@@ -593,6 +652,7 @@ def describe(df: pd.DataFrame, subject: str, term: str) -> list[dict]:
     ep = epmc_links(subject)
     ep_by = {p: g.fid.tolist() for p, g in ep[ep.pmid.isin(df.pmid)].groupby("pmid")}
     ep_n = epmc_counts(subject)
+    via = tag_sources(s, df.pmid)
     own = set(s.get("pubtator", []))  # a disease's own PubTator tags are on every paper: not shown
     stems = set(query_words(term).values()) if term.strip() else set()
     rows = df.row.to_numpy()
@@ -609,6 +669,7 @@ def describe(df: pd.DataFrame, subject: str, term: str) -> list[dict]:
             "journal": a["journal"], "bm25": _num(bm, 2) if bm > 0 else None, "sim": _num(sim, 3),
             "kw_rank": _num(kw, 0), "sem_rank": _num(mn, 0),
             "mentions": _split(mentions.get(pmid)),
+            "via": via.get(pmid, []),  # PubTator3's curated sources (MESH, gene2pubmed...)
             "term_words": sorted({w for w in set(WORD.findall(text.lower())) if STEMMER.stemWord(w) in stems}),
             "curated": [] if c is None else [
                 {"id": f, "name": n, "sources": sorted({x for v in g.sources for x in v})}
