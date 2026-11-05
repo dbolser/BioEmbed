@@ -9,9 +9,11 @@ and semantic or hybrid words keep every paper. Each map comes from app.api_map, 
 lands under the key the app looks for. Maps already made are kept (a rebuild would move every dot and renumber the
 topics in shared links); one named by topic terms (the LLM failed) is named again. Ctrl-C stops after the maps in
 progress, and a rerun carries on. About 36,000 maps (~16 GB, ~$12 of LLM names) take a few hours with 14 workers
-of 8 threads on the 112-core box. A map's key is its exact list of papers: after an index rebuild that changes a
-subject's papers, or a MAP_VERSION bump, its map is made again when opened (or by rerunning this). Map files don't
-say whose they are: index/cache/maps_manifest.jsonl lists each subject's key.
+of 8 threads on the 112-core box; the run stops if the disk gets under 2 GB free. A map's key is its exact list
+of papers (and app.MAP_VERSION): after an index rebuild that changes a subject's papers, its map is made again
+when opened, or by rerunning this. A rebuild that changes only vectors, titles, years or curated flags leaves the
+old maps in place: bump MAP_VERSION, then rerun this. Map files don't say whose they are:
+index/cache/maps_manifest.jsonl lists each subject's key.
 """
 
 import argparse
@@ -29,6 +31,7 @@ from concurrent.futures.process import BrokenProcessPool
 from pathlib import Path
 
 TIMEOUT = 900  # s for one map; a longer one is reported as an error
+MIN_FREE = 2e9  # bytes free on the maps' disk below which the run stops (a map takes up to ~3.5 MB)
 
 
 def threads_env(threads: int):
@@ -109,14 +112,19 @@ def main():
     if semantic.source() != "full":
         sys.exit(f"The whole-PubMed vectors ({semantic.FULL_DIR}) aren't loaded: map keys would say 'cpu'.")
     app.MAPS.mkdir(parents=True, exist_ok=True)
-    if (free := shutil.disk_usage(app.MAPS).free / 1e9) < 25:
-        sys.exit(f"{free:.0f} GB free at {app.MAPS}: all the maps take ~16 GB.")
+    if shutil.disk_usage(app.MAPS).free < MIN_FREE:
+        sys.exit(f"Under {MIN_FREE / 1e9:.0f} GB free at {app.MAPS} (all the maps take ~16 GB).")
     subjects = ([] if a.diseases else list(zip(app.GENES.n_papers, app.GENES.hgnc_id))) + \
                ([] if a.genes else list(zip(app.DISEASES.n_papers, app.DISEASES.disease_id)))
     subjects = [s for _, s in sorted(subjects, reverse=True)][:a.limit]  # biggest first: no straggler at the end
     workers = a.workers or default_workers(a.threads)
     manifest = app.MAPS.parent / "maps_manifest.jsonl"
-    listed = {(r["sid"], r["key"]) for r in map(json.loads, manifest.open())} if manifest.exists() else set()
+    listed = set()
+    for line in manifest.read_text().splitlines() if manifest.exists() else []:
+        try:
+            listed.add(((r := json.loads(line))["sid"], r["key"]))
+        except ValueError:  # (a line cut short by a crash: that map is listed again)
+            pass
     print(f"{len(subjects):,} subjects, {workers} workers x {a.threads} threads, into {app.MAPS}", flush=True)
 
     t0, last, count, terms = time.time(), time.time(), Counter(), 0
@@ -132,6 +140,8 @@ def main():
                     for i, f in enumerate(as_completed([pool.submit(one, s) for s in subjects]), 1):
                         r = f.result()
                         count[r["status"]] += 1
+                        if shutil.disk_usage(app.MAPS).free < MIN_FREE:  # (stops the pool, below)
+                            sys.exit(f"Under {MIN_FREE / 1e9:.0f} GB free at {app.MAPS}: stopped (rerun to carry on).")
                         if r["status"] == "error":
                             print(f"  error: {r['sid']}: {r['error']}", flush=True)
                         if "key" in r:
