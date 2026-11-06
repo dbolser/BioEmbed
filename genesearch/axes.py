@@ -30,13 +30,20 @@ BACKGROUND = semantic.CACHE_DIR / "background.npz"
 _bg = None
 
 
+def _stamp() -> str:
+    """Which vectors a background is of: a file from other ones (a new model, or rebuilt vectors) is made again."""
+    full = semantic.full_index()
+    return f"{semantic.MODEL}@{semantic.REVISION}, {semantic.DIM}-d, {len(full.pmids) if full else 0:,} papers"
+
+
 def background(gene_pmids) -> tuple[np.ndarray, np.ndarray]:
     """(mean, covariance) of 50,000 random human-gene papers' vectors; raises Pending while they are computed (once,
     in about 5 s on a big server: then they are read from disk). gene_pmids(): every human-gene paper's PMID."""
     global _bg
     if _bg is None and BACKGROUND.exists():
         with np.load(BACKGROUND) as f:
-            _bg = f["mean"], f["cov"]
+            if "stamp" in f.files and str(f["stamp"]) == _stamp():
+                _bg = f["mean"], f["cov"]
     if _bg is None:
         j = semantic.job(("background",), lambda jb: _make_background(jb, gene_pmids))
         if not j.finished or j.error:
@@ -56,7 +63,7 @@ def _make_background(job: semantic.Job, gene_pmids) -> tuple[np.ndarray, np.ndar
     mean, cov = X.mean(0), _cov(X)
     BACKGROUND.parent.mkdir(parents=True, exist_ok=True)
     tmp = BACKGROUND.with_name(f"background.{os.getpid()}.tmp.npz")
-    np.savez(tmp, mean=mean, cov=cov, n=len(X))
+    np.savez(tmp, mean=mean, cov=cov, n=len(X), stamp=_stamp())
     os.replace(tmp, BACKGROUND)
     return mean, cov
 
