@@ -133,7 +133,7 @@ def cur_dir(name, pool, keep=None):
     """pool: {subject: (X, curated)}; keep: optional {subject: bool mask} (for half fits)."""
     sel = lambda n: keep[n] if keep else slice(None)  # noqa: E731
     X, y = pool[name][0][sel(name)], pool[name][1][sel(name)].astype(bool)
-    if pool[name][1].sum() >= MIN_OWN_CURATED:
+    if y.sum() >= MIN_OWN_CURATED:  # (counted in the half, for a half fit)
         return fisher2(X, y), f"own {int(y.sum())} curated"
     others = [n for n in pool if n != name]
     Xo = np.vstack([pool[n][0][sel(n)] - pool[n][0][sel(n)].mean(0) for n in others])

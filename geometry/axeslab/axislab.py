@@ -107,8 +107,9 @@ def total_var(S: dict) -> float:
 
 
 def _spearman(a, b) -> float:
-    ra, rb = np.argsort(np.argsort(a)), np.argsort(np.argsort(b))
-    return float(np.corrcoef(ra, rb)[0, 1])
+    """Spearman's rho with tied values sharing their average rank (years are always tied); nan if one is constant."""
+    from scipy.stats import spearmanr
+    return float(spearmanr(a, b).statistic)
 
 
 def pole_terms(S: dict, s: np.ndarray, top: int = 8) -> dict:
