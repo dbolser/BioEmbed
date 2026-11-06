@@ -224,7 +224,8 @@ def _google():
                 creds, project = google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
                 project = os.environ.get("GOOGLE_CLOUD_PROJECT") or project
                 _auth = (creds, project) if project else False
-            except google.auth.exceptions.DefaultCredentialsError:
+            except Exception as e:  # (none set up, or an unreadable/broken key file): name topics by their terms
+                print(f"litmap: no Google Cloud credentials ({type(e).__name__}: {e})", flush=True)
                 _auth = False
         return _auth or None
 
