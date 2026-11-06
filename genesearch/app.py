@@ -1107,7 +1107,7 @@ def api_axes(subject: str, key: str, a: str, b: str = ""):
             raise HTTPException(400, f"No suggested axes called '{kind}'.")
         if kind != "spread" and semantic.source() != "full":
             raise HTTPException(400, "These axes need the whole-PubMed vectors, which this server doesn't have yet.")
-        j = semantic.job(("axes", key, kind), lambda jb: suggested_axes(subject, m, kind, jb))
+        j = semantic.job(("axes", key, kind, subject), lambda jb: suggested_axes(subject, m, kind, jb))
         return j.result if j.finished and not j.error else {"pending": j.status(), "n": len(pm)}
     try:
         vecs, ok = semantic.vectors(subject, pm, texts_for)
