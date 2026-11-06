@@ -16,7 +16,8 @@ axes you choose. `/about` lists the data and how the map is made.
    changing the naming code or rewriting an index file it reads (a new size or time): until then the app counts
    live, and its startup line and `/api/about` say why (`named_stamp` in `app.py`).
    Then, optionally, `uv run python build_maps.py` (a few hours with 14 workers on the 112-core box, ~16 GB, ~$12 of
-   LLM topic names): every gene's and disease's map, so the Map tab opens at once. Copy `index/cache/maps` (and
+   Vertex AI topic names; `--no-llm` without Google Cloud credentials, topics then named by their terms): every
+   gene's and disease's map, so the Map tab opens at once. Copy `index/cache/maps` (and
    `maps_manifest.jsonl`) to a server with the index. Rerun it after an index rebuild (a map is remade only if its
    list of papers changed: if only vectors, titles or years did, bump `MAP_VERSION` in `app.py` first).
 2. Run: `cd genesearch && uv run python app.py --port 8766 --host 0.0.0.0`, then open http://localhost:8766

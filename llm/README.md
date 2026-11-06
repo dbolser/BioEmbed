@@ -8,10 +8,11 @@ Nothing under `vendor/` is modified; `run_bio_llm.py` puts the vendor repo on
 ## Which provider
 
 Use Google Vertex AI (GCP project `agentic-ai-iuk-ipf`, signed in with Application Default Credentials) for every
-LLM call: it bills the project's GCP credits. `.env.vertex` is the template (`use_vertex_ai=true`; any Gemini, or
-another Model Garden model, by `model=`). OpenRouter (`.env.or-*`) is a last resort, only for a model Vertex AI
-doesn't serve; the earlier model comparisons (`judge_pool.py`, `closed_book_probe.py`, `rerank_haystack_llm.py`)
-ran there.
+LLM call: it bills the project's GCP credits. `.env.vertex` is the template (`use_vertex_ai=true`): its endpoint is Vertex's
+OpenAI-compatible one, so `model=` can be any Gemini or an open model Vertex serves there (Claude on Vertex needs the
+Anthropic client instead). OpenRouter (`.env.or-*`) is a last resort, only for a model Vertex AI doesn't serve. The
+earlier model comparisons (`judge_pool.py`, `closed_book_probe.py`, `rerank_haystack_llm.py`) ran there and still
+read their `.env.or-*` files, so a rerun bills OpenRouter: point them at Vertex first.
 
 ## Setup
 
