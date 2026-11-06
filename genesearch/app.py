@@ -1191,7 +1191,6 @@ def api_about():
     by_source = CURATED.explode("sources")
     sizes = lambda d: {"links": len(d), "papers": int(d.pmid.nunique()), "pairs": int(d[["ensembl", "disease_id"]].drop_duplicates().shape[0])}
     ep_papers, ep_pairs = db().execute(f"SELECT count(DISTINCT pmid), count(DISTINCT (ensembl, disease_id)) FROM '{IDX}/epmc.parquet'").fetchone()
-    llm = litmap._llm_config()
     return {
         "pubmed": {"n": len(PMIDS)},
         "pubtator": {"version": Path(build_index.PUBTATOR).name, "gene_links": int(GENES.n_papers.sum()),  # (HGNC genes only)
@@ -1206,7 +1205,7 @@ def api_about():
         "named": {"n_precomputed": len(NAMED), "status": NAMED_STATUS},  # 'named in the abstract' lookups (build_named.py)
         "embeddings": {"model": semantic.MODEL, "revision": semantic.REVISION, "dim": semantic.DIM,
                        "n": None if full is None else len(full.pmids)},
-        "topic_names": llm.get("model", "google/gemini-3.1-flash-lite") if llm else None,
+        "topic_names": litmap.llm_model(),
         "map": {"cap": MAP_CAP, "max_topics": litmap.MAX_TOPICS, "neighbours": litmap.K},
     }
 

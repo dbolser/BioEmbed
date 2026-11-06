@@ -17,6 +17,7 @@ dependencies = [
     "hdbscan>=0.8.44",
     "scikit-learn>=1.9.1",
     "pillow>=13.0.0",
+    "google-auth[requests]>=2.62.1",
 ]
 
 [tool.uv]

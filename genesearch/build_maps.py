@@ -49,7 +49,7 @@ def init_worker(names_dir: str, no_llm: bool):
     import semantic
     litmap.NAMES = Path(names_dir) / f"names.{os.getpid()}.json"  # (a shared file is rewritten whole: names get lost)
     if no_llm:
-        litmap.LLM_ENV = Path(names_dir) / "no-llm"  # (no key: topics named by their terms)
+        litmap.LLM_MODEL = None  # (topics named by their terms)
     per_subject = [f for f in vars(app).values() if callable(f) and getattr(f, "cache_parameters", dict)().get("maxsize")]
     litmap.warm_up()  # compile UMAP once here, not in the first map
 
@@ -107,8 +107,9 @@ def main():
     import litmap
     import semantic
 
-    if not litmap._llm_config() and not a.no_llm:
-        sys.exit(f"No LLM key at {litmap.LLM_ENV}: topics would be named by their terms. Add it, or --no-llm.")
+    if not litmap.llm_model() and not a.no_llm:
+        sys.exit("No Google Cloud credentials for Vertex AI (gcloud auth application-default login): topics would "
+                 "be named by their terms. Set them up, or --no-llm.")
     if semantic.source() != "full":
         sys.exit(f"The whole-PubMed vectors ({semantic.FULL_DIR}) aren't loaded: map keys would say 'cpu'.")
     app.MAPS.mkdir(parents=True, exist_ok=True)

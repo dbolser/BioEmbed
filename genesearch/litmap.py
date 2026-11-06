@@ -1,8 +1,8 @@
 """Literature map: topic clusters of a list of papers, from their MedEmbed vectors.
 
 UMAP (cosine) to 12-D -> HDBSCAN clusters -> c-TF-IDF top terms per cluster -> short names from an
-LLM (Gemini Flash-Lite via OpenRouter, cached; the top terms if there is no key or no answer) ->
-UMAP to 2-D for display. Both UMAP runs share one nearest-neighbour graph.
+LLM (Gemini Flash-Lite on Google Vertex AI, cached; the top terms if there are no Google Cloud credentials or no
+answer) -> UMAP to 2-D for display. Both UMAP runs share one nearest-neighbour graph.
 """
 
 import json
@@ -12,15 +12,20 @@ import threading
 import time
 import urllib.request
 from collections import Counter
-from pathlib import Path
 
+import google.auth
+import google.auth.transport.requests
 import numpy as np
 import scipy.sparse as sp
 import Stemmer
 
 from semantic import CACHE_DIR, digest
 
-LLM_ENV = Path(__file__).resolve().parent.parent / "llm" / ".env.or-google_gemini-3.1-flash-lite"
+# Topic names: Gemini on Vertex AI, signed in with Application Default Credentials (a key file named by
+# GOOGLE_APPLICATION_CREDENTIALS, `gcloud auth application-default login`, or a GCE VM's service account).
+# None: name topics by their terms. The model is part of each cached name's key.
+LLM_MODEL = "google/gemini-3.1-flash-lite"
+VERTEX = "https://aiplatform.googleapis.com/v1/projects/{}/locations/global/endpoints/openapi/chat/completions"
 NAMES = CACHE_DIR / "cluster_names.json"
 N_JOBS = int(os.environ.get("GENESEARCH_MAP_JOBS", "32"))
 K = 15  # neighbours (UMAP's default)
@@ -206,22 +211,43 @@ def ctfidf(texts: list[str], labels: np.ndarray, skip_words: set[str], top: int 
 # ---------------------------------------------------------------- LLM names (optional, cached)
 _names_lock = threading.Lock()
 _llm_down_until = 0.0  # after a failure, don't ask again for a while
+_auth_lock = threading.Lock()
+_auth = None  # (credentials, project) once looked up; False: there are none
 
 
-def _llm_config() -> dict | None:
-    if not LLM_ENV.exists():
-        return None
-    cfg = dict(line.split("=", 1) for line in LLM_ENV.read_text().splitlines() if "=" in line)
-    return cfg if cfg.get("token") else None
+def _google():
+    """(credentials, project) for Vertex AI, or None when no Google Cloud credentials are set up."""
+    global _auth
+    with _auth_lock:
+        if _auth is None:
+            try:
+                creds, project = google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
+                project = os.environ.get("GOOGLE_CLOUD_PROJECT") or project
+                _auth = (creds, project) if project else False
+            except Exception as e:  # (none set up, or an unreadable/broken key file): name topics by their terms
+                print(f"litmap: no Google Cloud credentials ({type(e).__name__}: {e})", flush=True)
+                _auth = False
+        return _auth or None
+
+
+def llm_model() -> str | None:
+    """The model that names topics, or None when topics are named by their terms."""
+    return LLM_MODEL if LLM_MODEL and _google() else None
+
+
+def _token(creds) -> str:
+    with _auth_lock:  # (an access token lasts an hour)
+        if not creds.valid:
+            creds.refresh(google.auth.transport.requests.Request())
+        return creds.token
 
 
 def llm_names(about: str, avoid: str, clusters: list[dict], within: str = "") -> dict[str, str]:
-    """{cluster id: short name} from the LLM, or {} (no key, no answer, or nothing to name).
+    """{cluster id: short name} from the LLM, or {} (no credentials, no answer, or nothing to name).
     about: what the papers are about ('the human gene CFTR'); avoid: what the names must leave out
     ('the gene symbol'); within: the topic they all come from (a drill-in)."""
     global _llm_down_until
-    cfg = _llm_config()
-    if not cfg or not clusters or time.time() < _llm_down_until:
+    if not llm_model() or not clusters or time.time() < _llm_down_until:
         return {}
     blocks = [f"Cluster {c['id']} ({c['n']} papers)\nTerms: {', '.join(c['terms'])}\nExample titles:\n" +
               "\n".join(f"- {t[:160]}" for t in c["examples"][:5]) for c in clusters]
@@ -233,17 +259,18 @@ def llm_names(about: str, avoid: str, clusters: list[dict], within: str = "") ->
               "and make the names different from each other. Answer with only a JSON object mapping each cluster "
               'number to its name, like {"1": "Alzheimer disease risk", "2": "Lipoprotein metabolism"}.\n\n'
               + "\n\n".join(blocks))
-    key = digest(cfg.get("model"), prompt)
+    key = digest(LLM_MODEL, prompt)
     with _names_lock:
         cache = json.loads(NAMES.read_text()) if NAMES.exists() else {}
     if key in cache:
         return cache[key]
-    body = {"model": cfg.get("model", "google/gemini-3.1-flash-lite"), "temperature": 0, "max_tokens": 2000,
+    creds, project = _google()
+    body = {"model": LLM_MODEL, "temperature": 0, "max_tokens": 2000,
             "messages": [{"role": "user", "content": prompt}], "response_format": {"type": "json_object"}}
-    req = urllib.request.Request(cfg.get("base_url", "https://openrouter.ai/api/v1").rstrip("/") + "/chat/completions",
-                                 data=json.dumps(body).encode(), method="POST",
-                                 headers={"Authorization": f"Bearer {cfg['token']}", "Content-Type": "application/json"})
     try:
+        req = urllib.request.Request(VERTEX.format(project), data=json.dumps(body).encode(), method="POST",
+                                     headers={"Authorization": f"Bearer {_token(creds)}",
+                                              "Content-Type": "application/json"})
         with urllib.request.urlopen(req, timeout=20) as r:
             text = json.loads(r.read())["choices"][0]["message"]["content"]
         text = text.strip().removeprefix("```json").removeprefix("```").removesuffix("```")

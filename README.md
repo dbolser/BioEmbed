@@ -76,8 +76,9 @@ Open Targets curator gold, not part of the 12-task BioScore
 - `eval/` — embedding-side runs, pinned `mteb==2.11.6` (the version behind
   the paper's embedding results; harness validated by reproducing their
   multilingual-e5-small numbers exactly).
-- `llm/` — LLM-side runs via the paper's `llm_judge` framework (OpenRouter,
-  needs `llm/.env` with a key).
+- `llm/` — LLM-side runs via the paper's `llm_judge` framework (`llm/.env`).
+  Use Google Vertex AI (GCP credits) for LLM calls; OpenRouter only for models
+  Vertex doesn't serve (see `llm/README.md`).
 - `scripts/` — dataset builders, own-tokenizer token counting
   (`count_tokens_bio.py`), aggregation (`aggregate_bio.py`), Pareto plot
   (`pareto_bio.py`).
