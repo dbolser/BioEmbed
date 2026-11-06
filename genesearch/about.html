@@ -70,6 +70,45 @@
     <li><b>Drawing.</b> One colour per topic; grey = no clear topic. Curated papers are drawn bigger, with a ring.
       Maps are saved, so a list opens instantly the second time.</li>
   </ol>
+
+  <h2>Map Explorer</h2>
+  <p>The Map Explorer tab shows the same papers and topics as the map, but places them on two axes that mean
+    something, instead of UMAP’s layout. Each axis is a direction in the 384-number embedding space, and a paper’s place
+    on it is the dot product of its vector with that direction (with unit vectors, the cosine). Code:
+    <code>api_axes</code> in <code>app.py</code>, and <code>axes.py</code>.</p>
+  <ol>
+    <li><b>Your axes.</b> Each axis is some words (embedded as a search query) or a topic (the mean of its papers’
+      vectors). Across is how close each paper is to the first. Up is how close it is to the second, beyond the first:
+      the second direction with its part along the first taken out, so the two axes are at right angles. Without that,
+      two related axes would put every paper on the diagonal. The note says how far apart the two are in meaning
+      (90° = unrelated).</li>
+    <li><b>Or let the map find two.</b> Three buttons find directions from the papers themselves:
+      <ul>
+        <li><b>Discover:</b> the two directions in which these papers differ most, compared with how much papers about
+          human genes in general differ along them. Technically, the top generalised eigenvectors of the map’s
+          covariance against that of 50,000 random human-gene papers (shrunk 20% towards equal spread in every
+          direction). Before that, the map’s own direction is taken out, or it would come first for most maps. That
+          direction runs from the average gene paper to the map’s centre.</li>
+        <li><b>Main spread:</b> the two directions in which these papers differ most (principal components),
+          whatever gene papers do in general.</li>
+        <li><b>About it ↔ in passing:</b> across is the map’s own direction. Papers on the right are like the rest
+          of the map, and papers on the left are like gene papers in general: these often mention the gene or disease
+          only in passing, or are linked to it by mistake. Up is Discover’s first direction.</li>
+      </ul>
+      Each axis is turned so that its newer papers are at the top or right (except the across axis of About it ↔ in passing). The three were
+      chosen from 18 kinds of axis tried on 5 maps, where three blind judges ranked Discover first.</li>
+    <li><b>Naming the ends.</b> Each end of a suggested axis is its 10% of the papers. The AI model gets, for each end:
+      <ul>
+        <li>its most distinctive words (c-TF-IDF, as for topics), from the papers that are not also at an end of the
+          other axis, so that each end is named by what is its own;</li>
+        <li>up to 8 titles from 2–10% in from it (the most extreme papers are often odd ones out), again leaving out
+          papers shared with the other axis, unless fewer than 3 would be left;</li>
+        <li>the share of all its papers that name the gene or disease.</li>
+      </ul> It names all four ends at
+      once, so that the two axes don’t get the same names. Without it, each end is named by its 3 most distinctive
+      words. The names are cut to fit the plot, and are given in full in the note.</li>
+    <li><b>Small maps.</b> With fewer than 1,000 papers, a few papers can change the up axis a lot: the note says so.</li>
+  </ol>
 </div>
 <script>
 const fmt = (n) => n == null ? "?" : n.toLocaleString("en-GB");
