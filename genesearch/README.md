@@ -83,7 +83,8 @@ How it works
 - Map (`litmap.py`): up to 20,000 papers (a fixed random sample beyond that), UMAP (cosine) to 12-D, HDBSCAN
   topics (at most 8, one colour each; papers HDBSCAN leaves out join the nearest topic unless they are among
   the 10% it rates least typical: those stay grey), UMAP to 2-D for drawing; topics named by c-TF-IDF top terms, or by Gemini 3.1
-  Flash-Lite via OpenRouter (key in `llm/.env.or-google_gemini-3.1-flash-lite`). Maps and names are cached in
+  Flash-Lite on Google Vertex AI (project from the Application Default Credentials, or `GOOGLE_CLOUD_PROJECT`;
+  without credentials, the terms). Maps and names are cached in
   `index/cache/`.
 
 Papers with no abstract carry a small "no abstract" tag; those not in the local PubMed copy at all are listed last.

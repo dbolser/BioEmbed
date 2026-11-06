@@ -5,12 +5,20 @@ LLM-judge framework (`vendor/embedders-dilemma/llm_judge`, pinned mteb==2.6.5).
 Nothing under `vendor/` is modified; `run_bio_llm.py` puts the vendor repo on
 `sys.path` and reuses its evaluators, client, and `_DummyEncoder` pattern.
 
+## Which provider
+
+Use Google Vertex AI (GCP project `agentic-ai-iuk-ipf`, signed in with Application Default Credentials) for every
+LLM call: it bills the project's GCP credits. `.env.vertex` is the template (`use_vertex_ai=true`; any Gemini, or
+another Model Garden model, by `model=`). OpenRouter (`.env.or-*`) is a last resort, only for a model Vertex AI
+doesn't serve; the earlier model comparisons (`judge_pool.py`, `closed_book_probe.py`, `rerank_haystack_llm.py`)
+ran there.
+
 ## Setup
 
 ```bash
 cd llm
 uv sync
-cp .env.example .env   # then fill in token= and model=
+cp .env.vertex .env   # then set model=
 ```
 
 `.env` fields map to `llm_judge.settings.Settings` (see `.env.example` for the
