@@ -15,6 +15,39 @@ gaps. The first gene/protein agent failed, so that category was run again. 142 d
 datasets), plus one late-interaction model I added after a verifier flagged it; I re-checked that every one exists. Full records, with sources for every number:
 [`docs/hf-model-survey.json`](hf-model-survey.json). "Downloads" means the last 30 days.
 
+## TLDR: what we should do
+
+No new model clearly changes the paper's story. The main lesson is that BM25 still wins because it matches exact
+tokens, and late-interaction models now do that better. Two of our planned checks may also be biased.
+
+Short term (this week, almost no cost):
+
+1. Protect what we already have. Check which suite models trained on BRIGHT data, since R2MED Biology is the same
+   set (finding 1). Find out which GNorm2 model PubTator3 runs before we calibrate on NLM-Gene (finding 5).
+2. Run the cheap checks that answer reviewer questions: BioHiCL-Base as the same-backbone control for our fine-tune
+   (CPU minutes), and bge-reranker-v2-gemma and gpt-oss-120b as rerank arms (under $1 each). gpt-oss-120b also fixes
+   the problem that our two judges currently grade their own reranks. Cite the Dictyostelium paper.
+3. Compare our literature gene centroids with the 68 precomputed gene embeddings in the BoevaLab dataset. No GPU,
+   and it gives thread D a new way to find mis-tags.
+
+Medium term (next few weeks, tens of GPU hours):
+
+1. Add sparse and MaxSim scoring to `eval/haystack.py`, then run SPARSEUP, LateOn and DenseOn. They share a backbone
+   and training data, so they show which architecture closes the gap to BM25. Then try topk-embed-v1-small as a
+   top-100 reranker. This is the most likely new section for Paper 1.
+2. Run Nemotron-3-Embed-1B and 8B on the main task and suite. They are the new best open health embedders.
+3. Repeat our fine-tune on UltraBERT-Embed-150M to see whether the gain stacks on a better base. Use HunFlair2 as a
+   second-opinion tagger on the flagged bare symbols (SE, AST, TNM, CAR, ACE).
+
+Long term (only if the evidence supports it):
+
+1. Swap genesearch off MedEmbed-small only if harrier-oss-v1-270m (GPU) or bekko (CPU) beats it on our main task.
+   The 35M re-embed is the cost.
+2. Build the cross-model maps with Nemotron-3-Embed-1B as the large modern model, a static PubMed model as the
+   floor, and SemCSE or sciembed as a different training signal.
+3. Add protein axes (ESMC-6B, ProTrek) to the gene maps only once the free dataset comparison shows something.
+   Re-run this survey in about six months; nobody has yet released a successor to MedCPT or MedEmbed.
+
 ## Five findings that matter more than any one model
 
 1. **R2MED Biology is BRIGHT Biology.** Same 57,359 documents, same 103 queries (checked on the Hub's dataset
