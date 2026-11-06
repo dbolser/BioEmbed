@@ -246,8 +246,7 @@ def llm_names(about: str, avoid: str, clusters: list[dict], within: str = "") ->
     """{cluster id: short name} from the LLM, or {} (no credentials, no answer, or nothing to name).
     about: what the papers are about ('the human gene CFTR'); avoid: what the names must leave out
     ('the gene symbol'); within: the topic they all come from (a drill-in)."""
-    global _llm_down_until
-    if not llm_model() or not clusters or time.time() < _llm_down_until:
+    if not clusters:
         return {}
     blocks = [f"Cluster {c['id']} ({c['n']} papers)\nTerms: {', '.join(c['terms'])}\nExample titles:\n" +
               "\n".join(f"- {t[:160]}" for t in c["examples"][:5]) for c in clusters]
@@ -259,6 +258,15 @@ def llm_names(about: str, avoid: str, clusters: list[dict], within: str = "") ->
               "and make the names different from each other. Answer with only a JSON object mapping each cluster "
               'number to its name, like {"1": "Alzheimer disease risk", "2": "Lipoprotein metabolism"}.\n\n'
               + "\n\n".join(blocks))
+    return ask(prompt)
+
+
+def ask(prompt: str) -> dict[str, str]:
+    """The LLM's answer to a prompt that asks for a JSON object of short strings (cached), or {} (no credentials, no
+    answer, or a failure in the last 10 minutes)."""
+    global _llm_down_until
+    if not llm_model() or time.time() < _llm_down_until:
+        return {}
     key = digest(LLM_MODEL, prompt)
     with _names_lock:
         cache = json.loads(NAMES.read_text()) if NAMES.exists() else {}
@@ -275,8 +283,8 @@ def llm_names(about: str, avoid: str, clusters: list[dict], within: str = "") ->
             text = json.loads(r.read())["choices"][0]["message"]["content"]
         text = text.strip().removeprefix("```json").removeprefix("```").removesuffix("```")
         names = {str(k): str(v).strip() for k, v in json.loads(text).items() if str(v).strip()}
-    except Exception as e:  # fall back to the top terms
-        print(f"litmap: no LLM names ({type(e).__name__}: {e})", flush=True)
+    except Exception as e:  # (the caller falls back to the top terms)
+        print(f"litmap: no LLM answer ({type(e).__name__}: {e})", flush=True)
         _llm_down_until = time.time() + 600
         return {}
     with _names_lock:

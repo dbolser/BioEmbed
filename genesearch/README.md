@@ -3,7 +3,7 @@
 Type a gene (or click "Gene ⇄" for a disease), see its literature: PubMed abstracts tagged by PubTator3, Open
 Targets curated diseases (genes, for a disease), and an "Optionally rank by" box that ranks the papers by keywords,
 by meaning (AI embeddings), or both. A Map tab groups the current list into topics; Map Explorer puts the papers on
-axes you choose. `/about` lists the data and how the map is made.
+axes you choose, or on two it finds. `/about` lists the data and how the map is made.
 
 1. Build the index once (~10-15 min, 61 GB in `index/`; needs `data/gold/ot_curated_gene_disease_pmid.parquet`
    from the gene-disease work): `cd genesearch && uv run python build_index.py`.
@@ -36,9 +36,18 @@ axes you choose. `/about` lists the data and how the map is made.
    the papers it leaves out; `/api/map_facets`). Play years steps through time; Shift over a dot picks out its
    topic, Esc clears; "Drill in" re-maps one topic's papers. **Map Explorer**: across is closeness in meaning to
    your words or to a topic's centre (cosine of the MedEmbed vectors); up is closeness to the second thing beyond the
-   first (its part along the first taken out, so the axes are at right angles). "Download CSV" saves the whole list. URLs are
+   first (its part along the first taken out, so the axes are at right angles). Or the map finds two axes itself
+   (`axes.py`; each end named by Gemini from the papers 2-10% in from it):
+   - **Discover**: the directions in which these papers differ most compared with 50,000 random human-gene papers.
+     These are generalised eigenvectors against that background, shrunk 20%. How much each paper is about the subject
+     is taken out first, or it would be the first axis of most maps.
+   - **Main spread**: PCA.
+   - **About it ↔ in passing**: across is that subject direction, up is Discover's first.
+
+   The background's mean and covariance are computed once, in about 5 s, into `index/cache/background.npz`. They
+   need the whole-PubMed vectors. The three were picked from 18 kinds of axis (`data/geometry/axeslab`). "Download CSV" saves the whole list. URLs are
    shareable (`?gene=CFTR&q=sweat+chloride&rank=hybrid`, `?disease=cystic+fibrosis`, `&ot=any`, `&ep=<id>`, `&named=1`, `&view=map&topic=3`,
-   `&view=explore&ax=cancer&ay=topic:2`, `&view=map&pmid=27083884`: the paper clicked on a map, opened under it).
+   `&view=explore&ax=cancer&ay=topic:2`, `&view=explore&ax=auto:discover&ay=auto:discover`, `&view=map&pmid=27083884`: the paper clicked on a map, opened under it).
 7. **PubMedBERT map** tab (`&view=landscape`): the current list (facets applied) on the published map of PubMed by
    González-Márquez et al. (Patterns 2024): PubMedBERT embeddings of 23.4M abstracts, t-SNE to 2-D, fields from the
    journal. Behind the dots: its 6.26M human-gene papers (PubTator3 tags of HGNC genes) in their field colours. The map

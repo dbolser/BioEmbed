@@ -41,6 +41,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, Response
 
+import axes
 import build_index
 import landscape
 import litmap
@@ -1058,17 +1059,56 @@ def get_map(subject: str, pm: np.ndarray, within: str = "") -> tuple[dict, str]:
     return m, key
 
 
+def _along(vecs: np.ndarray, ok: np.ndarray, v: np.ndarray) -> list:
+    """Each paper's position along a unit vector (None: no vector)."""
+    return [None if np.isnan(s) else round(float(s), 4) for s in np.where(ok, vecs @ v, np.nan)]
+
+
+def human_gene_pmids() -> np.ndarray:
+    return db().execute(f"SELECT DISTINCT pmid FROM '{IDX}/gene_pmids.parquet' "
+                        f"WHERE ncbi IN (SELECT entrez_id FROM '{IDX}/genes.parquet')").fetchnumpy()["pmid"]
+
+
+def suggested_axes(subject: str, m: dict, kind: str, job: semantic.Job) -> dict:
+    """A map's suggested axes (axes.py): each paper's place on them, and the names of their ends."""
+    pm = np.asarray(m["pmid"], np.int64)
+    vecs, ok = job.wait_for(lambda: semantic.vectors(subject, pm, texts_for))
+    bg = None if kind == "spread" else job.wait_for(lambda: axes.background(human_gene_pmids))
+    job.step("Finding the directions")
+    years, titles = np.asarray(m["year"]), list(m["title"])
+    across, up = axes.directions(kind, vecs[ok], years[ok], bg)
+    job.step("Naming the ends of each axis")
+    about, _, skip = map_subject(subject)
+    s = info(subject)
+    if s["kind"] == "gene":  # (and the words of its full name: 'transmembrane conductance' tells no end apart)
+        skip = skip | set(litmap.TOKEN.findall(s["name"].lower()))
+    keep = [t for t, o in zip(titles, ok) if o]
+    named = np.isin(pm[ok], named_pmids(subject))
+    return {"kind": kind, "x": _along(vecs, ok, across), "y": _along(vecs, ok, up), "angle": 90,
+            "names": axes.name_axes({"x": vecs[ok] @ across, "y": vecs[ok] @ up}, keep, named, about,
+                                    s["symbol"] if s["kind"] == "gene" else s["name"], skip)}
+
+
 @app.get("/api/axes")
-def api_axes(subject: str, key: str, a: str, b: str):
+def api_axes(subject: str, key: str, a: str, b: str = ""):
     """Map Explorer: the papers of a map placed by how close each is in meaning to two things (the
     axes): words, embedded as a query, or a topic's centre ('topic:3', the mean of its papers'
     vectors). Across = closeness to a (cosine similarity); up = closeness to b beyond a: b with its
     part along a taken out, so the axes are at right angles and the plot is the papers' shadow on the
     plane of a and b (two similar axes would otherwise put every paper on the diagonal). angle = how
-    far apart a and b are, in degrees (90 = unrelated in meaning)."""
+    far apart a and b are, in degrees (90 = unrelated in meaning).
+    a = 'auto:discover', 'auto:spread' or 'auto:ontopic' (b is then not used): both axes found from the
+    papers themselves (axes.py), with names for each axis's two ends."""
     if not re.fullmatch(r"[0-9a-f]{20}", key) or (m := cached_map(key)) is None:
         raise HTTPException(404, "That map is gone: open the map again.")
     pm = np.asarray(m["pmid"], np.int64)
+    if (kind := a.strip().removeprefix("auto:")) != a.strip():
+        if kind not in axes.KINDS:
+            raise HTTPException(400, f"No suggested axes called '{kind}'.")
+        if kind != "spread" and semantic.source() != "full":
+            raise HTTPException(400, "These axes need the whole-PubMed vectors, which this server doesn't have yet.")
+        j = semantic.job(("axes", key, kind, subject), lambda jb: suggested_axes(subject, m, kind, jb))
+        return j.result if j.finished and not j.error else {"pending": j.status(), "n": len(pm)}
     try:
         vecs, ok = semantic.vectors(subject, pm, texts_for)
     except Pending as p:
@@ -1092,8 +1132,8 @@ def api_axes(subject: str, key: str, a: str, b: str):
     if np.linalg.norm(up) < 1e-3:
         raise HTTPException(400, "The two axes mean the same: pick something different for one of them.")
     up /= np.linalg.norm(up)
-    as_list = lambda v: [None if np.isnan(s) else round(float(s), 4) for s in np.where(ok, vecs @ v, np.nan)]
-    return {"x": as_list(va), "y": as_list(up), "angle": round(float(np.degrees(np.arccos(np.clip(cos, -1, 1)))))}
+    return {"x": _along(vecs, ok, va), "y": _along(vecs, ok, up),
+            "angle": round(float(np.degrees(np.arccos(np.clip(cos, -1, 1)))))}
 
 
 MAPS = semantic.CACHE_DIR / "maps"

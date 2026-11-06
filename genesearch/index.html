@@ -863,7 +863,15 @@ const topicColour = (c) => c < 1 ? NOISE : SLOTS[(c - 1) % SLOTS.length];
 const DRILL_MIN = 30;  // smallest topic offered a map of its own
 // Map Explorer's plot margins: fixed (no growing for the year colour bar), so a glide starts and ends where the dots draw
 const exMargin = () => ({l: 74, r: mapColour === "year" ? 96 : 12, t: 12, b: 64, autoexpand: false});
-const AXES_HINT = "Across: how close each paper is in meaning to your words, or to a topic’s centre. Up: how close to the second, beyond the first. Short words work best, e.g. “mouse model”.";
+const AXES_HINT = "Across: how close each paper is in meaning to your words, or to a topic’s centre. Up: how close to the second, beyond the first. Short words work best, e.g. “mouse model”. Or let the map find two directions itself.";
+// Suggested axes (axes.py): found from the papers themselves, each end named from the papers near it
+const AUTO = {discover: "Discover", spread: "Main spread", ontopic: "About it ↔ in passing"};
+const autoKind = (spec) => /^auto:(\w+)$/.exec(spec || "")?.[1];
+const AUTO_NOTE = {
+  discover: (s) => `Discover: the two directions in which these papers differ most, compared with gene papers in general, leaving out how much each one is about ${s}.`,
+  spread: () => "Main spread: the two directions in which these papers differ most (principal components).",
+  ontopic: (s) => `Across: how much each paper is like the rest of this map (right) rather than like gene papers in general (left); papers far left often mention ${s} only in passing. Up: Discover’s first direction.`,
+};
 let M = null;          // the map from /api/map (+ params, secs)
 let EX = null;         // Map Explorer positions for M: {id, ax, ay, x, y, angle, range}
 let MORPH = null;      // in-between positions (in EX's units) while the dots glide onto new axes
@@ -1066,7 +1074,7 @@ async function play() {  // one year every ~half second; at the end, back to all
 
 // ---- Map Explorer: put the papers on two axes of your choosing
 function axesHTML(r) {
-  const text = (k) => S[k].startsWith("topic:") ? "" : S[k] || (k === "ax" ? S.q.trim() : "");
+  const text = (k) => S[k].startsWith("topic:") || autoKind(S[k]) ? "" : S[k] || (k === "ax" ? S.q.trim() : "");
   const topics = (k) => `<option value="">—</option>` + r.clusters.map((c) =>
     `<option value="topic:${c.id}"${S[k] === `topic:${c.id}` ? " selected" : ""}>${c.id}. ${esc(c.name)}</option>`).join("");
   const axis = (k, label, eg) => `<div class="axis">
@@ -1074,18 +1082,29 @@ function axesHTML(r) {
       <label>or a topic <select id="${k}t" aria-label="${label}: a topic">${topics(k)}</select></label></div>`;
   return `<form class="axes" id="axes" autocomplete="off">
       ${axis("ax", "Across →", "amyotrophic lateral sclerosis")}${axis("ay", "Up ↑", "mouse model")}
-      <button class="primary" type="submit">Draw</button></form>
+      <button class="primary" type="submit">Draw</button>
+      <div class="field"><span>or let the map find two</span><div class="seg">${Object.entries(AUTO).map(([k, label]) =>
+        `<button type="button" data-auto="${k}" aria-pressed="${autoKind(S.ax) === k}">${label}</button>`).join("")}</div></div></form>
     <p class="hint" id="axesNote" style="max-width:75ch">${EX?.note ?? AXES_HINT}</p>`;
 }
+const pressed = (kind) => document.querySelectorAll("[data-auto]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.auto === kind));
 function wireAxes() {
   for (const k of ["ax", "ay"]) {
     $(k + "t").onchange = (e) => { if (e.target.value) $(k).value = ""; };
     $(k).oninput = () => { $(k + "t").value = ""; };
   }
+  document.querySelectorAll("[data-auto]").forEach((b) => b.onclick = () => {
+    S.ax = S.ay = "auto:" + b.dataset.auto;
+    for (const k of ["ax", "ay"]) $(k).value = $(k + "t").value = "";
+    pressed(b.dataset.auto);
+    writeURL(true);
+    loadAxes(true);
+  });
   $("axes").onsubmit = (e) => {
     e.preventDefault();
     const v = Object.fromEntries(["ax", "ay"].map((k) => [k, $(k + "t").value || $(k).value.trim()]));
     if (!v.ax || !v.ay) { $("axesNote").textContent = "Give both axes some words or a topic."; return; }
+    pressed(null);
     Object.assign(S, v);
     document.activeElement?.blur();
     writeURL(true);
@@ -1111,12 +1130,17 @@ async function loadAxes(animate) {
   try {
     r = await poll("/api/axes?" + new URLSearchParams({subject: G.id, key: M.key, a: ax, b: ay}), my,
                    (html) => { if (mine()) note.innerHTML = html; });
-  } catch (e) { if (mine()) { note.textContent = `Error: ${e.message}`; drawMap(); } return; }
+  } catch (e) { if (mine()) { note.textContent = `Error: ${e.message}`; pressed(autoKind(EX?.ax)); drawMap(); } return; }
   if (!r || !mine()) return;
   const from = animate && M.pmid.length <= 12000 ? onScreen() : null;
-  EX = {id, ax, ay, x: r.x, y: r.y, angle: r.angle, range: {x: padded(r.x), y: padded(r.y)},
-        note: `${axisName(ax)} and ${axisName(ay)} are ${r.angle}° apart in meaning (90° = unrelated). ` +
-              `Up shows how much closer each paper is to the second, beyond the first.`};
+  const kind = autoKind(ax), n = r.x.filter((v) => v != null).length;
+  EX = {id, ax, ay, x: r.x, y: r.y, angle: r.angle, names: r.names, range: {x: padded(r.x), y: padded(r.y)},
+        note: kind ? AUTO_NOTE[kind](G.label) + ` Across: ← ${r.names.x.minus} · ${r.names.x.plus} →. Up: ↓ ${r.names.y.minus} · ${r.names.y.plus} ↑.` +
+                     (r.names.x.by === "llm" ? " An AI model named each end from the papers near it." :
+                       " Each end is named by its most distinctive words.") +
+                     (n < 1000 ? ` With only ${fmt(n)} papers, the up axis can change a lot with a few papers: read it with care.` : "")
+          : `${axisName(ax)} and ${axisName(ay)} are ${r.angle}° apart in meaning (90° = unrelated). ` +
+            `Up shows how much closer each paper is to the second, beyond the first.`};
   note.textContent = EX.note;
   if (from) await morph(from, mine);
   if (mine()) return drawMap();
@@ -1155,6 +1179,11 @@ function centres() {  // topic label positions: the topic's median position
 
 const ctx2d = document.createElement("canvas").getContext("2d");
 const textWidth = (text, size) => { ctx2d.font = `${size}px ${FONT}`; return ctx2d.measureText(text).width; };
+const fitText = (text, px, size, pre = "", post = "") => {  // pre + text + post, the text cut short (…) to fit px
+  if (textWidth(pre + text + post, size) <= px) return pre + text + post;
+  while (text.length > 1 && textWidth(`${pre}${text}…${post}`, size) > px) text = text.slice(0, -1);
+  return `${pre}${text.trimEnd()}…${post}`;
+};
 // Topic names at their centres, biggest topic first. A name that would overlap one already placed,
 // or cover a curated paper, moves up, down or sideways (with a thin line to its centre); if there
 // is no room it is left out until you zoom in. Every name is also in the topic list below the map.
@@ -1177,6 +1206,23 @@ function placeLabels() {
     M.c.forEach((c, i) => { const y = M.year[i]; if (y > 0 && !(M.firstYear[c] <= y)) M.firstYear[c] = y; });
   }
   const dys = explore ? [0, -h, h] : [0, -h, h, -2 * h, 2 * h, -3 * h, 3 * h, -4 * h, 4 * h];
+  // Suggested axes: what the papers at each end are about (cut to fit; in full in the note). Across: under the
+  // axis, at its two ends. Up: level in the top and bottom left corners (too long for a turned title), kept clear
+  // of the topic names.
+  if (explore && EX?.names) {
+    const nm = EX.names, half = xa._length / 2 - 8, ann = {showarrow: false, font: {size: fs, color: INK, family: FONT}};
+    out.push({...ann, xref: "paper", yref: "paper", x: 0, y: 0, xanchor: "left", yanchor: "top", yshift: -26,
+              text: pesc(fitText(nm.x.minus, half, fs, "← "))},
+             {...ann, xref: "paper", yref: "paper", x: 1, y: 0, xanchor: "right", yanchor: "top", yshift: -26,
+              text: pesc(fitText(nm.x.plus, half, fs, "", " →"))});
+    for (const [end, top] of [["plus", true], ["minus", false]]) {
+      const text = fitText(nm.y[end], xa._length - 12, fs, top ? "↑ " : "↓ "), w = textWidth(text, fs) + 10;
+      const y0 = top ? ya._offset : ya._offset + ya._length - h;
+      placed.push({x0: xa._offset, x1: xa._offset + w, y0, y1: y0 + h});
+      out.push({...ann, xref: "paper", yref: "paper", x: 0, y: top ? 1 : 0, xanchor: "left", yanchor: top ? "top" : "bottom",
+                text: pesc(text), bgcolor: "rgba(255,255,255,0.85)", borderpad: 2});
+    }
+  }
   let hidden = 0;
   for (const c of M.clusters.filter((c) => !focus || c.id === focus)) {
     if (!C[c.id]) continue;
@@ -1283,7 +1329,9 @@ function drawMap() {
     traces.push(trace(cur, {name: "curated", marker: {size: big, opacity: 1, line: {width: 2, color: INK}, ...colourOf(cur)}}));
     traces.push(trace(cur, {name: "curated", type: "scatter", marker: {size: big + 2, opacity: 0}}));
   }
-  const axis = (k, range) => ({title: {text: pesc(`closer in meaning to ${axisName(EX[k])}${k === "ay" ? `, beyond ${axisName(EX.ax)}` : ""} →`),
+  const ends = (k) => EX.names?.[k === "ax" ? "x" : "y"];  // suggested axes: what each end is about
+  const axis = (k, range) => ({title: {text: pesc(ends(k) ? ""
+                                         : `closer in meaning to ${axisName(EX[k])}${k === "ay" ? `, beyond ${axisName(EX.ax)}` : ""} →`),
                                          font: {size: 16, family: FONT, color: INK}, standoff: 8},
     range: [...range], zeroline: false, gridcolor: "#e6e6e6", tickfont: {size: 14, family: FONT}, automargin: false});
   const layout = {

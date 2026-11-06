@@ -106,7 +106,7 @@ fetch("/api/about").then((r) => r.json()).then((a) => {
      `A ${a.embeddings.dim}-number embedding of each title + abstract, computed ahead of time (on a GPU for the bulk of PubMed, on CPU for papers added since): semantic and hybrid ranking, the map and Map Explorer. Your words are embedded the same way, live.`,
      a.embeddings.n ? `${fmt(a.embeddings.n)} papers` : "computed per gene, as needed"],
     [a.topic_names ? ext("https://cloud.google.com/vertex-ai/generative-ai/docs/models", a.topic_names) + " (via Google Vertex AI)" : "No AI topic names",
-     a.topic_names ? "Short names for the map’s topics. Sent: the gene or disease searched, and each topic’s size, top words and 5 most typical titles (on a drill-in, also the parent topic’s name)." : "The map’s topics are named by their most distinctive words.", ""],
+     a.topic_names ? "Short names for the map’s topics, and for the ends of Map Explorer’s suggested axes. Sent: the gene or disease searched, and each topic’s size, top words and 5 most typical titles (on a drill-in, also the parent topic’s name); for the axes, up to 8 titles and the top words from near each end." : "The map’s topics and the ends of Map Explorer’s suggested axes are named by their most distinctive words.", ""],
   ];
   document.getElementById("data").innerHTML = rows.map(([s, w, n]) => `<tr><td>${s}</td><td>${w}</td><td class="n">${n}</td></tr>`).join("");
   document.querySelectorAll(".cap").forEach((e) => e.textContent = fmt(a.map.cap));
