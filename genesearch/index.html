@@ -294,7 +294,7 @@ if (freshLink) history.replaceState({...history.state, id: entryId(), y: 0}, "")
 let placeTimer = 0, restoreY = null;  // restoreY: the place to go back to, once the page is drawn (null: none)
 const savePlace = () => history.replaceState({...history.state, y: scrollY}, "");
 addEventListener("scroll", () => {
-  PLACES[history.state?.id] = scrollY;
+  if (history.state?.id) PLACES[history.state.id] = scrollY;  // (an entry not ours, e.g. a #hash typed in: no place)
   clearTimeout(placeTimer); placeTimer = setTimeout(savePlace, 300);
 }, {passive: true});
 const placeBack = () => { if (restoreY != null) scrollTo(0, restoreY); };  // (as soon as a view's page is in, and at the end)
@@ -341,7 +341,7 @@ function progressHTML(p, n) {  // n = how many papers the work is on, when the s
 }
 function progressLine(p, n) {  // the same in a line, for a place that keeps its height (a faded map's status, a note)
   const eta = p.eta_s == null ? "" : p.eta_s < 90 ? ` · about ${p.eta_s} s left` : ` · about ${Math.round(p.eta_s / 60)} min left`;
-  return `<span class="oneline"><b>Working${n ? ` on ${fmt(n)} papers` : ""}: ${esc(p.phase)}…</b>${p.total ? ` ${Math.floor(100 * p.done / p.total)}%` : ""}${eta}</span>`;
+  return `<span class="oneline" role="status"><b>Working${n ? ` on ${fmt(n)} papers` : ""}: ${esc(p.phase)}…</b>${p.total ? ` ${Math.floor(100 * p.done / p.total)}%` : ""}${eta}</span>`;
 }
 // A new map (or placement) is on its way while one is drawn: the old one stays, faded, and the status line above it
 // (keeping its height) says what is happening. Else the page would shrink to that line and spring back, and the
@@ -1685,7 +1685,8 @@ let paperNo = 0;  // the newest paper asked for wins; a late answer for an older
 // The last paper drawn under a map, put back at once when a map is drawn anew with it open (Back, a tab, a chip):
 // it is fetched again, but meanwhile there is no gap where it goes.
 // (Same subject and words only: their highlights are in it. Kept across a reload too.)
-let lastPaper = JSON.parse(sessionStorage.getItem("lastPaper") || "null") || {};
+let lastPaper = {};
+try { lastPaper = JSON.parse(sessionStorage.getItem("lastPaper")) || {}; } catch {}  // (storage blocked: start empty)
 const keptPaper = (pmids) => S.pmid && lastPaper.pmid === S.pmid && lastPaper.key === `${G.id}|${S.q}` && pmids.includes(+S.pmid)
   ? lastPaper.html : "";
 const syncChips = () => document.querySelectorAll("#mappaper [data-facet]")  // the open paper's chips show what is picked
