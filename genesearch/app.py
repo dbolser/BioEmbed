@@ -1119,6 +1119,8 @@ def api_axes(subject: str, key: str, a: str, b: str = ""):
         bg = axes.background(human_gene_pmids) if about else None
     except Pending as p:
         return {"pending": p.job.status(), "n": len(pm)}
+    if about and not ok.any():
+        raise HTTPException(400, "None of this map's papers has a vector, so it has no direction of its own.")
     labels = np.asarray(m["c"])
 
     def axis(spec: str) -> np.ndarray:  # a unit vector

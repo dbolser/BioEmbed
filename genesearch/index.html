@@ -1074,7 +1074,7 @@ async function play() {  // one year every ~half second; at the end, back to all
 
 // ---- Map Explorer: put the papers on two axes of your choosing
 // Ready-made axes in each "or a topic" list: the map's own direction ('about', from the server) and your rank-by words
-const RANK_AXIS = "rank";
+const RANK_AXIS = "\nrank-by";  // (a text box can hold no line break, so no axis of your own is ever this)
 const rankWords = () => S.q.trim();
 function axesHTML(r) {
   // with no axes of your own yet: across = about it ↔ in passing, up = your rank-by words (if any)
