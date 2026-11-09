@@ -17,6 +17,7 @@
     font: 1rem/1.65 "Atkinson Hyperlegible", Verdana, "DejaVu Sans", system-ui, sans-serif;
   }
   .wrap { max-width: 88rem; margin: 0 auto; padding: 0 1.2rem 4rem; }
+  #list, #list *, #dis * { scroll-margin-top: var(--head, 0px); }  /* (see --head in the script) */
   header { background: var(--panel); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 2; }
   header .wrap { padding-top: .8rem; padding-bottom: .8rem; }
   form { display: flex; flex-wrap: wrap; gap: .6rem; align-items: end; }
@@ -64,6 +65,8 @@
   .dlist button.zero { color: var(--muted); }
   .dlist .n { white-space: nowrap; color: var(--muted); font-size: .9rem; min-width: 3em; text-align: right; }
   .stale .n { opacity: .35; }  /* counts from before the last click, while new ones load: rows don't move */
+  /* the papers or map from before the last change, faded while the new ones load (in their place: nothing moves) */
+  #list > .stale { opacity: .45; }
   details.more > summary { cursor: pointer; color: var(--gene); margin-top: .4rem; font-size: .95rem; }
   .bar { display: flex; flex-wrap: wrap; gap: .8rem 1.2rem; align-items: center; margin: .6rem 0; }
   .bar input[type=number] { width: 5.5rem; }
@@ -81,6 +84,9 @@
   .filters { display: flex; flex-wrap: wrap; gap: .5rem .7rem; align-items: center; margin: .9rem 0 0;
     padding: .5rem .8rem; border: 2px solid var(--cur); border-radius: 10px; background: var(--panel); }
   .filters b { margin-right: .2rem; }
+  /* the bar stays when no filter is set, so picking or clearing one doesn't move what is below it */
+  .filters.none { border-color: var(--line); color: var(--muted); }
+  .filters.none .clearall { visibility: hidden; }  /* (there, for the bar's height) */
   .fchip { display: inline-flex; align-items: center; gap: .3rem; border: 1px solid #888; border-radius: 999px;
     background: var(--bg); padding: .05rem .2rem .05rem .75rem; }
   .fchip button { border: none; background: none; padding: 0 .45rem; font-weight: bold; color: var(--fg); }
@@ -99,6 +105,7 @@
   /* progress */
   .working { margin-top: 1rem; padding: .7rem 1rem; border: 2px solid var(--focus); border-radius: 10px; max-width: 70ch; }
   .working progress { width: 100%; height: 1.1rem; margin: .4rem 0; accent-color: var(--focus); }
+  .oneline { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   ol.papers { list-style: none; padding: 0; margin: 0; }
   ol.papers > li { border-top: 1px solid var(--line); padding: 1rem 0; }
   .title { font-weight: bold; font-size: 1.15rem; line-height: 1.45; max-width: 70ch; }
@@ -110,7 +117,7 @@
   .dchip .src { border-radius: 0; }
   .dchip.ep { border-color: var(--ep); }
   .dchip:hover { background: var(--panel); }
-  .dchip[aria-pressed=true] { font-weight: bold; box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--fg); }
+  .dchip[aria-pressed=true] { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--fg); }  /* (not bold: it would grow) */
   .tag { display: inline-block; border: 1px solid var(--line); color: var(--muted); border-radius: 6px;
     padding: 0 .4rem; font-size: .9rem; font-weight: normal; margin-left: .4rem; }
   .chip {
@@ -133,7 +140,16 @@
   .years { display: inline-flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
   .years input[type=range] { width: 14rem; accent-color: var(--gene); padding: 0; }
   #play { min-width: 8.5rem; }
-  #yrNote { font-variant-numeric: tabular-nums; }
+  /* room for the longest note (set per map): a longer one would wrap the bar (and move the slider out from under the
+     mouse) */
+  #yrNote { font-variant-numeric: tabular-nums; display: inline-block; white-space: nowrap; }  /* (min-width: per map) */
+  /* the map's notes that change as you hover and pick: room kept for them, so nothing below moves */
+  #maskNote { display: inline-block; }  /* (its min-width: the longest count, set per map) */
+  #hiddenNote { min-height: 1.65em; }
+  #axesNote { min-height: 8.25em; }  /* five lines: the longest notes */
+  @media (max-width: 80rem) { #axesNote { min-height: 9.9em; } }  /* (six, and seven where the column is narrowest) */
+  @media (max-width: 68rem) and (min-width: 56rem) { #axesNote { min-height: 11.55em; } }
+  @media (max-width: 62rem) and (min-width: 56rem) { #axesNote { min-height: 14.85em; } }
   #plot { height: 74vh; min-height: 30rem; border: 1px solid var(--line); border-radius: 10px; margin-top: .6rem; }
   #mappaper ol.papers > li { border-top: 3px solid var(--gene); }
   .crumbs { display: flex; flex-wrap: wrap; gap: .3rem .5rem; align-items: center; margin: .4rem 0; }
@@ -204,8 +220,23 @@ const ext = (url, html) => `<a href="${esc(url)}" target="_blank" rel="noopener"
 const pesc = (s) => String(s ?? "").replace(/[&<>]/g, (c) => `&#${c.charCodeAt(0)};`);
 function setList(html) {  // replace the results; free the old map's WebGL context first
   if (window.Plotly && $("plot")) Plotly.purge($("plot"));
+  keepFloor();
   $("list").innerHTML = html;
+  dropBlankFloor();
 }
+// Before a redraw: the page doesn't get shorter than the bottom of the window, so a shorter list (or fewer rows on
+// the left) can't clamp the scroll and pull the page down under the mouse. The floor goes once the page's own height
+// reaches the window's bottom again (the user scrolled up, or the page grew).
+function keepFloor() { document.body.style.minHeight = `${Math.max(scrollY + innerHeight, parseFloat(document.body.style.minHeight) || 0)}px`; }
+// After a redraw: no floor if it would leave most of the window blank (a much shorter page: a few results, a message).
+// Then the scroll is clamped, as before, and the page's end is in view.
+function dropBlankFloor() {
+  if (document.querySelector("body > .wrap").getBoundingClientRect().bottom < innerHeight / 3) document.body.style.minHeight = "";
+}
+addEventListener("scroll", () => {
+  const wrap = document.querySelector("body > .wrap");
+  if (document.body.style.minHeight && wrap.getBoundingClientRect().bottom >= innerHeight) document.body.style.minHeight = "";
+}, {passive: true});
 
 // ---- state <-> URL
 // gene or disease (what the first box searched for; one of them, see MODE), q, ot and ep (facets:
@@ -245,8 +276,32 @@ function writeURL(push = true) {
   for (const [k, v] of Object.entries(S)) if (v && !(k === "page" && v === 1)) p.set(k, v);
   const url = "?" + p.toString();
   // The mode goes in the history state: an empty search's URL ("?") doesn't say gene or disease
-  (push && url !== location.search ? history.pushState : history.replaceState).call(history, {mode: MODE}, "", url);
+  if (push && url !== location.search) {
+    clearTimeout(placeTimer); savePlace();
+    history.pushState({mode: MODE, id: entryId(), y: scrollY}, "", url);  // (the new view starts where the page is)
+  }
+  else history.replaceState({...history.state, mode: MODE}, "", url);
 }
+// Back, Forward and reload come back to the same place on the page. The browser's own restoring comes before the page
+// is drawn again, against a shorter page (it landed far too high), so the place is kept in the history entry (y) and
+// restored once the page is drawn (fromURL).
+// PLACES has each entry's place at once (a Back right after a scroll has it); y in the entry, for a reload, is saved
+// 300 ms after scrolling stops (browsers limit how often an entry can be rewritten).
+history.scrollRestoration = "manual";
+const entryId = () => Math.random().toString(36).slice(2), PLACES = {};
+const freshLink = !history.state?.id;  // (a reload, or Back into the page from elsewhere, has our entry)
+if (freshLink) history.replaceState({...history.state, id: entryId(), y: 0}, "");
+let placeTimer = 0, restoreY = null;  // restoreY: the place to go back to, once the page is drawn (null: none)
+const savePlace = () => history.replaceState({...history.state, y: scrollY}, "");
+addEventListener("scroll", () => {
+  PLACES[history.state?.id] = scrollY;
+  clearTimeout(placeTimer); placeTimer = setTimeout(savePlace, 300);
+}, {passive: true});
+const placeBack = () => { if (restoreY != null) scrollTo(0, restoreY); };  // (as soon as a view's page is in, and at the end)
+// The user scrolling or clicking meanwhile wins over a restore still to come, or a jump to new results' top (inputs:
+// how many such, so far)
+let inputs = 0;
+for (const t of ["wheel", "touchmove", "keydown", "pointerdown"]) addEventListener(t, () => { restoreY = null; inputs++; }, {passive: true, capture: true});
 const apiParams = (extra = {}) => new URLSearchParams({subject: G.id, term: S.q, ot: S.ot, ep: S.ep,
   named: S.named ? 1 : 0, ymin: S.ymin || 0, ymax: S.ymax || 0, sort: S.sort, match: S.match || "all",
   rank: rank(), page: S.page, ...extra});
@@ -261,13 +316,14 @@ async function getJSON(url) {
 const sleep = (ms) => new Promise((ok) => setTimeout(ok, ms));
 
 // Poll an endpoint that answers {pending: progress} until it has the result; null if superseded.
+// show(progress, n) draws the progress (progressHTML or progressLine).
 async function poll(url, my, show) {
   for (;;) {
     const r = await getJSON(url);
     if (my !== reqNo) return null;
     if (!r.pending) return r;
     if (r.pending.error) throw new Error(r.pending.error);
-    show(progressHTML(r.pending, r.n));
+    show(r.pending, r.n);
     await sleep(1000);
     if (my !== reqNo) return null;
   }
@@ -282,6 +338,28 @@ function progressHTML(p, n) {  // n = how many papers the work is on, when the s
       : `<progress></progress><div class="hint">${fmt(p.elapsed_s)} s so far</div>`}
     ${p.note ? `<p class="hint">${esc(p.note)}</p>` : ""}
   </div>`;
+}
+function progressLine(p, n) {  // the same in a line, for a place that keeps its height (a faded map's status, a note)
+  const eta = p.eta_s == null ? "" : p.eta_s < 90 ? ` · about ${p.eta_s} s left` : ` · about ${Math.round(p.eta_s / 60)} min left`;
+  return `<span class="oneline"><b>Working${n ? ` on ${fmt(n)} papers` : ""}: ${esc(p.phase)}…</b>${p.total ? ` ${Math.floor(100 * p.done / p.total)}%` : ""}${eta}</span>`;
+}
+// A new map (or placement) is on its way while one is drawn: the old one stays, faded, and the status line above it
+// (keeping its height) says what is happening. Else the page would shrink to that line and spring back, and the
+// scroll with it. false: no map drawn.
+function fadeMap(text) {
+  const st = document.querySelector("#list .status");
+  if (!$("plot") || !st) return false;
+  st.style.minHeight = `${st.offsetHeight}px`;
+  st.innerHTML = text;
+  for (let e = st.nextElementSibling; e; e = e.nextElementSibling) Object.assign(e, {inert: true}).classList.add("stale");
+  document.querySelectorAll("#list [data-view]").forEach((b) => b.setAttribute("aria-selected", S.view === b.dataset.view));
+  return true;
+}
+// Bring the map into view after a click under it (a topic in the list), unless a third of it is in view already:
+// then the list stays under the mouse for the next click.
+function showPlot() {
+  const r = $("plot").getBoundingClientRect(), top = Math.max(r.top, document.querySelector("header").getBoundingClientRect().bottom);
+  if (Math.min(r.bottom, innerHeight) - top < r.height / 3) $("plot").scrollIntoView({behavior: "smooth", block: "nearest"});
 }
 
 // ---- highlighting: gene mentions (bold, pale blue) and search words (yellow, dashed underline)
@@ -362,7 +440,7 @@ $("mode").onclick = () => {
   Object.assign(S, {gene: "", disease: "", ot: "", ep: "", named: "", ymin: "", ymax: "", sort: "", match: "", topic: "",
                     ax: "", ay: "", pmid: "", page: 1});
   $("subject").value = ""; $("choices").innerHTML = ""; $("msg").innerHTML = "";
-  showMode(); clearGene(); writeURL(true);
+  writeURL(true); showMode(); clearGene();  // (writeURL first: it saves the place of the page being left)
   $("subject").focus();
 };
 
@@ -396,7 +474,11 @@ async function searchGene(push = true) {
 }
 
 // reqNo++: also stops polls for the old gene's results; geneNo++: and a lookup still on its way
-function clearGene() { reqNo++; geneNo++; G = null; M = null; $("card").innerHTML = ""; $("dis").innerHTML = ""; setList(""); }
+function clearGene() {  // (the page is emptied: no floor, and from the top)
+  reqNo++; geneNo++; G = null; M = null; clearTimeout(yearTimer); listTop = false;
+  $("card").innerHTML = ""; $("dis").innerHTML = ""; setList("");
+  document.body.style.minHeight = ""; scrollTo(0, 0);
+}
 
 function pubtator(g) {  // PubTator3's own search for the gene (NCBI Gene id) or disease (its first PubTator id)
   const id = g.kind === "gene" ? g.entrez && `@GENE_${g.entrez}` : g.pubtator[0] && `@DISEASE_${g.pubtator[0]}`;
@@ -442,7 +524,7 @@ async function loadGene(g, also, push, picked = false, my = geneNo) {
     (also.length ? `<p class="muted">“${esc(S[MODE])}” is also ${G.kind === "gene" ? "an alias or old symbol" : "another name"} of:
        ${also.map((a) => `<a href="?${MODE}=${encodeURIComponent(a.kind === "gene" ? a.symbol : a.id)}">${esc(a.label)}</a>`).join(", ")}</p>` : "");
   renderDiseases();
-  await show(push);
+  return show(push);  // (true once drawn, unless something newer took over)
 }
 
 // ---- facets: one box per source, the same look. For a gene they list diseases, for a disease
@@ -500,13 +582,13 @@ function facetHTML(k, fc) {
 // Only the papers whose title or abstract names the gene (its symbol, an alias or old symbol, or a
 // name PubTator3 found for it in that paper) or the disease (name, synonym, or PubTator3's word for
 // it there). n: how many, within the other filters (null while counting).
+const namedTitle = () => S.named ? "Click to show all papers again."
+  : `Show only papers naming ${G.label} (or ${G.kind === "gene" ? "an alias" : "a synonym"}) in the title or abstract.`;
 function namedHTML(n, stale) {
-  const alias = G.kind === "gene" ? "an alias" : "a synonym";
   return `<section class="facet nm${stale ? " stale" : ""}" aria-labelledby="fh-nm">
     <h2 id="fh-nm">Named in the abstract</h2>
     <p class="sub">PubTator3 also tags papers that name the ${G.kind} only in the full text, or link it by curation or MeSH.</p>
-    <ul class="dlist"><li><button type="button" data-named aria-pressed="${!!S.named}"
-        title="${S.named ? "Click to show all papers again." : `Show only papers naming ${esc(G.label)} (or ${alias}) in the title or abstract.`}">
+    <ul class="dlist"><li><button type="button" data-named aria-pressed="${!!S.named}" title="${esc(namedTitle())}">
       <span>${esc(G.label)} in the title or abstract</span><span class="n">${n == null ? "" : fmt(n)}</span></button></li></ul>
   </section>`;
 }
@@ -528,19 +610,66 @@ function renderDiseases() {
       FC = {key, ...fc};
       renderDiseases();
       const bar = document.querySelector("#list .filters");  // a filter chip may still show a bare id
-      if (named && bar) { bar.outerHTML = filtersHTML(); wireTop(); }
+      if (named && bar) holdStill(document.querySelector("#list .lbar"), () => { bar.outerHTML = filtersHTML(); wireTop(); });
     }).catch(() => {});
   const have = FC?.key === key, fc = !filtered ? null : have ? FC : "wait";
+  const lastNamed = FC?.key.split("|")[0] === G.id ? FC.named : null;  // (while counting: the last count, faded)
+  // (In one column the boxes sit above the results: those are held still as the boxes change, wherever the mouse is
+  // outside the boxes. In two columns the results don't move then: nothing to do.)
+  const lbar = $("list"), hold = {below: false};
+  if (BOX.gene === G.id && disBusy() && holdStill(lbar, () => patchDiseases(fc, have, lastNamed), hold)) return;
+  disLater = false;
+  const again = BOX.gene === G.id && $("dis").firstElementChild;  // (the first draw for a subject holds nothing)
   if (BOX.gene !== G.id) Object.assign(BOX, {gene: G.id, rows: {}, total: {}, all: {}, open: {}});
   const f = document.activeElement?.closest?.("#dis [data-facet], #dis [data-named]");  // keep keyboard focus on the row
-  const what = isMap() ? `Hover over a ${other()} to grey out the other papers on the map; click to keep that.`
-    : `Click a ${other()} to show only its papers${keyWords() ? " (clears the keyword words)" : ""}.`;
-  const lastNamed = FC?.key.split("|")[0] === G.id ? FC.named : null;  // (while counting: the last count, faded)
-  $("dis").innerHTML = namedHTML(lastNamed, !have) + facetHTML("ot", fc) + facetHTML("ep", fc) +
-    `<p class="hint">${what} Pick one in each box = papers in both. ${fc ? "Counts are within your other filters." : ""}</p>`;
+  holdStill(again ? lbar : null, () => {
+    keepFloor();
+    $("dis").innerHTML = namedHTML(lastNamed, !have) + facetHTML("ot", fc) + facetHTML("ep", fc) + `<p class="hint">${disHint(fc)}</p>`;
+    dropBlankFloor();
+  }, hold);
   if (f) $("dis").querySelector(f.dataset.named != null ? "[data-named]"
-    : `[data-facet="${f.dataset.facet}"][data-id="${CSS.escape(f.dataset.id)}"]`)?.focus();
+    : `[data-facet="${f.dataset.facet}"][data-id="${CSS.escape(f.dataset.id)}"]`)?.focus({preventScroll: true});
 }
+const disHint = (fc) => `${isMap() ? `Hover over a ${other()} to grey out the other papers on the map; click to keep that.`
+  : `Click a ${other()} to show only its papers${keyWords() ? " (clears the keyword words)" : ""}.`} Pick one in each box = papers in
+  both. ${fc ? "Counts are within your other filters." : ""}`;
+// The user is working in the boxes: the mouse is over them, or the keyboard is in them. (Not a row that keeps the
+// focus after a mouse click: the boxes are sorted once the mouse leaves.)
+const disBusy = () => $("dis").matches(":hover") || !!$("dis").querySelector(":focus-visible");
+// While the mouse is over the boxes (or the keyboard is in them), a redraw only changes the rows' counts, fading and
+// pressed state in place: rows sorted by new counts, or new or gone, would move under the mouse (the next click picks
+// the wrong one), and a row drawn anew between mouse down and up gets no click at all. The rows are sorted, added and
+// dropped once the mouse leaves. false: a box has no rows to keep yet (still counting), so draw them all.
+let disLater = false;
+function patchDiseases(fc, have, named) {
+  const box = (k) => $("dis").querySelector(`.facet.${k}`);
+  if (!["nm", "ot", "ep"].every(box) || $("dis").querySelector(".facet .hint")) return false;
+  box("nm").classList.toggle("stale", !have);
+  const nb = box("nm").querySelector("[data-named]");
+  Object.assign(nb, {title: namedTitle()}).setAttribute("aria-pressed", !!S.named);
+  if (have) nb.querySelector(".n").textContent = named == null ? "" : fmt(named);
+  for (const k of ["ot", "ep"]) {
+    box(k).classList.toggle("stale", fc === "wait");
+    const items = k === "ot" ? G.curated : G.epmc;
+    for (const b of box(k).querySelectorAll("[data-facet]")) {
+      b.setAttribute("aria-pressed", S[k] === b.dataset.id);
+      if (fc === "wait") continue;  // (the last counts stay, faded)
+      const id = b.dataset.id, n = fc ? (fc[k][id] ?? 0)  // within the filters, else the subject's own counts
+        : id === "any" ? (k === "ot" ? G.n_curated_papers : G.n_epmc_papers) : items.find((d) => d.id === id)?.n_papers ?? null;
+      b.querySelector(".n").textContent = n == null ? "" : fmt(n);
+      b.classList.toggle("zero", n === 0);
+    }
+    if (fc === "wait") continue;  // what is drawn, for a faded redraw while the next counts load (copies: BOX.rows can
+    BOX.all[k] = fc ? fc[k].any : k === "ot" ? G.n_curated_papers : G.n_epmc_papers;  // hold the subject's own items)
+    BOX.rows[k] = (BOX.rows[k] || []).map((d) => ({...d, n_papers: fc ? fc[k][d.id] ?? 0 : items.find((x) => x.id === d.id)?.n_papers}));
+  }
+  $("dis").querySelector(":scope > p.hint").innerHTML = disHint(fc);
+  disLater = true;
+  return true;
+}
+const disLeft = () => { if (disLater && !disBusy()) renderDiseases(); };
+$("dis").addEventListener("mouseleave", disLeft);
+$("dis").addEventListener("focusout", () => setTimeout(disLeft));
 function addNames(names) {  // facet names from the server; redraw the boxes if one was missing or differs
   const fresh = Object.entries(names || {}).filter(([id, name]) => DN[id] !== name);
   for (const [id, name] of fresh) DN[id] = name;
@@ -548,29 +677,32 @@ function addNames(names) {  // facet names from the server; redraw the boxes if 
 }
 
 // An item from a facet box or a paper's chip; clicking the one already picked turns it off.
-function pickFacet(k, id, name) {
+function pickFacet(k, id, name, chip = false) {
   if (name) DN[id] = name;
   const off = S[k] === id;
   S[k] = off ? "" : id;
   // An item replaces keyword words, which filter: both together usually leave nothing (the words
   // are often the same disease, spelled differently). Semantic and hybrid words only rank: kept.
   if (!off && id !== "any" && keyWords()) { Object.assign(S, {q: "", match: "", sort: ""}); $("term").value = ""; }
+  // A chip on a paper in the list: the new list's top is shown when it comes (the boxes on the left stay where they are,
+  // for the next pick; the map greys out the other papers where it is). In one column the boxes sit above the list:
+  // its top is shown then too.
+  listTop = isList() && (chip || oneColumn());
   filtersChanged();
-  if (isMap()) return;  // (the map greys out the other papers where it is)
-  const top = $("list").getBoundingClientRect().top;
-  if (top < 0 || top > innerHeight * 0.6) $("list").scrollIntoView({behavior: "smooth", block: "start"});
 }
 // After a filter changes. The map is of the list without its facets: if it stays the same, it only
 // greys out the papers the facets leave out (zoom and drill-in kept); else a new list or map.
 function filtersChanged() {
   S.page = 1;
   renderDiseases();
-  const same = M && mapParams() === M.params;  // (a drill-in is kept unless the map changes)
+  // (a drill-in is kept unless the map changes; while a new map loads, the drawn one is old: not the same)
+  const same = M && mapParams() === M.params && !$("plot")?.classList.contains("stale");
   if (!same) S.topic = "";
   if (!(same && isMap())) return show(true);
   writeURL(true);
   $("how").innerHTML = howHTML();
-  updateFilterBar();
+  holdStill($("mappaper"), updateFilterBar);  // (a chip in the open paper stays under the mouse if the bar wraps)
+  syncChips();
   redraw();
 }
 function updateFilterBar() {
@@ -585,8 +717,8 @@ $("dis").addEventListener("click", (e) => {  // remember each box's "more" list 
 });
 document.addEventListener("click", (e) => {
   const b = e.target.closest("[data-facet]");
-  if (b && G) pickFacet(b.dataset.facet, b.dataset.id, b.dataset.name);
-  if (e.target.closest("[data-named]") && G) { S.named = S.named ? "" : "1"; filtersChanged(); }
+  if (b && G) pickFacet(b.dataset.facet, b.dataset.id, b.dataset.name, !b.closest("#dis"));
+  if (e.target.closest("[data-named]") && G) { S.named = S.named ? "" : "1"; listTop = isList() && oneColumn(); filtersChanged(); }
 });
 // In the map, hovering over a facet row greys out the papers it would leave out, for a moment.
 let hoverPick = null;  // e.g. {ot: "MONDO_0009061"} or {named: "1"}
@@ -610,7 +742,9 @@ function filtersHTML() {
   if (keyWords()) chip(`Words: <b>“${esc(S.q.trim())}”</b>`, "q");  // semantic/hybrid words rank, not filter
   if (S.ymin || S.ymax) chip(`Years: <b>${esc(S.ymin || "…")}–${esc(S.ymax || "…")}</b>`, "years");
   const n = f.length + marked.length;
-  if (!n) return "";
+  // The bar stays when there is no filter (with the same height), so picking or clearing one doesn't move what is below.
+  if (!n) return `<div class="filters none" role="region" aria-label="Active filters">No filters.
+    <button type="button" class="clearall" tabindex="-1" aria-hidden="true">Clear filter</button></div>`;
   return `<div class="filters" role="region" aria-label="Active filters">${f.length ? `<b>Showing only:</b> ${f.join("")}` : ""}
     ${marked.length ? `<b>Highlighted (the rest grey):</b> ${marked.join("")}` : ""}
     <button type="button" class="clearall" data-clear="all">${n > 1 ? "Clear all filters" : "Clear filter"}</button></div>`;
@@ -686,6 +820,16 @@ function wireTop() {
 const isMap = () => S.view === "map" || S.view === "explore";
 function show(push = true) { playing = false; return isMap() ? loadMap(push) : isLand() ? loadLand(push) : loadPapers(push); }
 const isLand = () => S.view === "landscape" || S.view === "medmap";
+const isList = () => !isMap() && !isLand();
+// The next results drawn are shown from their top, at once (a new search from the header, a new page, a paper's chip
+// picked: new results, which a smooth scroll would carry under the mouse)
+let listTop = false;
+function showListTop() {
+  const top = $("list").getBoundingClientRect().top;
+  if (top < 0 || top > innerHeight * 0.6) $("list").scrollIntoView({block: "start"});
+}
+// In one column the boxes sit above the list: a pick there shows the new list's top too (else nothing in view changes)
+const oneColumn = () => $("dis").getBoundingClientRect().bottom <= $("list").getBoundingClientRect().top;
 
 function scopeText(n, facets = true) {  // facets: false for the map, which is of the list without them
   const conds = !facets ? [] : [S.ot && (S.ot === "any" ? `curated (any ${other()})` : `curated for ${esc(dname(S.ot))}`),
@@ -696,34 +840,82 @@ function scopeText(n, facets = true) {  // facets: false for the map, which is o
 
 // A year box: empty shows the subject's first or last year greyed (placeholder), and the arrow keys and spinner
 // step from that year (browsers step an empty box from 0). A step's input event has no inputType; typing's has.
-// The list is redrawn after each change, so the box gets the focus back for the next step (unless the user moved on).
-function yearBox(el, set) {
-  let was = el.value;
+// The year goes into S at once (so a search started meanwhile, a facet or a tab, has it), but steps in quick
+// succession make one search, once they pause; typing searches on Enter or on leaving the box.
+function yearBox(el, k) {
+  let stepped = false;
+  el._was = el.value;  // (syncBar sets it too, with the value)
   el.oninput = (e) => {
-    if (!e.inputType && was === "" && el.placeholder) el.value = +el.placeholder + Math.sign(+el.value || 1);
-    was = el.value;
+    stepped = !e.inputType;
+    el._typing = !stepped;  // typed, not entered yet: syncBar leaves it as it is
+    if (stepped && el._was === "" && el.placeholder) el.value = +el.placeholder + Math.sign(+el.value || 1);
+    el._was = el.value;
   };
-  el.onchange = () => { yearFocus = document.activeElement === el ? el.id : null; set(el.value); };  // (not after a click away)
-  // Left before the redraw: no focus back. (A redraw blurs the box too, as it removes it: still in the page then, gone after.)
-  el.onblur = () => queueMicrotask(() => { if (el.isConnected) yearFocus = null; });
-  if (yearFocus === el.id) { yearFocus = null; if (document.activeElement === document.body) el.focus(); }  // (nothing else took it)
+  el.onblur = () => { el._typing = false; };  // (no change event when the text ends as it began)
+  el.onchange = () => {
+    el._typing = false;
+    Object.assign(S, {[k]: el.value, page: 1, topic: ""});
+    clearTimeout(yearTimer);
+    yearTimer = setTimeout(() => { yearTimer = 0; if (G && el.isConnected) { renderDiseases(); loadPapers(); } }, stepped ? STEP_PAUSE : 0);
+  };
 }
-let yearFocus = null;  // the year box to focus again once the list is redrawn
+// A search starting while a year box's search waits: that one is dropped (this one has the year), but the boxes on
+// the left still need the year's counts.
+function takeYear() { if (yearTimer) { clearTimeout(yearTimer); yearTimer = 0; renderDiseases(); } }
+const STEP_PAUSE = 400;  // ms without a step before the year boxes search
+let yearTimer = 0;       // that search, waiting (any search that starts first takes the year along: it is cancelled)
 
+// Run redraw(), which changes parts of the page, and keep el where it was on screen: scroll by however much the
+// parts above it grew or shrank (a new filter chip, a status line that wraps differently), so a second click lands
+// on the control the user is at. Only while the user is at el (it has the focus), or the mouse is level with el or
+// below it (what is under the mouse stays put; anywhere, with below false), and not in the boxes on the left (the
+// scroll would move those). again(): el after the redraw, if it was drawn anew.
+function holdStill(el, redraw, {again = () => el, below = true} = {}) {  // (returns what redraw returns)
+  const top = el?.getBoundingClientRect().top;
+  const at = el && (el.contains(document.activeElement) || !disBusy() && (!below || pointerY >= top) && top < innerHeight);
+  const out = redraw(), now = at && again();
+  if (now?.isConnected) {
+    const d = now.getBoundingClientRect().top - top;
+    if (d > 0) document.body.style.minHeight = `${Math.max(scrollY + d + innerHeight, parseFloat(document.body.style.minHeight) || 0)}px`;
+    scrollBy(0, d);
+  }
+  return out;
+}
+let pointerY = -1;  // the mouse's height in the window, last seen
+addEventListener("pointermove", (e) => { pointerY = e.clientY; }, {passive: true, capture: true});
+addEventListener("pointerdown", (e) => { pointerY = e.clientY; }, {passive: true, capture: true});
+
+// The list page is drawn whole once per subject and words. After that, a change (years, sort, a filter, a page)
+// redraws only its parts: the filter bar, the status line, the papers. The controls bar (year boxes, sort) is kept,
+// so the control under the mouse stays (and keeps the focus), and see holdStill. While the papers load, the status
+// line keeps its height (saying Searching…, or the progress) and the old papers stay, faded, also for new words or a
+// new subject: nothing moves, and the page doesn't shrink to one line (the scroll would jump) before they come.
+const listKey = () => `${G.id}|${S.q.trim()}`;  // what the controls bar is drawn for (year placeholders, Best match)
 async function loadPapers(push = true) {
   S.pmid = "";
+  takeYear();
+  if (push) restoreY = null;
   writeURL(push);
   const my = ++reqNo, t0 = performance.now();
   const head = () => tabsHTML() + filtersHTML();
-  const st = document.querySelector("#list .status");
-  if (st && document.querySelector("#list ol.papers")) st.innerHTML = `<b>Searching…</b>`;
-  else { setList(head() + `<p class="status"><b>Searching…</b></p>`); wireTop(); }
+  const bar = document.querySelector("#list .bar.lbar"), kept = bar?._key === listKey() ? bar : null, toTop = listTop, seen = inputs;
+  listTop = false;
+  const working = (html) => {  // in the drawn page's status line (it keeps its height), else in place of the page
+    if (bar?.isConnected) $("lstatus").innerHTML = html; else { setList(head() + `<p class="status">${html}</p>`); wireTop(); }
+  };
+  if (bar) holdStill(kept, () => {  // the filter bar changes now, with the click (not again when the papers come)
+    updateFilterBar();
+    $("lstatus").style.minHeight = `${$("lstatus").offsetHeight}px`;
+    $("lpapers").classList.add("stale");
+    $("lpapers").inert = true;
+  });
+  working(`<b>Searching…</b>`);
   $("how").innerHTML = howHTML();
   let r;
   try {
-    r = await poll("/api/papers?" + apiParams(), my, (html) => { setList(head() + html); wireTop(); });
+    r = await poll("/api/papers?" + apiParams(), my, (pr, n) => working(progressLine(pr, n)));
   } catch (e) {
-    if (my === reqNo) { setList(head() + `<p class="note">Error: ${esc(e.message)}</p>`); wireTop(); }  // (not a stale one)
+    if (my === reqNo) { setList(head() + `<p class="note">Error: ${esc(e.message)}</p>`); wireTop(); showListTop(); }  // (not a stale one)
     return;
   }
   if (!r) return;  // a newer request superseded this one
@@ -751,32 +943,57 @@ async function loadPapers(push = true) {
       ${fmt(r.sem_capped.of)} papers; the rest follow, newest first. (A ready-made AI index of all PubMed is being built;
       once it is there, every paper is ranked.)</p>` : "";
   const sortName = {relevance: "best match first", newest: "newest first", oldest: "oldest first"}[r.sort];
-  const csv = "/api/papers.csv?" + apiParams();
-  $("how").innerHTML = howHTML();
-  setList(head() + `
-    <p class="status">${what} · ${sortName} · ${secs} s ${infoBtn()}</p>
-    ${capped}
-    <div class="bar">
-      <label>From year <input type="number" id="ymin" value="${esc(S.ymin)}" placeholder="${G.year_min ?? ""}"></label>
-      <label>To year <input type="number" id="ymax" value="${esc(S.ymax)}" placeholder="${G.year_max ?? ""}"></label>
-      ${S.ymin || S.ymax ? `<button type="button" id="yclear" title="Clear the years: papers from every year">All years</button>` : ""}
-      <label>Sort <select id="sort">
-        ${term ? `<option value="relevance">Best match</option>` : ""}
-        <option value="newest">Newest first</option><option value="oldest">Oldest first</option></select></label>
-      <a href="${csv}" download>Download CSV (all ${fmt(r.n_matched)}${r.n_matched > 50000 ? `, about ${fmt(Math.round(r.n_matched / 2000))} MB` : ""})</a>
-    </div>
-    ${r.n_matched ? "" : `<p class="note">No papers here. ${S.ot || S.ep || S.named || keyWords() || S.ymin || S.ymax ? "Remove a filter above." : ""}</p>`}
+  const status = `${what} · ${sortName} · ${secs} s ${infoBtn()}`;
+  const papers = `${r.n_matched ? "" : `<p class="note">No papers here. ${S.ot || S.ep || S.named || keyWords() || S.ymin || S.ymax
+      ? "Remove a filter above." : ""}</p>`}
     <ol class="papers">${r.papers.map((p) => paperHTML(p, hl(p))).join("")}</ol>
-    ${pager(r)}`);
-  wireTop();
-  $("sort").value = r.sort;
-  $("sort").onchange = (e) => { S.sort = e.target.value; S.page = 1; loadPapers(); };
-  document.querySelectorAll("#list [data-match]").forEach((b) => b.onclick = () => { S.match = b.dataset.match; S.page = 1; renderDiseases(); loadPapers(); });
-  for (const k of ["ymin", "ymax"]) yearBox($(k), (v) => { S[k] = v; S.page = 1; S.topic = ""; renderDiseases(); loadPapers(); });
-  if ($("yclear")) $("yclear").onclick = () => clearFilter("years");
-  document.querySelectorAll("nav.pager button").forEach((b) => b.onclick = () => {
-    S.page = +b.dataset.p; loadPapers().then(() => $("list").scrollIntoView({behavior: "smooth"}));
+    ${pager(r)}`;
+  $("how").innerHTML = howHTML();
+  if (kept?.isConnected) holdStill(kept, () => {
+    keepFloor();
+    updateFilterBar();
+    $("lstatus").innerHTML = status;
+    $("lstatus").style.minHeight = "";
+    $("lcapped").innerHTML = capped;
+    $("lpapers").innerHTML = papers;
+    $("lpapers").classList.remove("stale");
+    $("lpapers").inert = false;
+    syncBar(r);
+    dropBlankFloor();
   });
+  else {
+    setList(head() + `
+      <p class="status" id="lstatus">${status}</p>
+      <div id="lcapped">${capped}</div>
+      <div class="bar lbar">
+        <label>From year <input type="number" id="ymin" placeholder="${G.year_min ?? ""}"></label>
+        <label>To year <input type="number" id="ymax" placeholder="${G.year_max ?? ""}"></label>
+        <button type="button" id="yclear" title="Clear the years: papers from every year">All years</button>
+        <label>Sort <select id="sort">
+          ${term ? `<option value="relevance">Best match</option>` : ""}
+          <option value="newest">Newest first</option><option value="oldest">Oldest first</option></select></label>
+        <a id="csv" download></a>
+      </div>
+      <div id="lpapers">${papers}</div>`);
+    wireTop();
+    document.querySelector("#list .lbar")._key = listKey();
+    $("sort").onchange = (e) => { S.sort = e.target.value; S.page = 1; loadPapers(); };
+    for (const k of ["ymin", "ymax"]) yearBox($(k), k);
+    $("yclear").onclick = () => clearFilter("years");
+    syncBar(r);
+    placeBack();
+  }
+  document.querySelectorAll("#list [data-match]").forEach((b) => b.onclick = () => { S.match = b.dataset.match; S.page = 1; renderDiseases(); loadPapers(); });
+  document.querySelectorAll("nav.pager button").forEach((b) => b.onclick = () => { S.page = +b.dataset.p; listTop = true; loadPapers(); });
+  if (toTop && inputs === seen) showListTop();
+  return my === reqNo;
+}
+function syncBar(r) {  // the controls bar, to the state now (a year being typed, not entered yet, is left as it is)
+  for (const k of ["ymin", "ymax"]) if (!($(k)._typing && $(k) === document.activeElement) && $(k).value !== S[k]) $(k).value = $(k)._was = S[k];
+  $("yclear").style.visibility = S.ymin || S.ymax ? "" : "hidden";  // (hidden, not gone: Sort doesn't move along)
+  $("sort").value = r.sort;
+  $("csv").href = "/api/papers.csv?" + apiParams();
+  $("csv").textContent = `Download CSV (all ${fmt(r.n_matched)}${r.n_matched > 50000 ? `, about ${fmt(Math.round(r.n_matched / 2000))} MB` : ""})`;
 }
 
 function scoreText(p) {
@@ -859,10 +1076,15 @@ function pager(r) {
 // each; papers in no topic are a pale grey, drawn smaller and underneath.
 const SLOTS = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a3aa7", "#e34948"];
 const NOISE = "#d6d5cf", INK = "#0b0b0b", FONT = "Atkinson Hyperlegible, Verdana, sans-serif";
+// The year colour bar on the maps without axes: inside the map's bottom right corner, so the plot area keeps its size in
+// every colouring (a narrower one moved every dot, and the kept zoom crept outwards with each switch).
+const YEAR_BAR = {title: {text: "Year"}, thickness: 14, len: 0.45, x: 1, xanchor: "right", xpad: 12, y: 0, yanchor: "bottom", ypad: 12,
+                  bgcolor: "rgba(255,255,255,0.85)"};
 const topicColour = (c) => c < 1 ? NOISE : SLOTS[(c - 1) % SLOTS.length];
 const DRILL_MIN = 30;  // smallest topic offered a map of its own
-// Map Explorer's plot margins: fixed (no growing for the year colour bar), so a glide starts and ends where the dots draw
-const exMargin = () => ({l: 74, r: mapColour === "year" ? 96 : 12, t: 12, b: 64, autoexpand: false});
+// Map Explorer's plot margins: fixed, with room for the year colour bar in both colourings (so a glide starts and ends
+// where the dots draw, and Colour by doesn't shift them)
+const exMargin = () => ({l: 74, r: 96, t: 12, b: 64, autoexpand: false});
 const AXES_HINT = "Across: how close each paper is in meaning to your words, or to a topic’s centre. Up: how close to the second, beyond the first. Short words work best, e.g. “mouse model”. Or let the map find two directions itself.";
 // Suggested axes (axes.py): found from the papers themselves, each end named from the papers near it
 const AUTO = {discover: "Discover", spread: "Main spread", ontopic: "About it ↔ in passing"};
@@ -878,6 +1100,7 @@ let MORPH = null;      // in-between positions (in EX's units) while the dots gl
 let mapColour = "topic", mapFocus = 0, hoverFocus = 0, lastHoverC = 0, shiftHeld = false, mapYear = null, playing = false, zoomK = 1;
 let drawn = {rev: "", cur: [], big: 11, annotations: []};  // what drawMap drew last
 let axesCall = 0;      // bumps on every axes request; a late answer to an older one is dropped
+let mapTop = false;    // the next map drawn is scrolled into view (a drill-in, clicked in the topic list under the map)
 
 function loadPlotly() {
   if (window.Plotly) return Promise.resolve();
@@ -889,6 +1112,8 @@ function loadPlotly() {
 }
 
 async function loadMap(push = true) {
+  takeYear();
+  if (push) restoreY = null;
   writeURL(push);
   playing = false;
   const my = ++reqNo, t0 = performance.now();
@@ -896,18 +1121,24 @@ async function loadMap(push = true) {
   const params = mapParams();
   $("how").innerHTML = howHTML();
   let r = M && M.params === params ? M : null;  // switching between Map and Map Explorer, or a facet: same map
+  const toPlot = mapTop, toTop = listTop, seen = inputs;  // (a drill-in: show the new map once drawn; a new search: its top)
+  mapTop = listTop = false;
   if (!r) {
-    setList(head() + `<p class="status"><b>Making the map…</b></p>`); wireTop();
+    const faded = fadeMap("<b>Making the map…</b>");
+    if (!faded) { setList(head() + `<p class="status"><b>Making the map…</b></p>`); wireTop(); }
     try {
       [r] = await Promise.all([
-        poll("/api/map?" + params, my, (html) => { setList(head() + html); wireTop(); }),
+        poll("/api/map?" + params, my, (pr, n) => {
+          if (faded && $("plot")) document.querySelector("#list .status").innerHTML = progressLine(pr, n);
+          else { setList(head() + progressHTML(pr, n)); wireTop(); }
+        }),
         loadPlotly()]);
     } catch (e) {  // a drill-in link can outlive its map (topics renumbered): offer the way back up
       if (my !== reqNo) return;  // (a stale request's error)
       setList(head() + `<p class="note">${S.topic && e.message.startsWith("404") ? "That topic is not on this map any more."
           : `Error: ${esc(e.message)}`}</p>
         ${S.topic ? `<p><button type="button" data-crumb="">Show the map of all the papers</button></p>` : ""}`);
-      wireTop(); wireCrumbs(); return;
+      wireTop(); wireCrumbs(); showListTop(); return;
     }
     if (!r) return;
     Object.assign(r, {params, secs: ((performance.now() - t0) / 1000).toFixed(1)});
@@ -936,7 +1167,7 @@ async function loadMap(push = true) {
     const few = path.length ? path.at(-1).n : r.n_text;
     setList(head() + crumbs + `<p class="status">${few ? `Only ${plural(few, "paper")}` : "No papers"} with an abstract here:
       too few for a map. ${path.length ? "Go back up above" : "Remove a filter, or use the list"}.</p>`);
-    wireTop(); wireCrumbs(); return;
+    wireTop(); wireCrumbs(); showListTop(); return;
   }
   const n = r.pmid.length, noise = r.c.filter((c) => c < 1).length, explore = S.view === "explore";
   const within = path.length ? ` in topic “${esc(path.at(-1).name)}”` : "";
@@ -948,7 +1179,7 @@ async function loadMap(push = true) {
   if (explore && !(S.ax && S.ay)) EX = null;  // (Back to a page with no axes: no axes)
   setList(head() + `
     <p class="status">${explore ? "Map Explorer" : "Map"} of <b>${fmt(n)}</b>${!path.length && n < r.n_list ? ` (out of ${fmt(r.n_list)})` : ""} ${scopeText(n, false)}${within}:
-      ${r.clusters.length ? `<b>${r.clusters.length}</b> ` : "no clear "}${path.length ? "sub-topics" : "topics"} · ${fmt(noise)} in no clear topic (grey)<span id="maskNote"></span> · ${r.secs} s ${infoBtn()}</p>
+      ${r.clusters.length ? `<b>${r.clusters.length}</b> ` : "no clear "}${path.length ? "sub-topics" : "topics"} · ${fmt(noise)} in no clear topic (grey) · ${r.secs} s ${infoBtn()} <span id="maskNote">${maskText()}</span></p>
     ${crumbs}
     <p class="hint" style="max-width:75ch">Dot = paper; close dots are close in meaning. Ring = curated paper. Click a dot to read it.
       Hold <kbd>Shift</kbd> over a dot to pick out its topic; <kbd>Esc</kbd> clears. Hover over a box on the left to grey out
@@ -965,7 +1196,7 @@ async function loadMap(push = true) {
     </div>
     <div id="plot" role="img" aria-label="Literature map: ${fmt(n)} papers in ${r.clusters.length} topics. The topic list below gives the same information."></div>
     <p id="hiddenNote" class="hint"></p>
-    <div id="mappaper"></div>
+    <div id="mappaper">${keptPaper(r.pmid)}</div>
     <h2>${path.length ? "Sub-topics" : "Topics"} <span class="muted" style="font-weight:normal">(click one to pick it out on the map)</span></h2>
     <ol class="topics">${r.clusters.map((c) => `<li><button type="button" data-topic="${c.id}" class="${mapFocus === c.id ? "on" : ""}">
         <span class="sw" style="background:${topicColour(c.id)}"></span>
@@ -983,22 +1214,33 @@ async function loadMap(push = true) {
   document.querySelectorAll("[data-topic]").forEach((b) => b.onclick = () => {
     const c = +b.dataset.topic;
     setFocus(mapFocus === c ? 0 : c);
-    $("plot").scrollIntoView({behavior: "smooth", block: "nearest"});
+    showPlot();
   });
   document.querySelectorAll("[data-drill]").forEach((b) => b.onclick = () => {
-    S.topic = [S.topic, b.dataset.drill].filter(Boolean).join(".");
-    loadMap(true).then(() => $("list").scrollIntoView({behavior: "smooth", block: "start"}));
+    S.topic = [...path.map((q) => q.id), b.dataset.drill].join(".");
+    mapTop = true;
+    loadMap(true);
   });
+  syncChips();
+  if (toPlot) $("plot").scrollIntoView({block: "nearest"});  // at once, with the new map (not after its axes)
+  else if (toTop && inputs === seen) showListTop();
+  // Room for the longest texts these two notes can have on this map, so they never wrap the line they are on
+  roomFor($("maskNote"), `· ${fmt(n)} highlighted by the facets`);
   if ($("play")) {
+    const most = Math.max(...Object.values(M.year.reduce((c, y) => (c[y] = (c[y] || 0) + 1, c), {})));
+    roomFor($("yrNote"), `Up to ${y1}: ${fmt(n)} papers (${fmt(most)} new)`);
     $("play").onclick = play;
     $("yr").oninput = (e) => { playing = false; setYear(+e.target.value >= y1 ? null : +e.target.value); };
     syncYear();
   }
+  placeBack();  // (once the page has its final layout)
   if (explore) wireAxes();
-  openURLPaper(r.pmid, push);
+  const paper = openURLPaper(r.pmid, push);
   loadMapFacets(r);
   if (explore && S.ax && S.ay) await loadAxes(false);
   else drawMap();
+  if (!push) await paper;  // (Back or Forward: the place to go back to may be in the paper)
+  return my === reqNo;
 }
 
 // ---- facets on the map: which papers each facet row links (positions in M.pmid), loaded once per
@@ -1011,6 +1253,11 @@ function loadMapFacets(r) {
     addNames(f.names);
     if (M === r && isMap()) { updateFilterBar(); redraw(); }
   }).catch(() => { r.facetsLoading = false; });
+}
+// How many papers the facets highlight (written at the end of the status line, in room kept for it)
+function maskText(sel = facetMask()) {
+  return sel ? `· ${fmt(sel.reduce((a, v) => a + v, 0))} highlighted by the facets`
+    : (S.ot || S.ep || S.named) && !M.facets ? "· highlighting…" : "";
 }
 function facetMask() {  // 1 = kept by the picked (and hovered) facets; null = none picked (or not loaded yet)
   const F = M?.facets, st = {...S, ...hoverPick}, parts = [];
@@ -1141,7 +1388,7 @@ async function loadAxes(animate) {
   let r;
   try {
     r = await poll("/api/axes?" + new URLSearchParams({subject: G.id, key: M.key, a: ax, b: ay}), my,
-                   (html) => { if (mine()) note.innerHTML = html; });
+                   (pr, n) => { if (mine()) note.innerHTML = progressLine(pr, n); });
   } catch (e) { if (mine()) { note.textContent = `Error: ${e.message}`; pressed(autoKind(EX?.ax)); drawMap(); } return; }
   if (!r || !mine()) return;
   const from = animate && M.pmid.length <= 12000 ? onScreen() : null;
@@ -1190,6 +1437,15 @@ function centres() {  // topic label positions: the topic's median position
 }
 
 const ctx2d = document.createElement("canvas").getContext("2d");
+// el keeps room for text, measured in el itself (its font as drawn here, its digit style), every digit as "0" (the
+// widest in most fonts; the real numbers vary)
+function roomFor(el, text) {
+  const was = el.textContent;
+  el.style.minWidth = "";
+  el.textContent = text.replace(/\d/g, "0");
+  el.style.minWidth = `${Math.ceil(el.getBoundingClientRect().width) + 2}px`;
+  el.textContent = was;
+}
 const textWidth = (text, size) => { ctx2d.font = `${size}px ${FONT}`; return ctx2d.measureText(text).width; };
 const fitText = (text, px, size, pre = "", post = "") => {  // pre + text + post, the text cut short (…) to fit px
   if (textWidth(pre + text + post, size) <= px) return pre + text + post;
@@ -1286,7 +1542,7 @@ function zoomNow() {
 
 function drawMap() {
   const r = M, el = $("plot");
-  if (!el || !r || !window.Plotly) return Promise.resolve();
+  if (!el || !r || !window.Plotly || el.classList.contains("stale")) return Promise.resolve();  // (a faded map: the old one)
   const n = r.pmid.length, P = pos(), explore = S.view === "explore" && !!EX;
   const rev = MORPH ? "morph" : `${r.key}|${explore ? EX.id : "map"}`;  // a new rev = a fresh view, unzoomed
   if (rev !== drawn.rev && el._wired) { Plotly.purge(el); el._wired = false; }  // double-click "reset" = this view
@@ -1300,8 +1556,7 @@ function drawMap() {
   const later = (i) => yr != null && !(r.year[i] > 0 && r.year[i] <= yr);  // not published yet (playing years)
   const dim = (i) => focus && r.c[i] !== focus || sel && !sel[i];  // not the picked topic, or left out by the facets
   const note = $("maskNote");
-  if (note) note.textContent = sel ? ` · ${fmt(sel.reduce((a, v) => a + v, 0))} highlighted by the facets`
-    : (S.ot || S.ep || S.named) && !r.facets ? " · highlighting…" : "";
+  if (note) note.textContent = maskText(sel);
   const fresh = (i) => yr != null && r.year[i] === yr;
   const idx = (keep) => { const out = []; for (let i = 0; i < n; i++) if (keep(i)) out.push(i); return out; };
   // Most papers are recent: spread the year colours over the 10th to 98th percentile of years.
@@ -1329,7 +1584,7 @@ function drawMap() {
   add(none, {size: topicMode && !focus ? Math.max(3, size * 0.7) : size, opacity: focus ? 0.9 : 0.7, ...colourOf(none),
     ...(topicMode && focus === -1 ? {color: "#8a8984"} : {})});
   add(rest, {size, opacity: yr != null ? 0.45 : focus ? 0.9 : 0.8, ...colourOf(rest),
-    ...(topicMode ? {} : {showscale: true, colorbar: {title: {text: "Year"}, thickness: 14}})});
+    ...(topicMode ? {} : {showscale: true, colorbar: explore ? {title: {text: "Year"}, thickness: 14} : YEAR_BAR})});
   const now = idx((i) => shown(i) && fresh(i));
   add(now, {size: size * 1.6, opacity: 1, line: {width: 1, color: "#fff"}, ...colourOf(now)});
   // Curated papers: big dots with a ring, drawn last (on top). WebGL hover only measures the distance
@@ -1349,7 +1604,7 @@ function drawMap() {
     range: [...range], zeroline: false, gridcolor: "#e6e6e6", tickfont: {size: 14, family: FONT}, automargin: false});
   const layout = {
     showlegend: false, hovermode: "closest", dragmode: "pan", uirevision: rev,
-    margin: explore ? exMargin() : {l: 10, r: 10, t: 10, b: 10},
+    margin: explore ? exMargin() : {l: 10, r: 10, t: 10, b: 10, autoexpand: false},
     paper_bgcolor: "rgba(0,0,0,0)", plot_bgcolor: "rgba(0,0,0,0)",
     xaxis: explore ? axis("ax", EX.range.x) : {visible: false, range: [...(el._wired ? el.layout.xaxis.range : r.range.x)]},
     yaxis: explore ? axis("ay", EX.range.y)
@@ -1382,7 +1637,7 @@ function wirePlot(el) {  // once per plot element; the handlers read the current
   }
   let resizing = 0;
   el.on("plotly_relayout", (e) => {  // zoom/pan: re-place the names; zoom: resize the dots
-    if ("annotations" in e || MORPH) return;
+    if ("annotations" in e || MORPH || el.classList.contains("stale")) return;
     const k = zoomNow();
     placeLabels();
     if (Math.abs(k - zoomK) > 0.05) { zoomK = k; clearTimeout(resizing); resizing = setTimeout(drawMap, 120); }
@@ -1397,32 +1652,53 @@ function wirePlot(el) {  // once per plot element; the handlers read the current
     if (i >= 0 && !(q.data.name === "curated" && q.pointNumber === j)) Plotly.Fx.hover(el, [{curveNumber: hit, pointNumber: j}]);
   });
   el.on("plotly_unhover", () => { lastHoverC = 0; });
-  el.on("plotly_click", (ev) => {
-    const j = curatedAt(ev.event);
-    pickMapPaper(j >= 0 ? M.pmid[j] : ev.points[0].customdata[4]);
-  });
+  wireDotClick(el, (ev) => { const j = curatedAt(ev.event); return j >= 0 ? M.pmid[j] : ev.points[0].customdata[4]; });
 }
+// A click on a dot opens its paper once it is clearly not half of a double-click, which resets the zoom (else the
+// reset also opened the paper under the mouse, and the page scrolled to it). Plotly sends a click for each half.
+function wireDotClick(el, pmidOf) {
+  let timer = 0, dbl = -1e9;
+  el.on("plotly_click", (ev) => {
+    clearTimeout(timer);
+    if (performance.now() - dbl < DBLCLICK) return;  // (the second half, after the double-click)
+    const pmid = pmidOf(ev), req = reqNo;
+    timer = setTimeout(() => { if (req === reqNo && el.isConnected) pickMapPaper(pmid); }, DBLCLICK);  // (not if the page moved on)
+  });
+  el.on("plotly_doubleclick", () => { clearTimeout(timer); dbl = performance.now(); });
+}
+const DBLCLICK = 300;  // ms: Plotly's double-click time
 
 // A dot clicked on any map: its paper opens under the map, and goes in the URL (pmid=), so the link reopens it.
 // A pmid= that isn't a dot on this map (a link edited by hand, or from another map) is dropped.
 function openURLPaper(pmids, push) {
   if (!S.pmid) return;
-  if (pmids.includes(+S.pmid)) return showMapPaper(S.pmid, !push);
+  if (pmids.includes(+S.pmid)) return showMapPaper(S.pmid, fromLink && !push);  // (scrolled to on a link, not on Back or Forward)
   S.pmid = "";
   writeURL(false);
 }
 function pickMapPaper(pmid) {
   S.pmid = String(pmid);
   writeURL(false);
-  return showMapPaper(S.pmid);
+  return showMapPaper(S.pmid, true);
 }
 let paperNo = 0;  // the newest paper asked for wins; a late answer for an older one, or after leaving the map, is dropped
-async function showMapPaper(pmid, scroll = true) {
+// The last paper drawn under a map, put back at once when a map is drawn anew with it open (Back, a tab, a chip):
+// it is fetched again, but meanwhile there is no gap where it goes.
+// (Same subject and words only: their highlights are in it. Kept across a reload too.)
+let lastPaper = JSON.parse(sessionStorage.getItem("lastPaper") || "null") || {};
+const keptPaper = (pmids) => S.pmid && lastPaper.pmid === S.pmid && lastPaper.key === `${G.id}|${S.q}` && pmids.includes(+S.pmid)
+  ? lastPaper.html : "";
+const syncChips = () => document.querySelectorAll("#mappaper [data-facet]")  // the open paper's chips show what is picked
+  .forEach((b) => b.setAttribute("aria-pressed", S[b.dataset.facet] === b.dataset.id));
+// scroll: show the paper (a dot clicked, or a link to it): an expected move, as the paper opens under the map
+async function showMapPaper(pmid, scroll) {
   const my = ++paperNo, req = reqNo;
   const p = await getJSON(`/api/paper?subject=${encodeURIComponent(G.id)}&pmid=${pmid}&term=${encodeURIComponent(S.q)}`);
   if (my !== paperNo || req !== reqNo || !$("mappaper")) return;
   $("mappaper").innerHTML = `<ol class="papers">${paperHTML(p, hl(p))}</ol>`;
   $("mappaper").querySelector("details.abs")?.setAttribute("open", "");
+  lastPaper = {pmid: String(pmid), key: `${G.id}|${S.q}`, html: $("mappaper").innerHTML};
+  try { sessionStorage.setItem("lastPaper", JSON.stringify(lastPaper)); } catch {}  // (full or blocked: no matter)
   if (scroll) $("mappaper").scrollIntoView({behavior: "smooth", block: "nearest"});
 }
 
@@ -1450,6 +1726,8 @@ const LAND = {
 const fieldName = (f) => f === 0 ? `no ${LAND[landMap()].unit}` : LM.fields[f].name;
 
 async function loadLand(push = true) {
+  takeYear();
+  if (push) restoreY = null;
   writeURL(push);
   const my = ++reqNo, t0 = performance.now();
   const head = () => tabsHTML() + filtersHTML();
@@ -1458,11 +1736,11 @@ async function loadLand(push = true) {
   $("how").innerHTML = howHTML();
   LM = LMS[mp] || null;  // (each map has its own fields and extent)
   if (!(L && L.params === params)) {
-    setList(head() + `<p class="status"><b>Placing the papers…</b></p>`); wireTop();
+    if (!fadeMap("<b>Placing the papers…</b>")) { setList(head() + `<p class="status"><b>Placing the papers…</b></p>`); wireTop(); }
     let r, meta;
     try {
       [r, meta] = await Promise.all([getJSON("/api/landscape?" + params), LM || getJSON(`/api/landscape_meta?map=${mp}`), loadPlotly()]);
-    } catch (e) { if (my === reqNo) { setList(head() + `<p class="note">Error: ${esc(e.message)}</p>`); wireTop(); } return; }
+    } catch (e) { if (my === reqNo) { setList(head() + `<p class="note">Error: ${esc(e.message)}</p>`); wireTop(); showListTop(); } return; }
     if (my !== reqNo) return;  // (a newer request, e.g. the other map's tab, owns L and LM now)
     LM = LMS[mp] = meta;
     L = Object.assign(r, {params, secs: ((performance.now() - t0) / 1000).toFixed(1)});
@@ -1475,7 +1753,10 @@ async function loadLand(push = true) {
   const sw = (f) => `<span class="sw" style="background:${LM.fields[f].colour}"></span>`;
   const item = (f, c, label) => `<li><button type="button" data-field="${f}" class="${landFocus === f ? "on" : ""}">${sw(f)}
       <span><b>${esc(label)}</b> <span class="muted">· ${plural(c, "paper")}</span></span></button></li>`;
-  setList(head() + `
+  const open = keptPaper(L.pmid), toTop = listTop, seen = inputs;
+  listTop = false;
+  // (a chip in the open paper picked: the paper stays under the mouse though the filter bar above may wrap)
+  holdStill(open ? $("mappaper") : null, () => setList(head() + `
     <p class="status">${T.title} of <b>${fmt(n)}</b>${L.sampled ? ` (a fixed sample of the ${fmt(L.n_on)})` : ""} ${scopeText(n)}
       · ${off ? `${plural(off, "paper")} not on it (${T.off}) · ` : ""}${L.secs} s ${infoBtn()}</p>
     <p class="hint" style="max-width:75ch">Dot = paper, ${T.about(LM.n_human)}
@@ -1487,11 +1768,13 @@ async function loadLand(push = true) {
         <button type="button" data-lcolour="year" aria-pressed="${landColour === "year"}">Year</button></span></span>
     </div>
     <div id="plot" role="img" aria-label="${T.title}: ${fmt(n)} papers over the human-gene literature. The ${T.unit} list below gives the same information."></div>
-    <div id="mappaper"></div>
+    <div id="mappaper">${open}</div>
     <h2>${T.units} <span class="muted" style="font-weight:normal">(${T.unitsNote})</span></h2>
     <ol class="topics">${fields.map(([f, c]) => item(f, c, LM.fields[f].name)).join("")}
-      ${counts.get(0) ? item(0, counts.get(0), T.none) : ""}</ol>`);
+      ${counts.get(0) ? item(0, counts.get(0), T.none) : ""}</ol>`), {again: () => $("mappaper")});
   wireTop();
+  syncChips();
+  if (toTop && inputs === seen) showListTop();
   document.querySelectorAll("[data-lcolour]").forEach((b) => b.onclick = () => {
     landColour = b.dataset.lcolour;
     document.querySelectorAll("[data-lcolour]").forEach((x) => x.setAttribute("aria-pressed", x === b));
@@ -1499,11 +1782,14 @@ async function loadLand(push = true) {
   });
   document.querySelectorAll("[data-field]").forEach((b) => b.onclick = () => {
     setLandFocus(landFocus === +b.dataset.field ? -1 : +b.dataset.field);
-    $("plot").scrollIntoView({behavior: "smooth", block: "nearest"});
+    showPlot();
   });
   landZoom = 1;
-  openURLPaper(L.pmid, push);
-  return drawLand();
+  placeBack();
+  const paper = openURLPaper(L.pmid, push);
+  await drawLand();
+  if (!push) await paper;
+  return my === reqNo;
 }
 
 function setLandFocus(f) {
@@ -1514,7 +1800,7 @@ function setLandFocus(f) {
 
 function drawLand() {
   const el = $("plot");
-  if (!el || !L || !window.Plotly) return Promise.resolve();
+  if (!el || !L || !window.Plotly || el.classList.contains("stale")) return Promise.resolve();
   const n = L.pmid.length, E = LM.extent;
   L.hover ??= L.pmid.map((p, i) => [wrap(pesc(L.title[i] || `PMID ${p}`)), L.year[i] || "no year",
     pesc(fieldName(L.f[i])), L.curated[i] ? " · curated" : "", p]);
@@ -1537,13 +1823,13 @@ function drawLand() {
   add(idx(dim), {size: size * 0.8, color: "#5f5e5a", opacity: 0.45});
   const rest = idx((i) => !dim(i) && !L.curated[i]);
   add(rest, {size, opacity: 0.85, line: {width: 0.6, color: "#fff"}, ...colourOf(rest),
-    ...(landColour === "year" ? {showscale: true, colorbar: {title: {text: "Year"}, thickness: 14}} : {})});
+    ...(landColour === "year" ? {showscale: true, colorbar: YEAR_BAR} : {})});
   const cur = idx((i) => !dim(i) && L.curated[i]);
   add(cur, {size: big, opacity: 1, line: {width: 2, color: INK}, ...colourOf(cur)}, {name: "curated"});
   const keep = el._land && el.layout?.xaxis?.range;
   const layout = {
     showlegend: false, hovermode: "closest", dragmode: "pan", uirevision: L.params,
-    margin: {l: 10, r: landColour === "year" ? 90 : 10, t: 10, b: 10},
+    margin: {l: 10, r: 10, t: 10, b: 10, autoexpand: false},
     paper_bgcolor: "rgba(0,0,0,0)", plot_bgcolor: "rgba(0,0,0,0)",
     xaxis: {visible: false, range: [...(keep ? el.layout.xaxis.range : E.x)]},
     yaxis: {visible: false, range: [...(keep ? el.layout.yaxis.range : E.y)], scaleanchor: "x"},
@@ -1589,21 +1875,23 @@ function wireLand(el) {  // once per plot element
   el._land = true;
   let resizing = 0;
   el.on("plotly_relayout", (e) => {  // zoom/pan: re-place the names; zoom: resize the dots
-    if ("annotations" in e) return;
+    if ("annotations" in e || el.classList.contains("stale")) return;
     const E = LM.extent, r = el.layout.xaxis.range;
     const k = Math.min(4, Math.max(1, Math.sqrt((E.x[1] - E.x[0]) / Math.abs(r[1] - r[0]))));
     placeLandLabels();
     if (Math.abs(k - landZoom) > 0.05) { landZoom = k; clearTimeout(resizing); resizing = setTimeout(drawLand, 120); }
   });
-  el.on("plotly_click", (ev) => pickMapPaper(ev.points[0].customdata[4]));
+  wireDotClick(el, (ev) => ev.points[0].customdata[4]);
 }
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && isLand() && landFocus >= 0 && !document.querySelector("#how:popover-open")) setLandFocus(-1);
 });
 
 // ---- wiring
-// Scrolling to the results must not hide their top under the sticky header.
-new ResizeObserver(([e]) => document.documentElement.style.scrollPaddingTop = `${e.target.offsetHeight + 8}px`)
+// Scrolling to the results must not hide their top under the sticky header: --head, the room the results' parts keep
+// above them when scrolled to (scroll-margin). (Not scroll-padding on the page: the header's own boxes would sit in
+// that band, and the browser scrolled the page at each key typed in them.)
+new ResizeObserver(([e]) => document.documentElement.style.setProperty("--head", `${e.target.offsetHeight + 8}px`))
   .observe(document.querySelector("header"));
 $("f").onsubmit = (e) => {
   e.preventDefault();
@@ -1611,17 +1899,20 @@ $("f").onsubmit = (e) => {
   const text = $("subject").value.trim(), q = $("term").value.trim();
   const same = G && G.kind === MODE && [S[MODE], G.label].some((t) => t.toUpperCase() === text.toUpperCase());
   S = {...S, gene: "", disease: "", [MODE]: same ? S[MODE] : text, q, rank: $("rank").value, page: 1, sort: "", match: "", topic: "", pmid: ""};
+  clearTimeout(yearTimer);
+  listTop = true;  // (a new search: its results from the top)
   if (same) { renderDiseases(); show(); }
   else { Object.assign(S, {ot: "", ep: "", named: "", ymin: "", ymax: ""}); searchGene(); }
 };
 $("rank").onchange = () => {  // keyword ranking lists only papers with the words; the others list all
   S.rank = $("rank").value; S.page = 1; S.sort = ""; S.topic = "";
+  listTop = true;
   if (G) { renderDiseases(); show(); }
 };
 const typing = () => !!document.activeElement?.matches("textarea, input:not([type=range])");
 document.addEventListener("keydown", (e) => {
   if (e.key === "/" && !typing()) {
-    e.preventDefault(); $("subject").focus(); $("subject").select();
+    e.preventDefault(); $("subject").focus({preventScroll: true}); $("subject").select();
   }
   if (!isMap() || !M) return;
   if (e.key === "Escape" && !document.querySelector("#how:popover-open")) {  // Esc: drop the picked topic, else stop playing
@@ -1631,6 +1922,13 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Shift" && !typing() && lastHoverC && lastHoverC !== hoverFocus) { hoverFocus = lastHoverC; drawMap(); }  // Shift: pick out the hovered topic
 });
 document.addEventListener("keydown", (e) => { if (e.key === "Shift") shiftHeld = true; }, true);
+let byKeys = false;  // the last input was a key, not the mouse (inputs match :focus-visible on a click as well)
+addEventListener("keydown", () => { byKeys = true; }, true);
+addEventListener("pointerdown", () => { byKeys = false; }, true);
+document.addEventListener("focusin", (e) => {  // keyboard focus moved under the sticky header: show it
+  const head = document.querySelector("header").getBoundingClientRect().bottom, top = e.target.getBoundingClientRect().top;
+  if (byKeys && top < head && !e.target.closest("header, [popover]")) scrollBy(0, top - head - 8);
+});
 const shiftUp = () => {
   shiftHeld = false;
   if (hoverFocus && M) { hoverFocus = 0; drawMap(); }
@@ -1643,14 +1941,23 @@ $("creamBtn").onclick = () => {
 };
 if (localStorage.getItem("cream")) document.body.classList.add("cream");
 
+let fromNo = 0;  // the newest fromURL (a quick second Back supersedes the first)
 async function fromURL() {
+  const me = ++fromNo;
+  clearTimeout(yearTimer);
+  // (read first: drawing can clamp the scroll, and that is saved too)
+  const y = restoreY = fromLink ? null : PLACES[history.state?.id] ?? history.state?.y ?? null;
   readURL();
   showMode();
   $("subject").value = S[MODE]; $("term").value = S.q; $("rank").value = S.rank;
-  if (S[MODE]) await searchGene(false); else { clearGene(); $("subject").focus(); }
+  const drawn = S[MODE] ? await searchGene(false) : (clearGene(), $("subject").focus(), true);
+  if (me !== fromNo) return;
+  if (drawn && restoreY === y) placeBack();  // (unless the user moved on meanwhile)
+  restoreY = null;
 }
+let fromLink = freshLink;  // a link opened: not a reload (which has its place), nor Back or Forward
 window.addEventListener("popstate", fromURL);
-fromURL();
+fromURL().finally(() => { fromLink = false; });
 </script>
 </body>
 </html>
