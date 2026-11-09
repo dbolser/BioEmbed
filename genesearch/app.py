@@ -1097,7 +1097,7 @@ def api_axes(subject: str, key: str, a: str, b: str = ""):
     part along a taken out, so the axes are at right angles and the plot is the papers' shadow on the
     plane of a and b (two similar axes would otherwise put every paper on the diagonal). angle = how
     far apart a and b are, in degrees (90 = unrelated in meaning).
-    Either axis can also be 'about': the map's own direction, ontopic's across (axes.py): + = like the
+    Either axis can also be 'map:about': the map's own direction, ontopic's across (axes.py): + = like the
     map's centre (about the subject), - = like gene papers in general (mentions it in passing).
     a = 'auto:discover', 'auto:spread' or 'auto:ontopic' (b is then not used): both axes found from the
     papers themselves (axes.py), with names for each axis's two ends."""
@@ -1111,7 +1111,7 @@ def api_axes(subject: str, key: str, a: str, b: str = ""):
             raise HTTPException(400, "These axes need the whole-PubMed vectors, which this server doesn't have yet.")
         j = semantic.job(("axes", key, kind, subject), lambda jb: suggested_axes(subject, m, kind, jb))
         return j.result if j.finished and not j.error else {"pending": j.status(), "n": len(pm)}
-    about = "about" in (a.strip(), b.strip())
+    about = "map:about" in (a.strip(), b.strip())
     if about and semantic.source() != "full":
         raise HTTPException(400, "About it ↔ in passing needs the whole-PubMed vectors, which this server doesn't have yet.")
     try:
@@ -1129,7 +1129,7 @@ def api_axes(subject: str, key: str, a: str, b: str = ""):
             if not len(members):
                 raise HTTPException(400, f"no topic {t[1]} in this map")
             v = members.mean(0)
-        elif spec.strip() == "about":
+        elif spec.strip() == "map:about":
             v = axes.own_direction(vecs[ok], bg)
         elif spec.strip():
             v = semantic.query_vector(spec.strip())

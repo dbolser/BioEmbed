@@ -1074,15 +1074,17 @@ async function play() {  // one year every ~half second; at the end, back to all
 
 // ---- Map Explorer: put the papers on two axes of your choosing
 // Ready-made axes in each "or a topic" list: the map's own direction ('about', from the server) and your rank-by words
-const RANK_AXIS = "\nrank-by";  // (a text box can hold no line break, so no axis of your own is ever this)
+const ABOUT_AXIS = "map:about", RANK_AXIS = "\nrank-by";  // (a text box can hold no line break, so no axis of your own is ever this)
 const rankWords = () => S.q.trim();
 function axesHTML(r) {
-  // with no axes of your own yet: across = about it ↔ in passing, up = your rank-by words (if any)
-  const own = (k) => S[k] && !autoKind(S[k]) ? S[k] : k === "ax" ? "about" : rankWords();
+  // with no axes of your own yet: across = about it ↔ in passing (it needs the whole-PubMed vectors), up = your
+  // rank-by words (if any)
+  const about = r.source === "full";
+  const own = (k) => S[k] && !autoKind(S[k]) ? S[k] : k === "ax" ? (about ? ABOUT_AXIS : "") : rankWords();
   const picked = (k) => own(k) === rankWords() && rankWords() ? RANK_AXIS : own(k);
-  const text = (k) => /^topic:|^about$/.test(picked(k)) || picked(k) === RANK_AXIS ? "" : own(k);
+  const text = (k) => /^topic:/.test(picked(k)) || [ABOUT_AXIS, RANK_AXIS].includes(picked(k)) ? "" : own(k);
   const opt = (k, v, label) => `<option value="${esc(v)}"${picked(k) === v ? " selected" : ""}>${label}</option>`;
-  const topics = (k) => opt(k, "", "—") + opt(k, "about", "About it ↔ in passing") +
+  const topics = (k) => opt(k, "", "—") + (about ? opt(k, ABOUT_AXIS, "About it ↔ in passing") : "") +
     (rankWords() ? opt(k, RANK_AXIS, `Rank-by words: “${esc(rankWords())}”`) : "") +
     r.clusters.map((c) => opt(k, `topic:${c.id}`, `${c.id}. ${esc(c.name)}`)).join("");
   const axis = (k, label, eg) => `<div class="axis">
@@ -1121,7 +1123,7 @@ function wireAxes() {
   };
 }
 const axisName = (spec) => {
-  if (spec === "about") return "“about it ↔ in passing”";
+  if (spec === ABOUT_AXIS) return "“about it ↔ in passing”";
   const t = /^topic:(-?\d+)$/.exec(spec), c = t && M.clusters.find((c) => c.id === +t[1]);
   return t ? `topic ${t[1]}${c ? `. ${c.name}` : ""}` : `“${spec}”`;
 };
@@ -1340,7 +1342,7 @@ function drawMap() {
     traces.push(trace(cur, {name: "curated", type: "scatter", marker: {size: big + 2, opacity: 0}}));
   }
   const ends = (k) => EX.names?.[k === "ax" ? "x" : "y"];  // suggested axes: what each end is about
-  const towards = (k) => EX[k] === "about" ? `more about ${G.label}, less in passing` : `closer in meaning to ${axisName(EX[k])}`;
+  const towards = (k) => EX[k] === ABOUT_AXIS ? `more about ${G.label}, less in passing` : `closer in meaning to ${axisName(EX[k])}`;
   const axis = (k, range) => ({title: {text: pesc(ends(k) ? ""
                                          : `${towards(k)}${k === "ay" ? `, beyond ${axisName(EX.ax)}` : ""} →`),
                                          font: {size: 16, family: FONT, color: INK}, standoff: 8},
