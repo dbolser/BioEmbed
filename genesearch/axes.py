@@ -77,6 +77,12 @@ def _unit(v: np.ndarray) -> np.ndarray:
     return v / np.linalg.norm(v)
 
 
+def own_direction(X: np.ndarray, bg) -> np.ndarray:
+    """The map's own direction, a unit vector: its centre minus gene papers' in general ('about the subject <->
+    mentions it in passing'). bg: background()."""
+    return _unit(np.asarray(X, np.float64).mean(0) - bg[0])
+
+
 def directions(kind: str, X: np.ndarray, years: np.ndarray, bg=None) -> tuple[np.ndarray, np.ndarray]:
     """(across, up): unit vectors, up perpendicular to across. X: the map's papers' vectors; years: 0 = unknown;
     bg: background() (for discover and ontopic)."""
@@ -86,7 +92,7 @@ def directions(kind: str, X: np.ndarray, years: np.ndarray, bg=None) -> tuple[np
         a, b = V[:, -1], V[:, -2]
     else:
         mean, Cb = bg
-        own = _unit(X.mean(0) - mean)
+        own = own_direction(X, bg)
         P = np.eye(len(own)) - np.outer(own, own)  # (adding own's outer product back keeps the right side invertible)
         R = (1 - SHRINK) * Cb + SHRINK * np.trace(Cb) / len(own) * np.eye(len(own))
         _, V = scipy.linalg.eigh(P @ _cov(X) @ P, P @ R @ P + np.outer(own, own))
