@@ -294,6 +294,7 @@ if (freshLink) history.replaceState({...history.state, id: entryId(), y: 0}, "")
 let placeTimer = 0, restoreY = null;  // restoreY: the place to go back to, once the page is drawn (null: none)
 const savePlace = () => history.replaceState({...history.state, y: scrollY}, "");
 addEventListener("scroll", () => {
+  if (restoreY != null) return;  // (Back or Forward's page still being drawn: where it scrolls meanwhile isn't the place)
   if (history.state?.id) PLACES[history.state.id] = scrollY;  // (an entry not ours, e.g. a #hash typed in: no place)
   clearTimeout(placeTimer); placeTimer = setTimeout(savePlace, 300);
 }, {passive: true});
@@ -471,6 +472,7 @@ async function searchGene(push = true) {
     $("choices").innerHTML = "";
     loadGene(res.matches[+b.dataset.i], [], true, true, ++geneNo);
   });
+  return true;  // (drawn: a reload comes back to the same place in the list)
 }
 
 // reqNo++: also stops polls for the old gene's results; geneNo++: and a lookup still on its way
@@ -825,8 +827,8 @@ const isList = () => !isMap() && !isLand();
 // picked: new results, which a smooth scroll would carry under the mouse)
 let listTop = false;
 function showListTop() {
-  const top = $("list").getBoundingClientRect().top;
-  if (top < 0 || top > innerHeight * 0.6) $("list").scrollIntoView({block: "start"});
+  const top = $("list").getBoundingClientRect().top, head = document.querySelector("header").getBoundingClientRect().bottom;
+  if (top < head || top > innerHeight * 0.6) $("list").scrollIntoView({block: "start"});  // (under the sticky header is out of view too)
 }
 // In one column the boxes sit above the list: a pick there shows the new list's top too (else nothing in view changes)
 const oneColumn = () => $("dis").getBoundingClientRect().bottom <= $("list").getBoundingClientRect().top;
@@ -856,7 +858,8 @@ function yearBox(el, k) {
     el._typing = false;
     Object.assign(S, {[k]: el.value, page: 1, topic: ""});
     clearTimeout(yearTimer);
-    yearTimer = setTimeout(() => { yearTimer = 0; if (G && el.isConnected) { renderDiseases(); loadPapers(); } }, stepped ? STEP_PAUSE : 0);
+    // (a search begun before the change can draw the list anew meanwhile, new boxes and all: still search; not once the list is gone)
+    yearTimer = setTimeout(() => { yearTimer = 0; if (G && $(k)) { renderDiseases(); loadPapers(); } }, stepped ? STEP_PAUSE : 0);
   };
 }
 // A search starting while a year box's search waits: that one is dropped (this one has the year), but the boxes on
@@ -1222,7 +1225,7 @@ async function loadMap(push = true) {
     loadMap(true);
   });
   syncChips();
-  if (toPlot) $("plot").scrollIntoView({block: "nearest"});  // at once, with the new map (not after its axes)
+  if (toPlot && inputs === seen) $("plot").scrollIntoView({block: "nearest"});  // at once, with the new map (not after its axes)
   else if (toTop && inputs === seen) showListTop();
   // Room for the longest texts these two notes can have on this map, so they never wrap the line they are on
   roomFor($("maskNote"), `· ${fmt(n)} highlighted by the facets`);
@@ -1656,15 +1659,17 @@ function wirePlot(el) {  // once per plot element; the handlers read the current
 }
 // A click on a dot opens its paper once it is clearly not half of a double-click, which resets the zoom (else the
 // reset also opened the paper under the mouse, and the page scrolled to it). Plotly sends a click for each half.
+// (Kept on el: a new view drawn between the halves, as axes arrive, wires the plot anew and Plotly sees one click.)
 function wireDotClick(el, pmidOf) {
-  let timer = 0, dbl = -1e9;
   el.on("plotly_click", (ev) => {
-    clearTimeout(timer);
-    if (performance.now() - dbl < DBLCLICK) return;  // (the second half, after the double-click)
+    clearTimeout(el._dotTimer);
+    const last = el._dotAt;
+    el._dotAt = ev.event?.timeStamp ?? performance.now();  // (when the button went down, not when the page got to it)
+    if (el._dotAt - last < DBLCLICK) return;  // (the second half of a double-click)
     const pmid = pmidOf(ev), req = reqNo;
-    timer = setTimeout(() => { if (req === reqNo && el.isConnected) pickMapPaper(pmid); }, DBLCLICK);  // (not if the page moved on)
+    el._dotTimer = setTimeout(() => { if (req === reqNo && el.isConnected) pickMapPaper(pmid); }, DBLCLICK);  // (not if the page moved on)
   });
-  el.on("plotly_doubleclick", () => { clearTimeout(timer); dbl = performance.now(); });
+  el.on("plotly_doubleclick", () => { clearTimeout(el._dotTimer); el._dotAt = performance.now(); });
 }
 const DBLCLICK = 300;  // ms: Plotly's double-click time
 
@@ -1672,7 +1677,8 @@ const DBLCLICK = 300;  // ms: Plotly's double-click time
 // A pmid= that isn't a dot on this map (a link edited by hand, or from another map) is dropped.
 function openURLPaper(pmids, push) {
   if (!S.pmid) return;
-  if (pmids.includes(+S.pmid)) return showMapPaper(S.pmid, fromLink && !push);  // (scrolled to on a link, not on Back or Forward)
+  // (scrolled to on a link, not on Back or Forward; one that fails stays out, and the page is still put back)
+  if (pmids.includes(+S.pmid)) return showMapPaper(S.pmid, fromLink && !push).catch((e) => console.error(e));
   S.pmid = "";
   writeURL(false);
 }
@@ -1736,6 +1742,8 @@ async function loadLand(push = true) {
   const params = apiParams({page: 1, sort: ""}).toString() + `&map=${mp}`;
   $("how").innerHTML = howHTML();
   LM = LMS[mp] || null;  // (each map has its own fields and extent)
+  const toTop = listTop, seen = inputs;  // (before the papers are placed: the user scrolling meanwhile wins)
+  listTop = false;
   if (!(L && L.params === params)) {
     if (!fadeMap("<b>Placing the papers…</b>")) { setList(head() + `<p class="status"><b>Placing the papers…</b></p>`); wireTop(); }
     let r, meta;
@@ -1754,8 +1762,7 @@ async function loadLand(push = true) {
   const sw = (f) => `<span class="sw" style="background:${LM.fields[f].colour}"></span>`;
   const item = (f, c, label) => `<li><button type="button" data-field="${f}" class="${landFocus === f ? "on" : ""}">${sw(f)}
       <span><b>${esc(label)}</b> <span class="muted">· ${plural(c, "paper")}</span></span></button></li>`;
-  const open = keptPaper(L.pmid), toTop = listTop, seen = inputs;
-  listTop = false;
+  const open = keptPaper(L.pmid);
   // (a chip in the open paper picked: the paper stays under the mouse though the filter bar above may wrap)
   holdStill(open ? $("mappaper") : null, () => setList(head() + `
     <p class="status">${T.title} of <b>${fmt(n)}</b>${L.sampled ? ` (a fixed sample of the ${fmt(L.n_on)})` : ""} ${scopeText(n)}
@@ -1938,9 +1945,9 @@ document.addEventListener("keyup", (e) => { if (e.key === "Shift") shiftUp(); })
 window.addEventListener("blur", shiftUp);
 $("creamBtn").onclick = () => {
   document.body.classList.toggle("cream");
-  localStorage.setItem("cream", document.body.classList.contains("cream") ? "1" : "");
+  try { localStorage.setItem("cream", document.body.classList.contains("cream") ? "1" : ""); } catch {}  // (blocked: not kept)
 };
-if (localStorage.getItem("cream")) document.body.classList.add("cream");
+try { if (localStorage.getItem("cream")) document.body.classList.add("cream"); } catch {}  // (storage blocked: plain)
 
 let fromNo = 0;  // the newest fromURL (a quick second Back supersedes the first)
 async function fromURL() {
