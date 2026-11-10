@@ -61,8 +61,8 @@
     sit close together. Code: <code>litmap.py</code> (and <code>api_map</code> in <code>app.py</code>).</p>
   <ol>
     <li><b>Papers.</b> The current list’s papers that are in the local PubMed copy (title, and the abstract when it has one), leaving out the facet boxes on the left: on the
-      map those grey out the papers they leave out, rather than making a new map. Above <span class="cap">20,000</span>, a fixed sample of
-      <span class="cap">20,000</span>: chosen by a hash of the PMID, so it is the same sample every time and overlaps across filters.</li>
+      map those grey out the papers they leave out, rather than making a new map. Above <span class="cap">100,000</span>, a fixed sample of
+      <span class="cap">100,000</span>: chosen by a hash of the PMID, so it is the same sample every time and overlaps across filters.</li>
     <li><b>Embeddings.</b> Each paper’s 384-number MedEmbed-small vector of its title + abstract (unit length, so cosine
       similarity is the dot product).</li>
     <li><b>Neighbours.</b> Each paper’s <span class="k">15</span>-point neighbourhood (itself and its nearest papers, cosine),
@@ -215,7 +215,7 @@
 
   <h2>What we settled on</h2>
   <table>
-    <thead><tr><th>Step</th><th>MedEmbed map tab (all 7.8 million gene papers)</th><th>Map tab (one list, up to <span class="cap">20,000</span> papers)</th></tr></thead>
+    <thead><tr><th>Step</th><th>MedEmbed map tab (all 7.8 million gene papers)</th><th>Map tab (one list, up to <span class="cap">100,000</span> papers)</th></tr></thead>
     <tbody>
       <tr><td>Clustering space</td><td>UMAP, 15 neighbours, 12 dimensions</td><td>UMAP, 15 neighbours, 12 dimensions</td></tr>
       <tr><td>Clusters</td><td>HDBSCAN eom, minimum size 200, min_samples 3, on a 1 million sample; every paper voted in: 780 clusters</td>

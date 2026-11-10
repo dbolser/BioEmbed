@@ -90,7 +90,7 @@ How it works
   memory-mapped) once that exists and is complete. Until then they are computed on CPU for one gene's papers
   when first needed (~50-130 papers/s, shown as a progress bar), capped at the 30,000 best keyword matches,
   and kept in `index/cache/emb/`. Worker count: `GENESEARCH_EMBED_WORKERS` (12) x `GENESEARCH_EMBED_THREADS` (4).
-- Map (`litmap.py`): up to 20,000 papers (a fixed random sample beyond that), UMAP (cosine) to 12-D, HDBSCAN
+- Map (`litmap.py`): up to 100,000 papers (`GENESEARCH_MAP_CAP`) (a fixed random sample beyond that), UMAP (cosine) to 12-D, HDBSCAN
   topics (at most 8, one colour each; papers HDBSCAN leaves out join the nearest topic unless they are among
   the 10% it rates least typical: those stay grey), UMAP to 2-D for drawing; topics named by c-TF-IDF top terms, or by Gemini 3.1
   Flash-Lite on Google Vertex AI (project from the Application Default Credentials, or `GOOGLE_CLOUD_PROJECT`;
