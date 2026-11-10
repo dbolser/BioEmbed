@@ -22,6 +22,15 @@
   .muted { color: var(--muted); }
   ol li { margin: .45rem 0; }
   code { font-size: .9rem; }
+  .tabs { display: flex; flex-wrap: wrap; gap: .3rem; margin: 1.4rem 0 0; border-bottom: 2px solid var(--line); }
+  .tabs button { font: inherit; padding: .45rem .9rem; border: 1px solid var(--line); border-bottom: none;
+    border-radius: .4rem .4rem 0 0; background: var(--panel); color: var(--fg); cursor: pointer; margin-bottom: -2px; }
+  .tabs button[aria-selected="true"] { background: var(--bg); border-color: var(--line); border-bottom: 2px solid var(--bg);
+    font-weight: bold; }
+  .tabs button:focus-visible { outline: 2px solid var(--gene); outline-offset: 2px; }
+  [role="tabpanel"] h2:first-child { margin-top: 1.2rem; }
+  .scroll { overflow-x: auto; }
+  tr.pick td { font-weight: bold; }
 </style>
 </head>
 <body>
@@ -31,12 +40,22 @@
   <p>Type a gene, or click “Gene ⇄” to type a disease, and see the PubMed papers about it. Optional words rank
     those papers by keywords, by meaning (semantic), or both. Everything runs on this computer from the data below, except the AI topic names.</p>
 
+  <div class="tabs" role="tablist" aria-label="About sections">
+    <button role="tab" id="tab-data" aria-controls="data-panel" aria-selected="true">Data</button>
+    <button role="tab" id="tab-map" aria-controls="map-panel" aria-selected="false" tabindex="-1">Map</button>
+    <button role="tab" id="tab-explorer" aria-controls="explorer-panel" aria-selected="false" tabindex="-1">Map Explorer</button>
+    <button role="tab" id="tab-tests" aria-controls="tests-panel" aria-selected="false" tabindex="-1">Methods tested</button>
+  </div>
+
+  <section role="tabpanel" id="data-panel" aria-labelledby="tab-data">
   <h2>The data</h2>
   <table>
     <thead><tr><th>Source</th><th>What it gives the search</th><th>Size</th></tr></thead>
     <tbody id="data"><tr><td colspan="3" class="muted">Loading…</td></tr></tbody>
   </table>
+  </section>
 
+  <section role="tabpanel" id="map-panel" aria-labelledby="tab-map" hidden>
   <h2>How the map is made</h2>
   <p>The Map tab groups the papers in the current list into topics and lays them out so that papers close in meaning
     sit close together. Code: <code>litmap.py</code> (and <code>api_map</code> in <code>app.py</code>).</p>
@@ -70,7 +89,10 @@
     <li><b>Drawing.</b> One colour per topic; grey = no clear topic. Curated papers are drawn bigger, with a ring.
       Maps are saved, so a list opens instantly the second time.</li>
   </ol>
+  <p>Why these settings: see <a href="#tests">Methods tested</a>.</p>
+  </section>
 
+  <section role="tabpanel" id="explorer-panel" aria-labelledby="tab-explorer" hidden>
   <h2>Map Explorer</h2>
   <p>The Map Explorer tab shows the same papers and topics as the map, but places them on two axes that mean
     something, instead of UMAP’s layout. Each axis is a direction in the 384-number embedding space, and a paper’s place
@@ -109,6 +131,99 @@
       words. The names are cut to fit the plot, and are given in full in the note.</li>
     <li><b>Small maps.</b> With fewer than 1,000 papers, a few papers can change the up axis a lot: the note says so.</li>
   </ol>
+  </section>
+
+  <section role="tabpanel" id="tests-panel" aria-labelledby="tab-tests" hidden>
+  <h2>Methods tested</h2>
+  <p>Before settling the maps’ methods, we tested them on all 7.8 million papers about human genes (every PubMed paper
+    PubTator3 tags with an HGNC gene), using the same 384-number MedEmbed-small embeddings as the search. The question:
+    when the embeddings are squeezed down to a few dimensions, to cluster and to draw them, how much of their structure
+    survives? The results led to the MedEmbed map tab, and support the Map tab’s settings. Full write-up and code:
+    <code>geometry/README.md</code>.</p>
+  <p>The scores, each measured on 20,000 randomly chosen papers, against their true nearest neighbours (most similar papers, by cosine, over all 7.8 million):</p>
+  <ul>
+    <li><b>Kept neighbours:</b> of a paper’s 15 true nearest neighbours, the share still among its 15 nearest after the squeeze.</li>
+    <li><b>Share a gene:</b> of a paper’s 15 nearest neighbours, the share tagged with at least one of its genes. This measures
+      biology rather than geometry; the full 384-number space scores 61%, the most a squeeze can expect.</li>
+    <li><b>Same field:</b> of neighbour pairs where both papers have a journal field, the share with the same field.</li>
+    <li><b>Far stays far:</b> rank correlation of distances before and after the squeeze, over 100,000 random pairs of papers (1 = perfect).</li>
+  </ul>
+
+  <h2>Squeezing the embeddings</h2>
+  <p>One full run per setting, on all 7.8 million papers. k = UMAP’s number of neighbours. UMAP ran on a GPU (RAPIDS cuML), with
+    <code>min_dist</code> 0 and cosine distance; t-SNE ran on CPU (openTSNE, perplexity 30, about 2 hours).</p>
+  <div class="scroll"><table>
+    <thead><tr><th>Method</th><th>Kept neighbours</th><th>Share a gene</th><th>Same field</th><th>Far stays far</th><th>Verdict</th></tr></thead>
+    <tbody>
+      <tr><td>Full embeddings, 384 numbers</td><td class="n">100%</td><td class="n">61%</td><td class="n">53%</td><td class="n">1.00</td><td>The ceiling</td></tr>
+      <tr><td>PCA, 12 dimensions</td><td class="n">8%</td><td class="n">28%</td><td class="n">44%</td><td class="n">0.74</td><td rowspan="2">A straight-line squeeze: the baseline. Needs many dimensions.</td></tr>
+      <tr><td>PCA, 24 dimensions</td><td class="n">23%</td><td class="n">42%</td><td class="n">50%</td><td class="n">0.81</td></tr>
+      <tr><td>UMAP k = 15, 2 dimensions</td><td class="n">6%</td><td class="n">31%</td><td class="n">37%</td><td class="n">0.24</td><td>Too lossy for a picture</td></tr>
+      <tr><td>UMAP k = 15, 6 dimensions</td><td class="n">24%</td><td class="n">53%</td><td class="n">48%</td><td class="n">0.36</td><td>Gains stop at about 6 dimensions</td></tr>
+      <tr class="pick"><td>UMAP k = 15, 12 dimensions</td><td class="n">25%</td><td class="n">54%</td><td class="n">49%</td><td class="n">0.36</td><td>Chosen for clustering</td></tr>
+      <tr><td>UMAP k = 15, 24 dimensions</td><td class="n">25%</td><td class="n">54%</td><td class="n">49%</td><td class="n">0.37</td><td>No better than 12</td></tr>
+      <tr><td>UMAP k = 50, 12 dimensions</td><td class="n">20%</td><td class="n">52%</td><td class="n">48%</td><td class="n">0.38</td><td>More neighbours lose local detail</td></tr>
+      <tr><td>UMAP k = 50, 12 dimensions, more thorough neighbour search</td><td class="n">20%</td><td class="n">52%</td><td class="n">48%</td><td class="n">0.38</td><td>No change: UMAP already finds 91–95% of the true neighbours</td></tr>
+      <tr><td>UMAP k = 100 or 150</td><td colspan="4" class="muted">ran out of GPU memory at 7.8 million papers</td><td></td></tr>
+      <tr class="pick"><td>t-SNE, 2 dimensions</td><td class="n">16%</td><td class="n">48%</td><td class="n">48%</td><td class="n">0.37</td><td>Chosen for drawing: nearly 3× the neighbours UMAP keeps in 2-D</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>Other checks</h2>
+  <div class="scroll"><table>
+    <thead><tr><th>What we tried</th><th>Result</th><th>What it means</th></tr></thead>
+    <tbody>
+      <tr><td>Intrinsic dimension (how many directions the papers really spread in; TwoNN and Levina–Bickel estimates)</td>
+        <td>14 to 17; falls from 19 at 78,000 papers to 14 at 7.8 million</td><td>A squeeze to 6–24 dimensions can keep the local structure; 2 cannot. More papers make it easier, not harder.</td></tr>
+      <tr><td>UMAP <code>min_dist</code> from 0 to 0.99, on 8,000, 78,000 and 776,000 papers</td>
+        <td>0.01 or less: all the same; 0.1 and up: worse, an even disc</td><td>Not the problem; we used 0</td></tr>
+      <tr><td>UMAP neighbours from 2 to 200, same subsets</td>
+        <td>5 best locally; 2 draws noise; 50+ worse</td><td>Fewer neighbours keep more local detail</td></tr>
+      <tr><td>t-SNE against 2-D UMAP as the number of papers grows (share a gene, as a share of the ceiling)</td>
+        <td>t-SNE about 80% at every size; best UMAP 68% at 8,000 papers, 55% at 776,000</td><td>2-D UMAP gets worse with more papers; t-SNE does not</td></tr>
+      <tr><td>umap-learn (the reference UMAP) against cuML, 78,000 papers</td>
+        <td>share a gene 21% against cuML’s 17% (t-SNE 32%)</td><td>Not a quirk of the GPU version</td></tr>
+      <tr><td>cuML’s GPU t-SNE, 8,000 papers</td><td>near chance</td><td>Not used; openTSNE instead</td></tr>
+      <tr><td>The published PubMedBERT t-SNE map (González-Márquez et al. 2024), 6.3 million of our papers</td>
+        <td>share a gene 33%, of its own embeddings’ 49%; same field 50% of 58%</td><td>Its embeddings group papers by journal field more, ours by gene more. Now the PubMedBERT map tab.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>Clustering</h2>
+  <p>HDBSCAN on the 12-dimension UMAP, fitted on a 1 million paper sample. <b>Together:</b> of a paper’s 15 true nearest
+    neighbours, the share in its cluster (unclustered counts as a miss). <b>Gene lift:</b> how many times more often two papers
+    in one cluster share a gene than two random papers. <b>Unclustered:</b> papers HDBSCAN leaves out as noise. A selection of the 14 settings tried:</p>
+  <div class="scroll"><table>
+    <thead><tr><th>Selection method, minimum cluster size, min_samples</th><th>Clusters</th><th>Unclustered</th><th>Together</th><th>Gene lift</th></tr></thead>
+    <tbody>
+      <tr><td>leaf, 50, 10</td><td class="n">3,193</td><td class="n">59%</td><td class="n">33%</td><td class="n">16.6</td></tr>
+      <tr><td>leaf, 200, 10</td><td class="n">850</td><td class="n">58%</td><td class="n">35%</td><td class="n">14.3</td></tr>
+      <tr><td>eom, 50, 1</td><td class="n">4,230</td><td class="n">40%</td><td class="n">46%</td><td class="n">14.3</td></tr>
+      <tr><td>eom, 50, 3</td><td class="n">3,349</td><td class="n">46%</td><td class="n">44%</td><td class="n">14.9</td></tr>
+      <tr><td>eom, 200, 3</td><td class="n">780</td><td class="n">47%</td><td class="n">45%</td><td class="n">10.3</td></tr>
+      <tr><td>eom, 1000, 3</td><td class="n">159</td><td class="n">50%</td><td class="n">44%</td><td class="n">6.9</td></tr>
+      <tr><td>eom, 5000, 10</td><td class="n">2</td><td class="n">0%</td><td class="n">99%</td><td class="n">1.2</td></tr>
+      <tr><td colspan="5" class="muted">Then every one of the 7.8 million papers joins the commonest cluster among its 15 nearest clustered sample papers (12 dimensions):</td></tr>
+      <tr><td>eom, 50, 3, every paper</td><td class="n">3,349</td><td class="n">0%</td><td class="n">74%</td><td class="n">10.4</td></tr>
+      <tr class="pick"><td>eom, 200, 3, every paper</td><td class="n">780</td><td class="n">0%</td><td class="n">80%</td><td class="n">7.6</td></tr>
+    </tbody>
+  </table></div>
+  <p>Every HDBSCAN setting left 40–60% of papers unclustered, so we fitted on a sample and then placed every paper by a vote of
+    its neighbours. Scored on 20,000 papers outside the sample, the chosen 780 clusters still keep 80% of true neighbours together.
+    Drawn on the t-SNE map, which never saw them, the clusters land as coherent patches.</p>
+
+  <h2>What we settled on</h2>
+  <table>
+    <thead><tr><th>Step</th><th>MedEmbed map tab (all 7.8 million gene papers)</th><th>Map tab (one list, up to <span class="cap">20,000</span> papers)</th></tr></thead>
+    <tbody>
+      <tr><td>Clustering space</td><td>UMAP, 15 neighbours, 12 dimensions</td><td>UMAP, 15 neighbours, 12 dimensions</td></tr>
+      <tr><td>Clusters</td><td>HDBSCAN eom, minimum size 200, min_samples 3, on a 1 million sample; every paper voted in: 780 clusters</td>
+        <td>HDBSCAN, 16 settings, best kept, at most <span class="topics">8</span> topics (see the Map tab)</td></tr>
+      <tr><td>Drawing</td><td>t-SNE, 2 dimensions</td><td>UMAP, 2 dimensions (<code>min_dist</code> 0.1). Not yet changed: on 8,000 papers, these settings keep about 57% of the most a squeeze can keep of share a gene, against t-SNE’s 77%, so t-SNE would likely draw these maps better too.</td></tr>
+      <tr><td>Names</td><td>each cluster’s most typical genes</td><td>AI names from each topic’s words and titles</td></tr>
+    </tbody>
+  </table>
+  </section>
 </div>
 <script>
 const fmt = (n) => n == null ? "?" : n.toLocaleString("en-GB");
@@ -116,6 +231,29 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&": "&amp;", "<
 const ext = (url, text) => `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(text)}</a>`;
 const OT_DOCS = "https://platform-docs.opentargets.org/evidence";  // (each source's section: #europe-pmc...)
 const sizes = (s) => s ? `${fmt(s.links)} links<br>${fmt(s.pairs)} gene–disease pairs<br>${fmt(s.papers)} papers` : "";
+// Tabs: the address's #data, #map, #explorer or #tests picks one, so each can be linked to.
+const TABS = ["data", "map", "explorer", "tests"];
+function showTab(name, focus) {
+  if (!TABS.includes(name)) name = "data";
+  for (const t of TABS) {
+    const on = t === name, b = document.getElementById(`tab-${t}`);
+    b.setAttribute("aria-selected", on); b.tabIndex = on ? 0 : -1;
+    document.getElementById(`${t}-panel`).hidden = !on;
+    if (on && focus) b.focus();
+  }
+}
+document.querySelectorAll('[role="tab"]').forEach((b, i, all) => {
+  const name = b.id.slice(4);
+  b.addEventListener("click", () => { history.replaceState(null, "", `#${name}`); showTab(name); });
+  b.addEventListener("keydown", (e) => {  // arrow keys move between tabs
+    const step = {ArrowRight: 1, ArrowLeft: -1}[e.key];
+    if (!step) return;
+    const next = all[(i + step + all.length) % all.length].id.slice(4);
+    history.replaceState(null, "", `#${next}`); showTab(next, true);
+  });
+});
+addEventListener("hashchange", () => showTab(location.hash.slice(1)));
+showTab(location.hash.slice(1));
 try { if (localStorage.getItem("cream")) document.body.classList.add("cream"); } catch {}  // (storage may be blocked)
 fetch("/api/about").then((r) => r.json()).then((a) => {
   const rows = [
