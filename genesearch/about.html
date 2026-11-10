@@ -254,7 +254,9 @@ document.querySelectorAll('[role="tab"]').forEach((b, i, all) => {
     history.replaceState(null, "", `#${next}`); showTab(next, true);
   });
 });
-addEventListener("hashchange", () => showTab(location.hash.slice(1)));
+addEventListener("hashchange", () => {  // (a link to another tab: show it from its top)
+  showTab(location.hash.slice(1)); document.querySelector(".tabs").scrollIntoView();
+});
 showTab(location.hash.slice(1));
 try { if (localStorage.getItem("cream")) document.body.classList.add("cream"); } catch {}  // (storage may be blocked)
 fetch("/api/about").then((r) => r.json()).then((a) => {
