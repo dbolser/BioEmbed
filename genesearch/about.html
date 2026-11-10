@@ -191,7 +191,8 @@
 
   <h2>Clustering</h2>
   <p>HDBSCAN on the 12-dimension UMAP, fitted on a 1 million paper sample. <b>Together:</b> of a paper’s 15 true nearest
-    neighbours, the share in its cluster (unclustered counts as a miss). <b>Gene lift:</b> how many times more often two papers
+    neighbours that are among the papers clustered (on the sample rows, only those in the 1 million sample), the share in its
+    cluster (unclustered counts as a miss). <b>Gene lift:</b> how many times more often two papers
     in one cluster share a gene than two random papers. <b>Unclustered:</b> papers HDBSCAN leaves out as noise. A selection of the 14 settings tried:</p>
   <div class="scroll"><table>
     <thead><tr><th>Selection method, minimum cluster size, min_samples</th><th>Clusters</th><th>Unclustered</th><th>Together</th><th>Gene lift</th></tr></thead>
@@ -208,7 +209,7 @@
       <tr class="pick"><td>eom, 200, 3, every paper</td><td class="n">780</td><td class="n">0%</td><td class="n">80%</td><td class="n">7.6</td></tr>
     </tbody>
   </table></div>
-  <p>Every HDBSCAN setting left 40–60% of papers unclustered, so we fitted on a sample and then placed every paper by a vote of
+  <p>Every HDBSCAN setting left 40–60% of papers unclustered, apart from the one that collapsed to 2 clusters, so we fitted on a sample and then placed every paper by a vote of
     its neighbours. Scored on 20,000 papers outside the sample, the chosen 780 clusters still keep 80% of true neighbours together.
     Drawn on the t-SNE map, which never saw them, the clusters land as coherent patches.</p>
 
