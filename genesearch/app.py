@@ -55,7 +55,9 @@ PAGE = 50
 K1, B = 1.5, 0.75  # BM25 parameters (bm25s defaults)
 RRF_K = 60  # reciprocal-rank fusion constant for hybrid ranking
 SEM_CAP = 30_000  # most papers given semantic ranking while vectors are computed here on CPU
-MAP_CAP = 20_000  # most papers on a map (a fixed sample beyond that)
+MAP_CAP = int(os.environ.get("GENESEARCH_MAP_CAP", 100_000))  # most papers on a map (a fixed sample beyond that); env: set per server
+if MAP_CAP < 1:  # (a typo stops the server, from int(), rather than quietly falling back)
+    sys.exit(f"GENESEARCH_MAP_CAP must be a positive number of papers, not {MAP_CAP}.")
 MAP_VERSION = 7  # bump to recompute cached maps
 LAND_CAP = 50_000  # most papers drawn on a whole-literature map (a fixed sample beyond that)
 LAND_NAMES = {"pubmedbert": "PubMedBERT map", "medembed": "MedEmbed map"}
