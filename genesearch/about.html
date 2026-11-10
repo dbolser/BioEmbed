@@ -245,9 +245,10 @@ function showTab(name, focus) {
 document.querySelectorAll('[role="tab"]').forEach((b, i, all) => {
   const name = b.id.slice(4);
   b.addEventListener("click", () => { history.replaceState(null, "", `#${name}`); showTab(name); });
-  b.addEventListener("keydown", (e) => {  // arrow keys move between tabs
+  b.addEventListener("keydown", (e) => {  // arrow keys move between tabs (not the page; shortcuts left alone)
     const step = {ArrowRight: 1, ArrowLeft: -1}[e.key];
-    if (!step) return;
+    if (!step || e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return;
+    e.preventDefault();
     const next = all[(i + step + all.length) % all.length].id.slice(4);
     history.replaceState(null, "", `#${next}`); showTab(next, true);
   });
