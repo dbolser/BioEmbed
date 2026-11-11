@@ -80,13 +80,16 @@ for i, v in enumerate(an["axes"]):
     m = np.flatnonzero(comp == i)  # comp ids follow the order themes were found, before sorting by size
     vv = cen[E[m, 1]] - cen[E[m, 0]]
     add(f"A{i}", "analogy", v, np.median(np.abs(vv @ (v / np.linalg.norm(v)))))
-# the 20 largest analogy themes among the 3,349 finer topics (named in <fine>_themes_named.json)
+# the analogy themes among the 3,349 finer topics (named in <fine>_themes_named.json): those an agent and its
+# skeptic kept as a real repeated relation (is_analogy) with at least medium confidence
 FINE = "eom_mcs50_ms3"
 if (M / f"{FINE}_themes_named.json").exists():
     fz = np.load(M / f"{FINE}_analogies.npz"); fth = json.load(open(M / f"{FINE}_analogies.json"))["themes"]
     fS, fn = np.load(M / f"{FINE}_sum.npy"), np.load(M / f"{FINE}_size.npy"); fcen = fS / fn[:, None] - mu
     fnamed = {t["theme"]: t for t in json.load(open(M / f"{FINE}_themes_named.json"))["themes"]}
-    for i, v in enumerate(fz["axes"][:20]):
+    for i, v in enumerate(fz["axes"]):
+        f = fnamed.get(f"F{i}", {})
+        if not f.get("is_analogy") or f.get("confidence") == "low": continue
         m = np.flatnonzero(fz["comp"] == i); vv = fcen[fz["edges"][m, 1]] - fcen[fz["edges"][m, 0]]
         add(f"F{i}", "fine_analogy", v, np.median(np.abs(vv @ (v / np.linalg.norm(v)))))
         meta[-1] |= dict(pairs=fth[i]["pairs"][:8], edges=fth[i]["edges"], fine=fnamed.get(f"F{i}", {}))
@@ -97,7 +100,7 @@ for mta in meta:
     if mta["kind"] == "fine_analogy":
         f = mta.pop("fine"); x, _, y = f.get("name", "").partition("->")
         mta |= dict(name=f.get("name", ""), minus_pole=x.strip(), plus_pole=y.strip(), description=f.get("description", ""),
-                    confidence=f.get("confidence", ""))
+                    confidence=f.get("confidence", ""), move=f.get("kind", ""))
     elif mta["kind"] == "step":
         mta |= STEP_NAMES[mta["id"]]
     else:
