@@ -77,7 +77,7 @@ a { color: var(--neg); text-decoration: none; } a:hover { text-decoration: under
 
   <div class="tabs">
     <button data-tab="locate" class="on">Locate</button><button data-tab="walk">Walk</button>
-    <button data-tab="analogy">Analogy</button><button data-tab="path">Path</button>
+    <button data-tab="analogy">Analogy</button><button data-tab="path">Path</button><button data-tab="pairs">Pairs</button>
   </div>
   <div class="pane on" id="p-locate">
     <div class="note">Where the start point sits: nearest topics, concepts and papers, and its coordinates on the main axes.
@@ -105,6 +105,15 @@ a { color: var(--neg); text-decoration: none; } a:hover { text-decoration: under
     <div id="ptosugg" class="sugg"></div>
     <div class="row"><button id="go-path">Route</button></div>
   </div>
+  <div class="pane" id="p-pairs">
+    <div class="note">Pairs of neighbouring topics whose step, from one topic's centre to the other's, points along a direction:
+      the most parallel first, one pair per region of the map so the list stays diverse. No start point needed.</div>
+    <label class="h" for="paxis">Direction</label><select id="paxis"></select>
+    <div id="paxisinfo" class="note"></div>
+    <label class="h" for="pn">Pairs: <span id="pnv">8</span></label>
+    <input id="pn" type="range" min="3" max="15" value="8" style="width:100%">
+    <div class="row"><button id="go-pairs">Find pairs</button></div>
+  </div>
 
   <label class="h" for="colour">Colour the map by</label>
   <select id="colour"><option value="">nothing (grey)</option></select>
@@ -117,7 +126,7 @@ a { color: var(--neg); text-decoration: none; } a:hover { text-decoration: under
 <div id="mapwrap"><canvas id="cv"></canvas><canvas id="ov"></canvas><div id="tip"></div></div>
 <section class="results" id="res"><h2>How to use it</h2>
 <p>Every point here is a direction in a 384-number space where each paper is an arrow. Close arrows mean similar papers.</p>
-<p><b>Axes</b> were found three ways: directions papers vary along <i>inside</i> nearly every topic (W: e.g. gene mapping ↔ drug treatment), directions that separate topics (B), and the shared <b>time</b> direction (older → newer). <b>Analogy themes</b> (A) are between-topic moves that recur across the map, e.g. "X in cancer → X".</p>
+<p><b>Axes</b> were found three ways: directions papers vary along <i>inside</i> nearly every topic (W: e.g. gene mapping ↔ drug treatment), directions that separate topics (B), and the shared <b>time</b> direction (older → newer). <b>Analogy themes</b> (A) are between-topic moves that recur across the map, e.g. "X in cancer → X". <b>S0</b> is the one direction steps between neighbouring topics most often take (hospital care ↔ basic science); <b>Pairs</b> lists diverse neighbouring topic pairs along any direction.</p>
 <p>Results always name real topics, concepts and papers near the point. "Nearest paper" says how close the point still is to a real paper: if it drops, the walk has left the literature.</p>
 </section>
 </main>
@@ -195,6 +204,13 @@ function overlay() {
     octx.lineWidth = 2; octx.strokeStyle = css('--accent'); octx.stroke(); };
   if (OVER.path) { line(OVER.path); OVER.path.forEach(([x, y], i) => marker(octx, sx(x), sy(y), i + 1)); }
   if (OVER.walk) { line(OVER.walk.map(s => s.xy)); OVER.walk.forEach(s => marker(octx, sx(s.xy[0]), sy(s.xy[1]), s.step > 0 ? '+' + s.step : s.step)); }
+  if (OVER.pairs) OVER.pairs.forEach(([x0, y0, x1, y1], k) => {
+    const X0 = sx(x0), Y0 = sy(y0), X1 = sx(x1), Y1 = sy(y1), a = Math.atan2(Y1 - Y0, X1 - X0), h = 10;
+    octx.beginPath(); octx.moveTo(X0, Y0); octx.lineTo(X1, Y1); octx.lineWidth = 2; octx.strokeStyle = css('--accent'); octx.stroke();
+    octx.beginPath(); octx.moveTo(X1, Y1); octx.lineTo(X1 - h * Math.cos(a - 0.45), Y1 - h * Math.sin(a - 0.45));
+    octx.lineTo(X1 - h * Math.cos(a + 0.45), Y1 - h * Math.sin(a + 0.45)); octx.closePath(); octx.fillStyle = css('--accent'); octx.fill();
+    marker(octx, X0, Y0, k + 1);
+  });
   if (OVER.point) marker(octx, sx(OVER.point[0]), sy(OVER.point[1]), '●');
   if (OVER.ans) { marker(octx, sx(OVER.ans[0]), sy(OVER.ans[1]), '?'); }
 }
@@ -268,9 +284,11 @@ async function api(path, body) {
   const r = await fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
   if (!r.ok) throw new Error((await r.json()).detail || r.statusText); return r.json();
 }
-function run() { ({ locate, walk, analogy, path: route })[TAB](); }
+function run() { ({ locate, walk, analogy, path: route, pairs: () => {} })[TAB](); }  // pairs needs no start point
 $('#go-locate').onclick = () => locate(); $('#go-walk').onclick = () => walk(); $('#go-analogy').onclick = () => analogy(); $('#go-path').onclick = () => route();
+$('#go-pairs').onclick = () => pairs();
 $('#reach').oninput = () => $('#reachv').textContent = $('#reach').value;
+$('#pn').oninput = () => $('#pnv').textContent = $('#pn').value;
 const need = () => { if (!START) { $('#res').innerHTML = '<p>Pick a start point first.</p>'; return false; } return true; };
 function busy() { $('#res').innerHTML = '<p class="note">Working…</p>'; }
 function fail(e) { $('#res').innerHTML = `<p class="warn">${esc(e.message)}</p>`; }
@@ -352,6 +370,23 @@ async function route() {
   } catch (e) { fail(e); }
 }
 
+const pct = s => (100 * s).toFixed(s < 0.01 ? 2 : 1) + '%';
+async function pairs() {
+  busy();
+  try {
+    const ax = $('#paxis').value, d = await api('/api/pairs', { axis: ax, n: +$('#pn').value }), a = d.axis;
+    OVER = { pairs: d.pairs.map(p => [p.frm.x, p.frm.y, p.to.x, p.to.y]) };
+    if ($('#colour').value !== ax) { $('#colour').value = ax; await $('#colour').onchange(); } else overlay();
+    $('#res').innerHTML = `<h2>Pairs along ${esc(AXNAME(a))}</h2>
+      <div class="note">Each arrow goes from the − end (${esc(a.minus_pole || '−')}) toward the + end (${esc(a.plus_pole || '+')}); the map is coloured by the same direction.
+      Score = cosine between the step and the direction (a random direction in 384-D scores about ${d.random_cos});
+      "top" = share of all ${d.steps.toLocaleString()} neighbour steps at least this parallel. ${pct(d.share_over_03)} of steps score above 0.3.</div>
+      <ol>${d.pairs.map(p => `<li><span class="click" data-topic="${p.frm.topic}">${esc(p.frm.label)}</span> → <span class="click" data-topic="${p.to.topic}">${esc(p.to.label)}</span><span class="sim">${p.cos} · top ${pct(p.top_share)}</span></li>`).join('')}</ol>
+      <div class="note">Click a topic to start from it (then Walk it along the same direction, say).</div>`; wire();
+  } catch (e) { fail(e); }
+}
+$('#paxis').onchange = () => { const a = AXES.find(x => x.id === $('#paxis').value); $('#paxisinfo').textContent = a.description || ''; };
+
 // ---------- colour by axis
 $('#colour').onchange = async () => {
   const a = $('#colour').value;
@@ -367,14 +402,14 @@ $('#axis').onchange = () => { const a = AXES.find(x => x.id === $('#axis').value
 (async function init() {
   META = await (await fetch('/api/meta')).json(); AXES = META.axes; TOPICS = META.topics;
   const groups = [['Time', a => a.kind === 'time'], ['Themes inside topics (W)', a => a.kind === 'within'],
-    ['Between topics (B)', a => a.kind === 'between'], ['Analogy themes (A)', a => a.kind === 'analogy'],
-    ['Analogy themes, finer topics (F)', a => a.kind === 'fine_analogy']];
-  for (const sel of [$('#axis'), $('#colour')]) for (const [g, f] of groups) {
+    ['Between topics (B)', a => a.kind === 'between'], ['Main direction of neighbour steps (S)', a => a.kind === 'step'],
+    ['Analogy themes (A)', a => a.kind === 'analogy'], ['Analogy themes, finer topics (F)', a => a.kind === 'fine_analogy']];
+  for (const sel of [$('#axis'), $('#colour'), $('#paxis')]) for (const [g, f] of groups) {
     const og = document.createElement('optgroup'); og.label = g;
     AXES.filter(f).forEach(a => { const o = document.createElement('option'); o.value = a.id; o.textContent = AXNAME(a); og.appendChild(o); });
     sel.appendChild(og);
   }
-  $('#axis').onchange();
+  $('#axis').onchange(); if (AXES.some(a => a.id === 'S0')) $('#paxis').value = 'S0'; $('#paxis').onchange();
   const buf = await (await fetch('/api/map')).arrayBuffer(), n = buf.byteLength / 10;
   const xy = new Float32Array(buf, 0, n * 2); MAPT = new Int16Array(buf, n * 8, n);
   MAPX = new Float32Array(n); MAPY = new Float32Array(n); for (let i = 0; i < n; i++) { MAPX[i] = xy[2 * i]; MAPY[i] = xy[2 * i + 1]; }

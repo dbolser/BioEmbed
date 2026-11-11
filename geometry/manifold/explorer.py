@@ -6,6 +6,7 @@ concept mean, the centring that put 60% of MeSH concepts on their own papers' ce
   walk     step a point along a named axis (within-topic themes W*, between-topic B*, time, analogy themes A*)
   analogy  c + (b - a), each of a, b, c text or a topic
   path     shortest route between two topics over the topic neighbour graph
+  pairs    diverse pairs of neighbouring topics whose step points along an axis (one per map region)
 Results always name real topics, concepts and papers near the point, and say how far the point is from the
 nearest paper (cosine), so a walk that leaves the papers behind shows it. Data: atlas.py.
 Run (root env): uv run --with fastapi --with uvicorn python geometry/manifold/explorer.py --port 8768
@@ -20,6 +21,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
+from sklearn.cluster import KMeans
 
 REPO = Path(__file__).resolve().parents[2]
 A = REPO / "data/geometry/medembed_small/manifold/atlas"
@@ -71,6 +73,11 @@ sim = Tn @ Tn.T; np.fill_diagonal(sim, -1)
 nb = np.argsort(-sim, 1)[:, :10]
 r, c = np.repeat(np.arange(len(Tn)), 10), nb.ravel()
 G = csr_matrix((np.maximum(1 - sim[r, c], 1e-6), (r, c)), shape=sim.shape); G = G.maximum(G.T)
+# the steps along that graph's edges (the between-topic vectors), and 20 coarse map regions (k-means of the topic
+# directions, as in relations.py) so that a list of pairs can be kept to one per region
+STEP_E = np.unique(np.sort(np.stack([r, c], 1), 1), axis=0)
+STEP_U = Tc[STEP_E[:, 1]] - Tc[STEP_E[:, 0]]; STEP_U /= np.linalg.norm(STEP_U, axis=1, keepdims=True)
+REGION = KMeans(20, n_init=4, random_state=0).fit_predict(Tn)
 print(f"ready: {len(p_pmid):,} papers, {len(TOP)} topics, {len(CON):,} concepts, {len(AX)} axes", flush=True)
 
 _model, _lock = None, threading.Lock()
@@ -175,6 +182,11 @@ class Q(BaseModel):
     b: dict = {}
     c: dict = {}
     to: int | None = None
+    n: int = 8
+
+
+def tdict(i: int) -> dict:
+    return dict(topic=int(i), label=str(TOP.label[i]), blurb=str(TOP.blurb[i]), x=float(TOP.x[i]), y=float(TOP.y[i]))
 
 
 @app.post("/api/locate")
@@ -211,9 +223,25 @@ def path(q: Q):
     if not np.isfinite(dist[t]): raise HTTPException(404, "no path")
     route = [t]
     while route[-1] != s: route.append(int(pred[route[-1]]))
-    route = route[::-1]
-    return dict(route=[dict(topic=i, label=str(TOP.label[i]), blurb=str(TOP.blurb[i]), x=float(TOP.x[i]), y=float(TOP.y[i]))
-                       for i in route])
+    return dict(route=[tdict(i) for i in route[::-1]])
+
+
+@app.post("/api/pairs")
+def pairs(q: Q):
+    """Diverse pairs of neighbouring topics whose step points along an axis, from its - end to its + end: the most
+    parallel steps first, keeping at most one pair per map region and each topic once."""
+    if q.axis not in AXI: raise HTTPException(400, "unknown axis")
+    cs = STEP_U @ AV[AXI[q.axis]]; ab = np.abs(cs)
+    regions, topics, out = set(), set(), []
+    for e in np.argsort(-ab):
+        i, j = (int(STEP_E[e, 0]), int(STEP_E[e, 1]))[:: 1 if cs[e] > 0 else -1]
+        rg = {int(REGION[i]), int(REGION[j])}
+        if rg & regions or {i, j} & topics: continue
+        regions |= rg; topics |= {i, j}
+        out.append(dict(frm=tdict(i), to=tdict(j), cos=round(float(ab[e]), 3), top_share=float(np.mean(ab >= ab[e]))))
+        if len(out) >= max(1, min(q.n, 20)): break
+    return dict(axis=AX[AXI[q.axis]], steps=len(STEP_E), random_cos=round(float(np.sqrt(2 / np.pi / AV.shape[1])), 3),
+                share_over_03=float(np.mean(ab > 0.3)), pairs=out)
 
 
 if __name__ == "__main__":

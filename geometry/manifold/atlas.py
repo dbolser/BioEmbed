@@ -4,7 +4,8 @@
   map.npz        200k of them for the background picture: x, y, topic
   topics.parquet topic id, label, blurb, kind, size, median year, t-SNE median x/y; topics.npy centred centroids
   concepts.parquet / concepts.npy   MeSH (>= 50 papers) and GO concepts, "name: definition" vectors
-  axes.json / axes.npy   every named axis: id, kind, unit (one step), names when axis naming has run
+  axes.json / axes.npy   every named axis: id, kind, unit (one step), names when axis naming has run (W, B, time,
+                         S0 the main direction of neighbour steps, A and F analogy themes)
 CPU, root env: uv run python geometry/manifold/atlas.py eom_mcs200_ms3
 """
 import json, sys
@@ -59,6 +60,20 @@ for i in range(12): add(f"B{i}", "between", z["B_vecs"][:, i], (Xs @ z["B_vecs"]
 tu = z["tvec"] / np.maximum(np.linalg.norm(z["tvec"], axis=1, keepdims=True), 1e-12)
 g = tu[z["tn"] > 200].mean(0); g /= np.linalg.norm(g)
 add("time", "time", g, (Xs @ g).std())
+# S0: the main direction of the steps between neighbouring topics (each topic to its 10 nearest): what clustering
+# the steps directly found (directions.py's one blob, cos 0.99 with this), oriented like B1
+cn = cen / np.linalg.norm(cen, axis=1, keepdims=True); sim = cn @ cn.T; np.fill_diagonal(sim, -9)
+nb = np.argsort(-sim, 1)[:, :10]
+E10 = np.unique(np.sort(np.stack([np.repeat(np.arange(k), 10), nb.ravel()], 1), 1), axis=0)
+su = cen[E10[:, 1]] - cen[E10[:, 0]]; su /= np.linalg.norm(su, axis=1, keepdims=True)
+s0 = np.linalg.eigh(su.T @ su)[1][:, -1]; s0 *= np.sign(s0 @ z["B_vecs"][:, 1])
+add("S0", "step", s0, (Xs @ s0).std())
+STEP_NAMES = dict(S0=dict(
+    name="Main direction of neighbour steps: hospital care <-> basic science", minus_pole="hospital care & specialties",
+    plus_pole="basic cell biology", confidence="high",
+    description="The one direction steps between neighbouring topics most often take (top principal direction of all "
+                f"{len(E10):,} steps). Clustering the steps directly found only this. A Gaussian copy of the topics with the "
+                "same spread has an equally strong top direction, so it is the main axis of the spread, not a theme."))
 an = np.load(M / f"{name}_analogies.npz"); th = json.load(open(M / f"{name}_analogies.json"))["themes"]
 E, comp = an["edges"], an["comp"]
 for i, v in enumerate(an["axes"]):
@@ -83,6 +98,8 @@ for mta in meta:
         f = mta.pop("fine"); x, _, y = f.get("name", "").partition("->")
         mta |= dict(name=f.get("name", ""), minus_pole=x.strip(), plus_pole=y.strip(), description=f.get("description", ""),
                     confidence=f.get("confidence", ""))
+    elif mta["kind"] == "step":
+        mta |= STEP_NAMES[mta["id"]]
     else:
         mta |= {k_: names.get(mta["id"], {}).get(k_, "") for k_ in ("name", "minus_pole", "plus_pole", "description", "confidence")}
 for i, mta in enumerate(meta):

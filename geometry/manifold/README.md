@@ -9,14 +9,14 @@ find the themes behind the topics → put core concepts next to the papers as co
 predict where the literature goes (inspired by ForeSCITE, below) → navigate.
 
 **Explorer:** <http://outsee4.lan:8768/> (`explorer.py`). Type an idea, see where it lands, walk it along any axis,
-complete an analogy, or route between topics.
+complete an analogy, route between topics, or list topic pairs that run along a direction.
 
 ## At a glance
 
 | # | Question | Answer | Against |
 |---|---|---|---|
 | 1 | Is the space centred? | No: the mean paper vector has length 0.79. Every paper shares one big direction; everything below works on vectors minus that mean | 0 for a centred space |
-| 2 | Do between-topic vectors, clustered directly, give themes? | Only one coarse one: a loose blob of 3,107 of 5,355 edges (coherence 0.18) along hospital care ↔ basic science (mostly the second principal axis, B1), and noise | A Gaussian null gives 36 small clusters and no blob, so the blob is real; it just hides everything finer |
+| 2 | Do between-topic vectors, clustered directly, give themes? | Only one coarse one: a loose blob of 3,107 of 5,355 edges (coherence 0.18) along hospital care ↔ basic science, and noise. Its axis is the main direction of all the steps (cos 0.99), which PCA gives without clustering. As pairs it reads "same subject, bedside → bench" (sleep and health → circadian clock genes) | A Gaussian null with the same spread has an equally strong main direction (5.2% of step variance against 4.8%), though HDBSCAN splits it into 36 small clusters: a property of the spread, not a theme |
 | 3 | Do between-topic vectors repeat across the map? | Yes: 10.9% of edges have a partner elsewhere on the map with \|cos\| > 0.6 | null: 0.0% |
 | 4 | Analogy themes, calibrated so the null gives none | 22 themes; the top three: **"X in cancer → X"** (39 edges, 16 regions), **"X in the clinic → X genetics"** (26, 12), **"X in the body → X in the brain"** (21, 10) | Largest \|cos\| in 5 null draws: 0.593 |
 | 5 | Do the analogy vectors work on topics that did not define them? | Yes: "X → X in cancer" applied to the 710 other topics lands on topics with +50 points more Neoplasms headings (z = 13) | Steps of the same length along real between-topic directions |
@@ -63,11 +63,17 @@ corpus rate of 0.21%), but most retracted papers are elsewhere: neighbouring ncR
 
 **Clustering them directly finds one coarse axis, nothing finer.** `directions.py` links each topic to its 10 nearest, takes the unit
 difference of the two centroids per edge, and clusters the 5,355 edges with HDBSCAN on 1 − |cos| (an edge has no
-direction, so v and −v are one axis). In 384-D one loose cluster (coherence 0.18) takes 3,107 edges: mostly the
-centroids' second principal axis, B1 (cos 0.73; with the first 0.55): surgery, cardiology, nursing ↔ nuclear
-transport, splicing, cell cycle. Centroids drawn from a Gaussian with the same covariance give 36 small clusters
-(largest 112 edges) and no blob, so this is real: neighbouring topics most often differ along hospital care ↔ basic
-science. But it swallows everything finer. Whitening the top axes does not rescue it: on 64 whitened axes one blob
+direction, so v and −v are one axis). In 384-D one loose cluster (coherence 0.18) takes 3,107 edges: surgery,
+cardiology, nursing ↔ nuclear transport, splicing, cell cycle. Its axis is just the main direction of all 5,355
+steps (cos 0.99; that one direction carries 4.8% of the steps' variance, a random one 0.26%), so PCA of the steps
+finds it without any clustering. It lies close to the centroids' second principal axis B1 (cos 0.73; the first, B0,
+0.55), the clinic → genetics analogy theme A1 (0.78) and the within-topic axis W1 (0.75): one bedside ↔ bench
+contrast, seen between neighbours, across the map and inside topics. Read as pairs it is "the same subject, bedside
+→ bench": sleep duration and health → circadian clock genes, intravenous iron therapy → transferrin and iron
+regulation, antiretroviral regimens → HIV accessory proteins (explorer: axis S0, Pairs tab). Centroids drawn from a
+Gaussian with the same covariance have an equally strong main direction (5.2%), though there HDBSCAN finds 36 small
+clusters (largest 112 edges) instead of one blob. So the direction is a property of the spread, not a theme that
+clustering found, and the blob swallows everything finer. Whitening the top axes does not rescue it: on 64 whitened axes one blob
 again (3,238 edges; the null gives one half that size), on 32 a few dozen small local clusters.
 
 **But the vectors do repeat.** Allow two edges to vouch for each other only if they share no topic and no
@@ -281,7 +287,7 @@ it.)
 ## 7. The explorer
 
 <http://outsee4.lan:8768/>: `atlas.py` bundles a 1.5M-paper sample (vectors, t-SNE positions, titles), the 780
-named topics, 62k concepts and the 47 named axes; `explorer.py` serves them (FastAPI). Everything is computed in
+named topics, 62k concepts and 68 axes (47 named by agents, S0, and the 20 finer analogy themes); `explorer.py` serves them (FastAPI). Everything is computed in
 the centred 384-D space, never on the 2-D map; the map only shows where results are.
 - **Locate**: text, a topic, a concept → nearest topics, concepts and papers, and coordinates on the main axes (in
   sd against concepts for text, against papers for topics).
@@ -289,6 +295,9 @@ the centred 384-D space, never on the 2-D map; the map only shows where results 
   nearest real paper still is (so leaving the literature shows).
 - **Analogy**: a : b :: start : ?, with the start alone shown as the baseline.
 - **Path**: shortest chain of neighbouring topics.
+- **Pairs**: pick a direction and get diverse pairs of neighbouring topics whose step points along it (most parallel
+  first, at most one pair per map region and each topic once), drawn as arrows on the map coloured by the same
+  direction. The default is S0, the main direction of neighbour steps (what clustering the steps directly found).
 - **Ideas in this point**: the strongest of the sparse autoencoder's 4,096 features, named by MeSH. They compose:
   "ferroptosis in neurodegeneration" = ferroptosis / iron / ROS + brain / neurons + neurodegeneration + iron / ferritin;
   "gut microbiome and depression" = depression + gut microbiome + intestinal mucosa + brain.
