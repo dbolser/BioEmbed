@@ -19,8 +19,8 @@ complete an analogy, route between topics, or list topic pairs that run along a 
 | 2 | Do between-topic vectors, clustered directly, give themes? | Only one coarse one: a loose blob of 3,107 of 5,355 edges (coherence 0.18) along hospital care ↔ basic science, and noise. Its axis is the main direction of all the steps (cos 0.99), which PCA gives without clustering. As pairs it reads "same subject, bedside → bench" (sleep and health → circadian clock genes) | A Gaussian null with the same spread has an equally strong main direction (5.2% of step variance against 4.8%), though HDBSCAN splits it into 36 small clusters: a property of the spread, not a theme |
 | 3 | Do between-topic vectors repeat across the map? | Yes: 10.9% of edges have a partner elsewhere on the map with \|cos\| > 0.6 | null: 0.0% |
 | 4 | Analogy themes, calibrated so the null gives none | 22 themes; the top three: **"X in cancer → X"** (39 edges, 16 regions), **"X in the clinic → X genetics"** (26, 12), **"X in the body → X in the brain"** (21, 10) | Largest \|cos\| in 5 null draws: 0.593 |
-| 5 | Do the analogy vectors work on topics that did not define them? | Yes: "X → X in cancer" applied to the 710 other topics lands on topics with +50 points more Neoplasms headings (z = 13) | Steps of the same length along real between-topic directions |
-| 5b | At 3,349 finer topics | 34.6% of edges have a partner above the null's maximum; 182 themes; the largest read as a grammar of moves: change the level of explanation (clinic → genetics, disease → its microRNAs, target → drugs), the context (non-cancer → cancer, brain → body), or the organ (gut → lung, body → mouth) | Same null procedure |
+| 5 | Do the analogy vectors work on topics that did not define them? | Yes: "X → X in cancer" applied to the 710 other topics lands on topics with +50 points more Neoplasms headings (z = 14; beats all 1,000 placebo steps) | Steps of the same length along real between-topic directions |
+| 5b | At 3,349 finer topics | 34.6% of edges have a partner above the null's maximum; 182 themes; the largest read as a grammar of moves: change the level of explanation (clinic → genetics, disease → its microRNAs, target → drugs), the context (non-cancer → cancer, brain → body), or the organ (gut → lung, body → mouth). All 182 named: 164 real, and 92% of the 61 with 5+ pairs are one of those three kinds | Same null procedure |
 | 5c | Does a dictionary learned from single papers agree? | Yes: a sparse autoencoder (4,096 features, 84% of variance) has single features within cos 0.80-0.92 of the cancer, brain and microRNA analogy vectors | |
 | 6 | Themes behind the clusters: directions papers vary along *inside* topics | 6 axes have at least half their length inside the top-20 local directions of most topics (93%, 83%, 82%, 74%, 65%, 52%): gene mapping ↔ drug treatment; populations ↔ mechanism; bench biochemistry ↔ patient outcomes; immune cells ↔ drug design; … | A random direction has 5% (20/384) of its length there on average and essentially never half |
 | 7 | Can concepts be placed by their text alone? | Yes: a MeSH concept's "name: definition" vector finds its own papers' centroid first among 22,142 in 60% of cases, top-10 in 88% | Chance: 1 in 22,142 |
@@ -44,6 +44,15 @@ picking each topic's central papers for naming, `topic_inputs.py`, which ranks b
 cosine 0.62 (sd 0.056), centred 0.00 (sd 0.10); a paper's nearest neighbour stands 4.8 random-pair sds above
 random raw, 6.9 centred; and only 80% of the 15 (79% of the 100) nearest neighbours are the same under the two.
 So cosine clustering of these vectors (e.g. a cosine HDBSCAN) should centre them first.
+
+**Inside one gene's map it barely matters** (`mapcentre.py`). The genesearch Map view (a gene's papers: cosine
+neighbours, UMAP to 12-D, up to 8 HDBSCAN topics, UMAP to 2-D) on 15 gene maps of 4,203 to 65,282 papers, run on
+raw vectors, vectors minus the corpus mean, and vectors minus the map's own mean, scored by MeSH headings the vectors
+never saw (headings on 2+ and at most 10% of the map's papers). Of each paper's 15 nearest neighbours on the 2-D
+picture, 0.643 share a heading with it raw; 0.650 corpus-centred and 0.652 map-centred (higher in 14 of 15 maps;
+a second raw run moves it by 0.000 ± 0.003). Nothing else moves: the 12-D and 384-D neighbours (±0.002), topic
+quality (P(share a heading | same topic) / P(share | any two): 1.90 raw, 1.87-1.90 centred) and the number of topics.
+A gain of 1% on the picture is not worth changing the Map view for.
 
 Centred, the 780 topic centroids spread in many directions: the first principal axis holds 10.6% of their
 variance, 45 axes hold 80%, participation ratio 27.
@@ -106,32 +115,56 @@ Directions are not kept by 2-D maps (t-SNE keeps neighbourhoods), so each theme 
   topic's own nearest neighbour and 72% top-5 for a step of the same length along another theme's vector. This is
   partly by construction (edges were picked for being parallel).
 - *Held out* (`analogy_check.py`), the real test: apply the vector to every topic that did not define it, land on the
-  nearest topic, and compare its MeSH branches with the start's. Placebo: 300 steps of the same length along real
-  between-topic directions (other edges of the topic graph). (Random directions in 384-D are a far weaker placebo:
-  most land back on the start topic's own neighbour, which inflates z about tenfold; a first version used them.)
+  nearest topic, and compare its MeSH branches with the start's. Placebo: 1,000 steps of the same length along real
+  between-topic directions (other edges of the topic graph, random sign). (Random directions in 384-D are a far
+  weaker placebo: most land back on the start topic's own neighbour, which inflates z about tenfold; a first version
+  used them.)
 
 Over the 710 topics outside A0, 738 outside A1, 748 outside A2 (change in the landing topic's share of papers under
-a MeSH branch, percentage points; z against the placebo):
+a MeSH branch, percentage points; z against the placebo; every shift in bold beats all 1,000 placebo steps):
 
 | Theme | Step toward + : landing topic has more | Step toward − : more |
 |---|---|---|
-| A0 X in cancer → X | (weak: sugars, hormones, z 2-3) | **Neoplasms +50 points (z 13)** |
-| A1 clinic → genetics | **Genetic phenomena +22, genetic structures +13 (z 5)** | Therapeutics +12, patient care (z 4-5) |
-| A2 body → brain | **Central nervous system +28 (z 25), neurocognitive disorders +12 (z 35)** | |
-| A3 → microRNAs | **Antisense elements / nucleic acids +51 (z 19)** | |
-| A7 heart → kidney | Urologic diseases +12 (z 9) | Heart diseases +4 (z 3.5) |
+| A0 X in cancer → X | (weak: sugars, hormones; z 2, beats 97-99%) | **Neoplasms +50 points (z 14)** |
+| A1 clinic → genetics | **Genetic phenomena +22, genetic structures +13 (z 5)** | **Therapeutics +12, drug therapy +6, patient care (z 5)** |
+| A2 body → brain | **Central nervous system +28, neurons +18 (z 20)** | |
+| A3 → microRNAs | **Antisense elements +51, nucleic acids +53 (z 30-80)** | |
+| A7 heart → kidney | **Urologic diseases +12 (z 11)** | Heart diseases +4 (z 4, beats 99%) |
+
+Where placebo steps barely move a branch (rare branches such as antisense elements), the placebo spread is tiny and z
+is unstable: rerun with other placebo draws, A2's z ranges 14-34 and A3's 63-97 (A0 12-14, A1 4-5). The share of
+placebo steps beaten does not move. (An earlier version of this table came from an older run of the script; this
+one is from the committed code, `--random 1000`.)
 
 **Finer topics, more themes.** On the 3,349 finer topics (named from their top MeSH headings, `mesh_labels.py`),
 9,539 mutual edges, null threshold 0.540: 34.6% of edges have a partner above it, 182 themes with 3+ edges.
 The 20 largest, named and checked by agents from their pairs and held-out MeSH shifts
 (`eom_mcs50_ms3_themes_named.json`; one, dopamine → serotonin, rejected as a local axis), read as a grammar with
-three kinds of move:
+three kinds of move (the full held-out check, `analogy_check.py eom_mcs50_ms3 --themes 182 --no-iso`):
 
-| Kind of move | Themes (topic pairs; held-out z of the main MeSH shift, against real between-topic steps) |
+| Kind of move | Themes (topic pairs; held-out z of the main MeSH shift, against 200 real between-topic steps; every shift quoted beats at least 99% of them) |
 |---|---|
-| **Change the level of explanation** | clinical care → genetics (82; genetic phenomena +18 points, z 5; backwards clinical protocols, drug therapy z 7-8); disease → its microRNA studies (58; z 132); genetic association → cell or tissue mechanism (32; backwards genotype z 14); immune → intrinsic cell biology (20; backwards z 10); drug target → medicinal chemistry (19; drug development z 32) |
-| **Change the context** | non-cancer → cancer (53; neoplasms +35 points, z 11); brain → whole body (49; backwards neurocognitive z 45); cardiovascular → metabolic (38; backwards heart z 12, forward nutrition only z 3); substance use → other disorders (23; backwards z 22); kidney disease → general (20; backwards urologic z 48); pregnancy and newborn → general (17; backwards embryonic structures z 40); stem cells → native tissue (14; backwards stem cells z 30); animals and ecosystems → human toxicology (14; backwards ecological z 19) |
-| **Change the organ** | gut → lung (20; lung z 16, backwards GI z 10); body → mouth and jaw (18; z 97); pancreas → stomach and colon (16; backwards pancreatic z 42, forward weak); cancer → glioma (15; nervous system neoplasms z 81); prostate → other cancers (15; backwards genital z 35); GI cancer → breast cancer (12; weak, z 5-8) |
+| **Change the level of explanation** | clinical care → genetics (82; genetic phenomena +18 points, z 5; backwards clinical protocols, drug therapy z 6-7); disease → its microRNA studies (58; antisense elements +50 points, z 50); genetic association → cell or tissue mechanism (32; backwards genotype z 15); immune → intrinsic cell biology (20; backwards z 8); drug target → medicinal chemistry (19; drug development z 26) |
+| **Change the context** | non-cancer → cancer (53; neoplasms +35 points, z 14); brain → whole body (49; backwards neurocognitive z 50); cardiovascular → metabolic (38; backwards heart z 14, forward sugars and nutrition only z 4); substance use → other disorders (23; backwards chemically induced disorders z 20); kidney disease → general (20; backwards urologic z 26); pregnancy and newborn → general (17; backwards reproductive phenomena z 39, embryonic structures z 32); stem cells → native tissue (14; backwards stem cells z 30); animals and ecosystems → human toxicology (14; backwards ecological z 18) |
+| **Change the organ** | gut → lung (20; lung z 16, backwards GI z 14); body → mouth and jaw (18; dentistry z 48); pancreas → stomach and colon (16; backwards pancreatic diseases z 27, forward weak); cancer → glioma (15; nervous system neoplasms z 61); prostate → other cancers (15; backwards urogenital neoplasms z 35); GI cancer → breast cancer (12; weak: forward skin z 5, backwards GI z 10) |
+
+**All 182, named.** The other 162 themes were named the same way (an agent per batch of 18, a skeptic checking each
+name; MeSH evidence only), and each of the 182 was sorted into one of the three kinds or "other" by a rubric written
+from the 20 above. 164 are real repeated relations (18 rejected: hub stars, grab-bags, near-duplicate pairs), 159 of
+them with medium or high confidence (107 high). How they sort:
+
+| Themes (medium/high confidence) | Level of explanation | Context | Organ | Other |
+|---|---|---|---|---|
+| with 5+ topic pairs (61) | 25% | 30% | 38% | 8% |
+| all (159) | 31% | 18% | 30% | 21% |
+
+The three kinds hold for the larger themes; "other" grows among the 3- and 4-pair themes but has no common fourth
+kind (lifestyle factor, pathway, chemistry, disease swap, species, method: one or two each). Caveat: the rubric came
+from the first 20, so it may have steered the sorting. New ones include cervical and genital-tract cancer → head,
+neck and mouth cancer (often HPV), allergic asthma → smoke- and dust-induced lung disease, X without ischaemia → X in
+stroke and myocardial ischaemia, X in general → X in HIV/AIDS, before conception → pregnancy, skin → gut, bone →
+cartilage, eye → brain, skeletal muscle → heart, cholesterol biology → statin treatment. All 159 are walkable in the
+explorer (axes F*), and `theme_evidence.py` writes the evidence the agents saw.
 
 **A learned dictionary agrees** (`sae.py`). A top-k sparse autoencoder on the centred paper vectors (4,096
 features, 32 active per paper, trained on 2.9M papers capped at 4,000 per topic; no topics, no MeSH) explains 84%
@@ -287,7 +320,8 @@ it.)
 ## 7. The explorer
 
 <http://outsee4.lan:8768/>: `atlas.py` bundles a 1.5M-paper sample (vectors, t-SNE positions, titles), the 780
-named topics, 62k concepts and 68 axes (47 named by agents, S0, and the 20 finer analogy themes); `explorer.py` serves them (FastAPI). Everything is computed in
+named topics, 62k concepts and 207 axes (47 named by agents, S0, and the 159 finer analogy themes kept after
+naming); `explorer.py` serves them (FastAPI). Everything is computed in
 the centred 384-D space, never on the 2-D map; the map only shows where results are.
 - **Locate**: text, a topic, a concept → nearest topics, concepts and papers, and coordinates on the main axes (in
   sd against concepts for text, against papers for topics).
@@ -301,7 +335,7 @@ the centred 384-D space, never on the 2-D map; the map only shows where results 
 - **Ideas in this point**: the strongest of the sparse autoencoder's 4,096 features, named by MeSH. They compose:
   "ferroptosis in neurodegeneration" = ferroptosis / iron / ROS + brain / neurons + neurodegeneration + iron / ferritin;
   "gut microbiome and depression" = depression + gut microbiome + intestinal mucosa + brain.
-- The 20 fine analogy themes (F0-F19) are walkable too: "Bone and cartilage tissue engineering" along body → mouth
+- The 159 fine analogy themes kept after naming (F*) are walkable too: "Bone and cartilage tissue engineering" along body → mouth
   goes to Dental materials and endodontics, then Periodontitis.
 - Colour the map by any axis (blue − end, red + end).
 
@@ -352,13 +386,15 @@ All CPU scripts use the repo root env (`uv run python geometry/manifold/<script>
 | `label_axes.py NAME` | 4 min | MeSH and publication types at each end of each axis |
 | `topic_inputs.py NAME` | 2 min | naming evidence per topic (MeSH lifts, central titles: local only) |
 | `analogies.py NAME` | 1 min | null-calibrated analogy themes, completion test |
-| `branches.py NAME`, `analogy_check.py NAME` | 1 min | MeSH branch shares per topic; held-out test of the themes |
+| `branches.py NAME`, `analogy_check.py NAME --themes 22 --random 1000` | 1 min, 1 min | MeSH branch shares per topic; held-out test of the themes |
 | `concepts.py --embed --score` | 25 min (16 threads) | MeSH and GO concepts embedded; MeSH paper centroids; placement scores |
 | `concept_axes.py NAME` | s | concept coordinates on every axis |
 | `timevec.py drift / drift_reassigned / growth / links` | s / 1 min / s / 50 min | the time tests |
 | `foresee.py` | 2 min | ForeSCITE-style shift test |
 | `axis_evidence.py NAME` | s | evidence file the axis names came from |
 | `mesh_labels.py eom_mcs50_ms3` | s | MeSH-only names for the 3,349 finer topics (after `topic_inputs.py`) |
+| `analogy_check.py eom_mcs50_ms3 --themes 182 --no-iso`, `theme_evidence.py eom_mcs50_ms3` | 15 min, s | held-out test of all 182 finer themes; the evidence the naming agents read |
+| `mapcentre.py [SYMBOL ...]` (genesearch env) | 10 min | does centring help the genesearch Map view? |
 | `sae.py` | 12 min (16 threads) | the sparse autoencoder and its feature names |
 | `figures.py NAME` | 1 min | the two figures |
 | `atlas.py NAME`, `explorer.py` | 3 min, 1 min | the explorer |
