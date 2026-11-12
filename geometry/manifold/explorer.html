@@ -374,13 +374,14 @@ const pct = s => (100 * s).toFixed(s < 0.01 ? 2 : 1) + '%';
 async function pairs() {
   busy();
   try {
-    const ax = $('#paxis').value, d = await api('/api/pairs', { axis: ax, n: +$('#pn').value }), a = d.axis;
+    const ax = $('#paxis').value, want = +$('#pn').value, d = await api('/api/pairs', { axis: ax, n: want }), a = d.axis;
+    const short = d.pairs.length < want ? `<div class="note">Only ${d.pairs.length} pairs: each of the map's 20 regions is used once, and a pair that crosses two regions uses both.</div>` : '';
     OVER = { pairs: d.pairs.map(p => [p.frm.x, p.frm.y, p.to.x, p.to.y]) };
     if ($('#colour').value !== ax) { $('#colour').value = ax; await $('#colour').onchange(); } else overlay();
     $('#res').innerHTML = `<h2>Pairs along ${esc(AXNAME(a))}</h2>
       <div class="note">Each arrow goes from the − end (${esc(a.minus_pole || '−')}) toward the + end (${esc(a.plus_pole || '+')}); the map is coloured by the same direction.
       Score = cosine between the step and the direction (a random direction in 384-D scores about ${d.random_cos});
-      "top" = share of all ${d.steps.toLocaleString()} neighbour steps at least this parallel. ${pct(d.share_over_03)} of steps score above 0.3.</div>
+      "top" = share of all ${d.steps.toLocaleString()} neighbour steps at least this parallel. ${pct(d.share_over_03)} of steps score above 0.3.</div>${short}
       <ol>${d.pairs.map(p => `<li><span class="click" data-topic="${p.frm.topic}">${esc(p.frm.label)}</span> → <span class="click" data-topic="${p.to.topic}">${esc(p.to.label)}</span><span class="sim">${p.cos} · top ${pct(p.top_share)}</span></li>`).join('')}</ol>
       <div class="note">Click a topic to start from it (then Walk it along the same direction, say).</div>`; wire();
   } catch (e) { fail(e); }

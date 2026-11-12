@@ -16,7 +16,7 @@ complete an analogy, route between topics, or list topic pairs that run along a 
 | # | Question | Answer | Against |
 |---|---|---|---|
 | 1 | Is the space centred? | No: the mean paper vector has length 0.79. Every paper shares one big direction; everything below works on vectors minus that mean | 0 for a centred space |
-| 2 | Do between-topic vectors, clustered directly, give themes? | Only one coarse one: a loose blob of 3,107 of 5,355 edges (coherence 0.18) along hospital care ↔ basic science, and noise. Its axis is the main direction of all the steps (cos 0.99), which PCA gives without clustering. As pairs it reads "same subject, bedside → bench" (sleep and health → circadian clock genes) | A Gaussian null with the same spread has an equally strong main direction (5.2% of step variance against 4.8%), though HDBSCAN splits it into 36 small clusters: a property of the spread, not a theme |
+| 2 | Do between-topic vectors, clustered directly, give themes? | Only one coarse one: a loose blob of 3,107 of 5,355 edges (coherence 0.18) along hospital care ↔ basic science, 5 small local clusters (15-22 edges) and noise. Its axis is the main direction of all the steps (cos 0.99), which PCA gives without clustering. As pairs it reads "same subject, bedside → bench" (sleep and health → circadian clock genes) | A Gaussian null with the same spread has an equally strong main step direction (5.2% of step variance against 4.8%), but along the map's first axis B0, and HDBSCAN finds 36 small clusters and no blob: the strength comes from the spread, the bedside ↔ bench direction from the real data |
 | 3 | Do between-topic vectors repeat across the map? | Yes: 10.9% of edges have a partner elsewhere on the map with \|cos\| > 0.6 | null: 0.0% |
 | 4 | Analogy themes, calibrated so the null gives none | 22 themes; the top three: **"X in cancer → X"** (39 edges, 16 regions), **"X in the clinic → X genetics"** (26, 12), **"X in the body → X in the brain"** (21, 10) | Largest \|cos\| in 5 null draws: 0.593 |
 | 5 | Do the analogy vectors work on topics that did not define them? | Yes: "X → X in cancer" applied to the 710 other topics lands on topics with +50 points more Neoplasms headings (z = 14; beats all 1,000 placebo steps) | Steps of the same length along real between-topic directions |
@@ -40,16 +40,25 @@ cosine similarity between any two papers is high. Differences between centroids 
 concept placement do not, so the geometry below subtracts the mean first (`centroids.py`; the one exception is
 picking each topic's central papers for naming, `topic_inputs.py`, which ranks by raw cosine).
 
-**Centring changes the neighbours, not just the scale** (1M papers, 5,000 queries): two random papers have raw
-cosine 0.62 (sd 0.056), centred 0.00 (sd 0.10); a paper's nearest neighbour stands 4.8 random-pair sds above
-random raw, 6.9 centred; and only 80% of the 15 (79% of the 100) nearest neighbours are the same under the two.
-So cosine clustering of these vectors (e.g. a cosine HDBSCAN) should centre them first.
+**Centring changes the neighbours, but does not improve them** (1M papers, 5,000 queries): two random papers have
+raw cosine 0.62 (sd 0.056), centred 0.00 (sd 0.10); a paper's nearest neighbour stands 4.8 random-pair sds above
+random raw, 6.9 centred; and only 80% of the 15 (79% of the 100) nearest neighbours are the same under the two. Over
+all 7.76M papers (`centre_nn.py`: truth.py's 20,000 queries, exact 15 nearest by raw and by centred cosine) 83%
+are the same, and the centred ones are slightly worse by everything the vectors never saw: they share an
+informative MeSH heading with the query 77.7% of the time against 77.9% raw (−0.19 ± 0.05 points), a gene 60.8%
+against 61.0%, a journal field 19.2% against 19.6%; among only the neighbours that differ, −0.8, −1.0 and −2.1
+points. So centring sharpens the contrast between near and random papers without finding better neighbours; there
+is no case for it in cosine kNN or kNN-based clustering of these vectors (an earlier version of this section said
+the opposite). Directions, axes and concept placement below still use centred vectors: there it is the shared
+offset, not the neighbour order, that matters.
 
-**Inside one gene's map it barely matters** (`mapcentre.py`). The genesearch Map view (a gene's papers: cosine
-neighbours, UMAP to 12-D, up to 8 HDBSCAN topics, UMAP to 2-D) on 15 gene maps of 4,203 to 65,282 papers, run on
-raw vectors, vectors minus the corpus mean, and vectors minus the map's own mean, scored by MeSH headings the vectors
-never saw (headings on 2+ and at most 10% of the map's papers). Of each paper's 15 nearest neighbours on the 2-D
-picture, 0.643 share a heading with it raw; 0.650 corpus-centred and 0.652 map-centred (higher in 14 of 15 maps;
+**Inside one gene's map it barely matters either** (`mapcentre.py`). The genesearch Map view's steps (cosine
+neighbours, UMAP to 12-D, up to 8 HDBSCAN topics, UMAP to 2-D) on the PubTator-tagged papers of 15 genes, 4,203 to
+65,282 per map (the live Map view also adds Open Targets curated and Europe PMC text-mined papers, so its maps of these
+genes are 5-34% bigger), run on raw vectors, vectors minus the corpus mean, and vectors minus the map's own mean,
+scored by MeSH headings the vectors never saw (headings on 2+ and at most 10% of the map's papers). Counting only
+papers that carry such a heading (63-81% of each map), as the paper and as its neighbours: of each such paper's 15
+nearest such papers on the 2-D picture, 0.643 share a heading with it raw; 0.650 corpus-centred and 0.652 map-centred (higher in 14 of 15 maps;
 a second raw run moves it by 0.000 ± 0.003). Nothing else moves: the 12-D and 384-D neighbours (±0.002), topic
 quality (P(share a heading | same topic) / P(share | any two): 1.90 raw, 1.87-1.90 centred) and the number of topics.
 A gain of 1% on the picture is not worth changing the Map view for.
@@ -73,17 +82,23 @@ corpus rate of 0.21%), but most retracted papers are elsewhere: neighbouring ncR
 **Clustering them directly finds one coarse axis, nothing finer.** `directions.py` links each topic to its 10 nearest, takes the unit
 difference of the two centroids per edge, and clusters the 5,355 edges with HDBSCAN on 1 − |cos| (an edge has no
 direction, so v and −v are one axis). In 384-D one loose cluster (coherence 0.18) takes 3,107 edges: surgery,
-cardiology, nursing ↔ nuclear transport, splicing, cell cycle. Its axis is just the main direction of all 5,355
+cardiology, nursing ↔ nuclear transport, splicing, cell cycle; 5 small local clusters take 15-22 edges each
+(coherence 0.48-0.72) and the other 2,154 edges are noise. The blob's axis is just the main direction of all 5,355
 steps (cos 0.99; that one direction carries 4.8% of the steps' variance, a random one 0.26%), so PCA of the steps
 finds it without any clustering. It lies close to the centroids' second principal axis B1 (cos 0.73; the first, B0,
 0.55), the clinic → genetics analogy theme A1 (0.78) and the within-topic axis W1 (0.75): one bedside ↔ bench
 contrast, seen between neighbours, across the map and inside topics. Read as pairs it is "the same subject, bedside
 → bench": sleep duration and health → circadian clock genes, intravenous iron therapy → transferrin and iron
 regulation, antiretroviral regimens → HIV accessory proteins (explorer: axis S0, Pairs tab). Centroids drawn from a
-Gaussian with the same covariance have an equally strong main direction (5.2%), though there HDBSCAN finds 36 small
-clusters (largest 112 edges) instead of one blob. So the direction is a property of the spread, not a theme that
-clustering found, and the blob swallows everything finer. Whitening the top axes does not rescue it: on 64 whitened axes one blob
-again (3,238 edges; the null gives one half that size), on 32 a few dozen small local clusters.
+Gaussian with the same covariance have an equally strong main step direction (5.2% of step variance against 4.8%),
+and there HDBSCAN finds 36 small clusters (largest 112 edges, coherence 0.40-0.78) and no blob. But the Gaussian's
+main step direction is the centroids' first principal axis B0 (82-97% of it on B0 in 6 draws; cos 0.52-0.76 with
+the real one), not bedside ↔ bench: real neighbours differ less along B0 than Gaussian ones (3.9% of step variance
+against 4.7-5.8%) and more along S0 (4.8% against 4.4-4.6%). So the strength of the main direction comes from the
+spread, and its tilt toward bedside ↔ bench from the real data. Clustering found nothing that PCA of the steps
+does not give, the 5 small real clusters are no tighter than the null's, and the blob swallows everything finer.
+Whitening the top axes does not rescue it: on 64 whitened axes one blob again (3,238 edges, plus one of 31; the null
+gives one half that size), on 32, 17 small local clusters (largest 53 edges; 4,342 of the 4,786 edges are noise).
 
 **But the vectors do repeat.** Allow two edges to vouch for each other only if they share no topic and no
 endpoint region (20 k-means regions of the map), and use mutual neighbours only (no hub topics). Then 10.9% of
@@ -117,11 +132,12 @@ Directions are not kept by 2-D maps (t-SNE keeps neighbourhoods), so each theme 
 - *Held out* (`analogy_check.py`), the real test: apply the vector to every topic that did not define it, land on the
   nearest topic, and compare its MeSH branches with the start's. Placebo: 1,000 steps of the same length along real
   between-topic directions (other edges of the topic graph, random sign). (Random directions in 384-D are a far
-  weaker placebo: most land back on the start topic's own neighbour, which inflates z about tenfold; a first version
-  used them.)
+  weaker placebo: most land back on the start topic's own neighbour, which inflates z about five-fold, four- to
+  ten-fold by theme; a first version used them.)
 
 Over the 710 topics outside A0, 738 outside A1, 748 outside A2 (change in the landing topic's share of papers under
-a MeSH branch, percentage points; z against the placebo; every shift in bold beats all 1,000 placebo steps):
+a MeSH branch, percentage points; z against the placebo; every shift in bold beats at least 998 of the 1,000
+placebo steps):
 
 | Theme | Step toward + : landing topic has more | Step toward − : more |
 |---|---|---|
@@ -132,8 +148,9 @@ a MeSH branch, percentage points; z against the placebo; every shift in bold bea
 | A7 heart → kidney | **Urologic diseases +12 (z 11)** | Heart diseases +4 (z 4, beats 99%) |
 
 Where placebo steps barely move a branch (rare branches such as antisense elements), the placebo spread is tiny and z
-is unstable: rerun with other placebo draws, A2's z ranges 14-34 and A3's 63-97 (A0 12-14, A1 4-5). The share of
-placebo steps beaten does not move. (An earlier version of this table came from an older run of the script; this
+is unstable: over five draws of 1,000 placebo steps (`--seed`), A3's antisense z ranges 20-83 and nucleic acids
+17-30, against A0 12-14, A1 4.4-4.6, A2 18-22 and A7 11-14. The share of placebo steps beaten does not move. (With
+200 placebo steps, as in the finer-topic table below, z is noisier still: A2 14-34 over three draws.) (An earlier version of this table came from an older run of the script; this
 one is from the committed code, `--random 1000`.)
 
 **Finer topics, more themes.** On the 3,349 finer topics (named from their top MeSH headings, `mesh_labels.py`),
@@ -150,20 +167,25 @@ three kinds of move (the full held-out check, `analogy_check.py eom_mcs50_ms3 --
 
 **All 182, named.** The other 162 themes were named the same way (an agent per batch of 18, a skeptic checking each
 name; MeSH evidence only), and each of the 182 was sorted into one of the three kinds or "other" by a rubric written
-from the 20 above. 164 are real repeated relations (18 rejected: hub stars, grab-bags, near-duplicate pairs), 159 of
-them with medium or high confidence (107 high). How they sort:
+from the 20 above. 164 are real repeated relations (18 rejected: 16 hub stars, where one topic or one narrow subject
+sits at the same end of most pairs; one set of near-duplicate topics; one local block between two neighbouring
+clusters), 159 of them with medium or high confidence (107 high). How they sort:
 
 | Themes (medium/high confidence) | Level of explanation | Context | Organ | Other |
 |---|---|---|---|---|
 | with 5+ topic pairs (61) | 25% | 30% | 38% | 8% |
 | all (159) | 31% | 18% | 30% | 21% |
 
-The three kinds hold for the larger themes; "other" grows among the 3- and 4-pair themes but has no common fourth
-kind (lifestyle factor, pathway, chemistry, disease swap, species, method: one or two each). Caveat: the rubric came
-from the first 20, so it may have steered the sorting. New ones include cervical and genital-tract cancer → head,
-neck and mouth cancer (often HPV), allergic asthma → smoke- and dust-induced lung disease, X without ischaemia → X in
-stroke and myocardial ischaemia, X in general → X in HIV/AIDS, before conception → pregnancy, skin → gut, bone →
-cartilage, eye → brain, skeletal muscle → heart, cholesterol biology → statin treatment. All 159 are walkable in the
+The three kinds hold for the larger themes, also those that did not shape the rubric (37 of the 42 with 5+ pairs
+beyond the first 20, 88%). "Other" grows among the 3- and 4-pair themes, and about a third of its 33 are one further
+move: keep the subject and swap the molecular pathway or player (Notch → Wnt, thrombin → plasmin, chromatin →
+splicing, long non-coding RNA → microRNA, signalling → oxidative stress), mostly 3-pair themes; three swap the
+organism (plants, fungi, microbes), four the lifestyle or nutrient (exercise, diet, vitamin D), and the rest are one
+or two each. Caveat: the rubric came from the first 20, and one agent plus one skeptic sorted each batch. New ones
+include cervical and genital-tract cancer → head, neck and mouth cancer (often HPV), allergic asthma → smoke- and
+dust-induced lung disease, X without ischaemia → X in stroke and myocardial ischaemia, X in general → X in HIV/AIDS,
+before conception → pregnancy, skin → gut, bone → cartilage, eye → elsewhere in the body (often the nervous system),
+skeletal muscle → heart, cholesterol biology → statin treatment. All 159 are walkable in the
 explorer (axes F*), and `theme_evidence.py` writes the evidence the agents saw.
 
 **A learned dictionary agrees** (`sae.py`). A top-k sparse autoencoder on the centred paper vectors (4,096
@@ -330,7 +352,8 @@ the centred 384-D space, never on the 2-D map; the map only shows where results 
 - **Analogy**: a : b :: start : ?, with the start alone shown as the baseline.
 - **Path**: shortest chain of neighbouring topics.
 - **Pairs**: pick a direction and get diverse pairs of neighbouring topics whose step points along it (most parallel
-  first, at most one pair per map region and each topic once), drawn as arrows on the map coloured by the same
+  first, at most one pair per map region and each topic once; 20 regions, so long lists can stop at 13-14 and the
+  page says so), drawn as arrows on the map coloured by the same
   direction. The default is S0, the main direction of neighbour steps (what clustering the steps directly found).
 - **Ideas in this point**: the strongest of the sparse autoencoder's 4,096 features, named by MeSH. They compose:
   "ferroptosis in neurodegeneration" = ferroptosis / iron / ROS + brain / neurons + neurodegeneration + iron / ferritin;
@@ -395,6 +418,7 @@ All CPU scripts use the repo root env (`uv run python geometry/manifold/<script>
 | `mesh_labels.py eom_mcs50_ms3` | s | MeSH-only names for the 3,349 finer topics (after `topic_inputs.py`) |
 | `analogy_check.py eom_mcs50_ms3 --themes 182 --no-iso`, `theme_evidence.py eom_mcs50_ms3` | 15 min, s | held-out test of all 182 finer themes; the evidence the naming agents read |
 | `mapcentre.py [SYMBOL ...]` (genesearch env) | 10 min | does centring help the genesearch Map view? |
+| `centre_nn.py` (after `../hdbscan_384.py` has made `eval/knn_centred.npy`) | 2 min | are centred nearest neighbours better, or only different? |
 | `sae.py` | 12 min (16 threads) | the sparse autoencoder and its feature names |
 | `figures.py NAME` | 1 min | the two figures |
 | `atlas.py NAME`, `explorer.py` | 3 min, 1 min | the explorer |

@@ -85,7 +85,8 @@ def main():
         for lab_ in ("forward", "backward"):
             for k_ in ("up", "down"):
                 print(f"  {lab_ if k_ == 'up' else '':8s} {k_ + ':':5s} " + "; ".join(
-                    f"{x} {d:+.3f} (z {s}; beats {b:.0%}; iso {zi_})" for x, d, s, zi_, b in res[lab_][k_][:4]))
+                    f"{x} {d:+.3f} (z {s}; beats {round(b * a.random)}/{a.random}; iso {zi_})"
+                    for x, d, s, zi_, b in res[lab_][k_][:4]))
         out.append(dict(theme=ti, start_topics=int(len(start)), **res))
         if ti % 10 == 9: f_out.write_text(json.dumps(out, indent=1))  # (progress survives a kill)
     f_out.write_text(json.dumps(out, indent=1))

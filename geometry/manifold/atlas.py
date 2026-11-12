@@ -73,7 +73,8 @@ STEP_NAMES = dict(S0=dict(
     plus_pole="basic cell biology", confidence="high",
     description="The one direction steps between neighbouring topics most often take (top principal direction of all "
                 f"{len(E10):,} steps). Clustering the steps directly found only this. A Gaussian copy of the topics with the "
-                "same spread has an equally strong top direction, so it is the main axis of the spread, not a theme."))
+                "same spread has an equally strong top direction, but along the map's main axis B0; the real one leans "
+                "toward B1 (bedside to bench). Its strength comes from the spread, its direction from the real data."))
 an = np.load(M / f"{name}_analogies.npz"); th = json.load(open(M / f"{name}_analogies.json"))["themes"]
 E, comp = an["edges"], an["comp"]
 for i, v in enumerate(an["axes"]):

@@ -1,6 +1,7 @@
 """Should the genesearch Map view centre the vectors before its cosine UMAP? A test on real gene maps.
 
-The Map view (genesearch/litmap.py) takes a gene's papers, finds 15 neighbours by cosine, UMAPs to 12-D, picks
+The Map view (genesearch/litmap.py) takes a gene's papers (here only the PubTator-tagged ones; the Map view also
+adds Open Targets curated and Europe PMC text-mined papers), finds 15 neighbours by cosine, UMAPs to 12-D, picks
 up to 8 HDBSCAN topics there (litmap.topics), and UMAPs to 2-D for the picture. Here the same steps run on four
 versions of the same vectors:
   raw        as the Map view does now (unit MedEmbed vectors)
@@ -26,7 +27,8 @@ REPO = Path(__file__).resolve().parents[2]
 D = REPO / "data/geometry/medembed_small"
 M = D / "manifold"
 sys.path.insert(0, str(REPO / "genesearch"))
-GENES = ["MUC5B", "SFTPC", "HFE", "TREM2", "LRRK2", "MECP2", "NOD2", "HTT", "PCSK9", "TERT", "CFTR"]
+GENES = ["MUC5B", "SFTPC", "HFE", "TREM2", "LRRK2", "MECP2", "NOD2", "HTT", "PCSK9", "TERT", "CFTR",
+         "SNCA", "ACE2", "APOE", "BRCA1"]
 VERSIONS = ["raw", "raw2", "corpus", "map"]
 FIELDS = ["gene", "version", "n", "secs", "topics", "grey", "mesh_knn_2d", "mesh_knn_12d", "mesh_knn_384",
           "field_knn_2d", "topic_lift", "mesh_random"]
