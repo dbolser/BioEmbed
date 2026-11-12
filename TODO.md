@@ -39,6 +39,8 @@ So: two papers, one tool. New ideas go under a paper or wait in "Later".
       (`pubTypeList`, e.g. "review") and PubMed has the "Review" publication type.
 - [ ] genesearch, hybrid ranking: show the semantic similarity (and BM25 score) as well as the two ranks. Today
       semantic mode shows "semantic match 0.79" but hybrid mode only "semantic rank 5", so the strength is hidden.
+- [ ] genesearch, Genes and Diseases tabs: merge the diseases from PubTator3 and Europe PMC into one list, so the same
+      disease from both sources is one row (raised 2026-11-12 on the dev copy, branch t3/explore-disease-gene-facets).
 
 ## Later (not now)
 
