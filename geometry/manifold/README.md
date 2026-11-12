@@ -16,6 +16,7 @@ complete an analogy, route between topics, or list topic pairs that run along a 
 | # | Question | Answer | Against |
 |---|---|---|---|
 | 1 | Is the space centred? | No: the mean paper vector has length 0.79. Every paper shares one big direction; everything below works on vectors minus that mean | 0 for a centred space |
+| 1b | Does centring help, and can papers be clustered straight in 384-D (cosine HDBSCAN)? | Centring changes 17% of nearest neighbours but makes them slightly worse by MeSH, genes and journal field; it barely changes a gene's Map view. HDBSCAN straight on the 384-D vectors (raw or centred) gives one giant cluster, or leaves 93-97% of papers out | Raw cosine; HDBSCAN on 12-D UMAP (780 topics, 53% of papers clustered) |
 | 2 | Do between-topic vectors, clustered directly, give themes? | Only one coarse one: a loose blob of 3,107 of 5,355 edges (coherence 0.18) along hospital care ↔ basic science, 5 small local clusters (15-22 edges) and noise. Its axis is the main direction of all the steps (cos 0.99), which PCA gives without clustering. As pairs it reads "same subject, bedside → bench" (sleep and health → circadian clock genes) | A Gaussian null with the same spread has an equally strong main step direction (5.2% of step variance against 4.8%), but along the map's first axis B0, and HDBSCAN finds 36 small clusters and no blob: the strength comes from the spread, the bedside ↔ bench direction from the real data |
 | 3 | Do between-topic vectors repeat across the map? | Yes: 10.9% of edges have a partner elsewhere on the map with \|cos\| > 0.6 | null: 0.0% |
 | 4 | Analogy themes, calibrated so the null gives none | 22 themes; the top three: **"X in cancer → X"** (39 edges, 16 regions), **"X in the clinic → X genetics"** (26, 12), **"X in the body → X in the brain"** (21, 10) | Largest \|cos\| in 5 null draws: 0.593 |
@@ -51,6 +52,26 @@ points. So centring sharpens the contrast between near and random papers without
 is no case for it in cosine kNN or kNN-based clustering of these vectors (an earlier version of this section said
 the opposite). Directions, axes and concept placement below still use centred vectors: there it is the shared
 offset, not the neighbour order, that matters.
+
+**HDBSCAN straight on the 384 numbers does not work** (`../hdbscan_384.py`, cuML on a GPU). cuML's HDBSCAN is
+Euclidean only, but on unit vectors Euclidean² = 2 − 2 cos, so the tree is the cosine tree; centred cosine is the
+same after subtracting the mean and rescaling. On the 1M-paper sample that the 780 topics were fitted on (scores as
+`cluster_sweep.py`: gene lift = P(share a gene | same cluster) / P(share a gene | any two clustered papers)):
+
+| Clustering of the same 1M papers | Clusters | Papers in a cluster | Gene lift | Journal field lift | Agreement with the 780 topics (ARI) |
+|---|---|---|---|---|---|
+| 12-D UMAP, then HDBSCAN eom, min cluster 200 (the 780 topics) | 780 | 53% | 10.3 | 5.2 | |
+| 384-D, eom, any of 4 settings, raw or centred | 2 | one cluster of 54-100%, or 13-27% | 0.95-1.05 | 1.0 | 0.00 |
+| 384-D, leaf, min cluster 200: raw / centred | 76 / 91 | 3.0% / 4.0% | 13.1 / 12.9 | 3.6 / 4.5 | 0.50 / 0.58 |
+| 384-D, leaf, min cluster 50: raw / centred | 575 / 606 | 5.6% / 6.5% | 23.1 / 25.4 | 5.0 / 5.8 | 0.54 / 0.53 |
+
+In 384-D, eom selection always returns one giant cluster and noise; leaf selection finds only the densest cores
+(very pure, and they agree with the UMAP topics), and leaves 93-97% of papers out. At 100k papers it is the same
+(80-99% noise, or one cluster of 79%). So density clustering needs the dimension reduction first (the intrinsic dimension is about 14,
+geometry/README). Centring helps the 384-D leaf clustering a little (more clusters and papers, higher field lift),
+the opposite of its effect on nearest neighbours, but not enough to matter. A cosine option in cuML's HDBSCAN would
+change nothing here: unit length plus Euclidean already is cosine, as cuML's maintainers say in
+https://github.com/NVIDIA/cuml/issues/6123.
 
 **Inside one gene's map it barely matters either** (`mapcentre.py`). The genesearch Map view's steps (cosine
 neighbours, UMAP to 12-D, up to 8 HDBSCAN topics, UMAP to 2-D) on the PubTator-tagged papers of 15 genes, 4,203 to
@@ -418,6 +439,7 @@ All CPU scripts use the repo root env (`uv run python geometry/manifold/<script>
 | `mesh_labels.py eom_mcs50_ms3` | s | MeSH-only names for the 3,349 finer topics (after `topic_inputs.py`) |
 | `analogy_check.py eom_mcs50_ms3 --themes 182 --no-iso`, `theme_evidence.py eom_mcs50_ms3` | 15 min, s | held-out test of all 182 finer themes; the evidence the naming agents read |
 | `mapcentre.py [SYMBOL ...]` (genesearch env) | 10 min | does centring help the genesearch Map view? |
+| `../hdbscan_384.py --data ~/medembed_small` (GPU, RAPIDS env next to `cluster_sweep.py`) | 20 min truth + 7 min per fit on an L4 | HDBSCAN straight on the 384-D vectors, raw vs centred; writes `eval/knn_centred.npy` |
 | `centre_nn.py` (after `../hdbscan_384.py` has made `eval/knn_centred.npy`) | 2 min | are centred nearest neighbours better, or only different? |
 | `sae.py` | 12 min (16 threads) | the sparse autoencoder and its feature names |
 | `figures.py NAME` | 1 min | the two figures |
